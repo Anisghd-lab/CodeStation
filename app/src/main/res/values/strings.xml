@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Synapse</string>
+    <string name="app_tagline">Autonomous AI Agent Hub</string>
+    <string name="onboarding_title">Synapse AI Studio</string>
+    <string name="onboarding_subtitle">Pilotez vos agents IA autonomes depuis votre mobile</string>
+    <string name="connect_server">Configurer mon serveur</string>
+    <string name="demo_mode">Explorer le mode démo</string>
+    <string name="lead_bot_title">Lead Bot</string>
+    <string name="pinned_bots_title">Agents épinglés</string>
+    <string name="active_bots_title">Tous les agents</string>
+    <string name="no_bots_yet">Aucun agent configuré</string>
+    <string name="create_bot">Créer un agent</string>
+    <string name="create_group">Créer un salon multi-agents</string>
+    <string name="send">Envoyer</string>
+    <string name="type_message">Écrivez un message…</string>
+    <string name="replying_to">En réponse à</string>
+    <string name="server_online">Connecté</string>
+    <string name="server_offline">Hors-ligne</string>
+    <string name="server_connecting">Connexion en cours…</string>
+    <string name="approve_once">Approuver</string>
+    <string name="approve_always">Toujours approuver</string>
+    <string name="reject">Refuser</string>
+</resources>
