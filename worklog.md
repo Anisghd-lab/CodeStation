@@ -150,24 +150,45 @@ Le projet respecte à 100% les contraintes imposées :
   - Écrans alignés : `RosterScreen.kt`, `ChatScreen.kt`, `PairingScreen.kt`, `ApprovalsScreen.kt`, `TraceScreen.kt`, `BotEditorScreen.kt`, `GroupEditorScreen.kt`, `SettingsScreen.kt`, `OnboardingScreen.kt`, `StateScreens.kt`
   - Nouveaux tests : `DesignTokensTest.kt`, `ServerConnectionTest.kt`
 
-### Phase 8 — Publication sur le Dépôt Officiel CodeStation & Résolution CI (Complétée)
+### Phase 8 — Publication sur le Dépôt Officiel CodeStation & Validation CI/CD (Complétée avec Succès)
 - **Vérification Initiale du Dépôt Cible** :
   - Dépôt distant : `https://github.com/Anisghd-lab/CodeStation`
-  - Inspection via `git ls-remote` et GitHub REST API : Dépôt distant vide (taille 0, aucun commit antérieur, branche `main` non initialisée).
+  - Inspection via `git ls-remote` et GitHub REST API : Dépôt distant vérifié vide (taille 0, aucun commit antérieur, branche `main` non initialisée).
   - Validation de l'accès en écriture sans risque d'écrasement de données.
 - **Publication Git & Préservation d'Historique** :
   - Remote `origin` configuré vers `https://github.com/Anisghd-lab/CodeStation.git`.
-  - Push de la branche locale `main` avec préservation stricte de l'arbre et du commit historique `37d2052`.
-- **Audit de la Première Exécution CI GitHub Actions** (Run ID `40521897087`) :
-  - Analyse approfondie des journaux de compilation via l'API GitHub Actions.
-  - Détection et correction des erreurs de compilation Kotlin 2.0 :
-    1. `ThinkingTraceView.kt` : Suppression de l'argument obsolète `isPulsing` lors de l'appel à `ThinkingOrb` ; exhaustivité du bloc `when` pour couvrir les variantes `StepType.THINKING` et `StepType.PLANNING`.
-    2. `BotEditorScreen.kt` & `Controls.kt` : Implémentation du composant générique `ChoicePicker` encapsulant `SegmentedChoice`.
-    3. `BotRepository.kt` & `BotRepositoryImpl.kt` : Ajout de la méthode `saveBot(bot: Bot)` effectuant la création ou la mise à jour conditionnelle.
-    4. `ComplementaryScreens.kt` : Correction de l'alignement horizontal `Alignment.CenterHorizontally` dans la colonne vocale, mise à jour des paramètres de `ThinkingOrb` et du `symbolName` de `EmptyStateView`.
-    5. `ConnectionStatusChip.kt` : Nettoyage de l'appel à `ThinkingOrb`.
-    6. `Type.kt` : Ajout de l'annotation `@OptIn(ExperimentalTextApi::class)` sur le chargeur de police dynamique.
-    7. `ChatViewModel.kt` : Découplage du `combine` à 7 flux en flux typés intermédiaires compatibles avec l'API standard Kotlin Coroutines.
-- **Validation Finale** :
-  - Codebase propre et exempte d'erreurs de compilation.
-  - Push des correctifs sur `origin/main` pour déclencher la nouvelle compilation GitHub Actions et la production de l'artefact APK debug.
+  - Push de la branche locale `main` avec préservation stricte de l'arbre et du commit historique de référence `37d2052` (ainsi que `2171c13` et `0e591b1`).
+- **Audit Itératif des Exécutions CI GitHub Actions & Résolutions** :
+  1. **Run 1 (`40521897087`) sur commit `37d2052`** :
+     - Échec en compilation Kotlin (`compileDebugKotlin`).
+     - Corrections apportées : Suppression de l'argument `isPulsing` sur `ThinkingOrb`, exhaustivité du `when` sur `StepType.THINKING` et `PLANNING`, implémentation de `ChoicePicker` dans `Controls.kt`, ajout de `saveBot(bot)` dans `BotRepository`, correction d'alignement dans `ComplementaryScreens.kt`, annotation `@OptIn(ExperimentalTextApi::class)` dans `Type.kt`, découplage du `combine` à 7 flux dans `ChatViewModel.kt`. (Commit `06ff37b`).
+  2. **Run 2 (`40527115482`) sur commit `06ff37b`** :
+     - Échec en compilation Kotlin (`compileDebugKotlin`).
+     - Corrections apportées : Import manquant `androidx.compose.foundation.layout.width` dans `ChatMessageItem.kt`, réassignation de 11 drawables vectoriels SF Symbols manquants vers des substituts existants vérifiés dans `res/drawable/`, import de `Palette` dans `ComplementaryScreens.kt`. (Commit `76b855f`).
+  3. **Run 3 (`40528816910`) sur commit `76b855f`** :
+     - Compilation du code source principal validée avec succès (`compileDebugKotlin` passé). Échec sur `compileDebugUnitTestKotlin`.
+     - Corrections apportées : Alignement du constructeur `HelloResponse(name = "termux-dev", version = "2.28.0")` et gestion de la nullabilité de `latencyMs` dans `ServerConnectionTest.kt`, mise à jour de `DesignTokensTest.kt` pour tester `AvatarPalette`, `Motion.hover()` et les tokens `@ReadOnlyComposable`. (Commit `e3868a2`).
+  4. **Run 4 (`40529860314`) sur commit `e3868a2`** :
+     - Compilation complète validée. 10 tests unitaires sur 13 réussis, 3 échecs d'assertion dus à la stratégie `SharingStarted.WhileSubscribed(5000)` des `StateFlow` dans `RosterViewModel` et `ChatViewModel` (en l'absence de collecteur actif en test unitaire, le flux amont ne démarre pas).
+     - Corrections apportées : Démarrage d'un collecteur en arrière-plan via `backgroundScope.launch(testDispatcher) { viewModel.uiState.collect() }` dans `RosterViewModelTest` et `ChatViewModelTest`. (Commit `7c17dd8`).
+  5. **Run 5 (`40532712267`) sur commit `7c17dd8` — SUCCÈS TOTAL** :
+     - **Tests unitaires (`testDebugUnitTest`)** : 13/13 tests exécutés et validés avec succès (100% de réussite en 2m 18s).
+     - **Compilation Debug APK (`assembleDebug`)** : BUILD SUCCESSFUL en 1m 17s (36 tâches Gradle exécutées/à jour).
+     - **Artefact généré** : `Synapse-v1.0.0-debug.apk` (18 968 581 octets).
+     - **Empreinte d'intégrité SHA-256** : `d320b6e03a24532a24e4c5485ce83ac492c051234f854c4091f1022346953916`
+     - **Artefact GitHub Actions** : `Synapse-v1.0.0-debug-apk` (ID `12747057215`).
+
+---
+
+## 4. Références & Liens Observables
+
+- **Dépôt GitHub Officiel** : [https://github.com/Anisghd-lab/CodeStation](https://github.com/Anisghd-lab/CodeStation)
+- **Branche Principale** : `main`
+- **Commit Historique Préservé** : [`37d2052`](https://github.com/Anisghd-lab/CodeStation/commit/37d2052)
+- **Commit de Validation Finale** : [`7c17dd8`](https://github.com/Anisghd-lab/CodeStation/commit/7c17dd8)
+- **Pipeline CI GitHub Actions (Succès)** : [Run #40532712267](https://github.com/Anisghd-lab/CodeStation/actions/runs/40532712267)
+- **Téléchargement de l'Artefact APK Debug** : [Synapse-v1.0.0-debug-apk (ID 12747057215)](https://github.com/Anisghd-lab/CodeStation/actions/runs/40532712267/artifacts/12747057215)
+- **Empreinte SHA-256 de l'APK** :
+  ```text
+  d320b6e03a24532a24e4c5485ce83ac492c051234f854c4091f1022346953916  Synapse-v1.0.0-debug.apk
+  ```
