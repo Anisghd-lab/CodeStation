@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Synapse</string>
+    <string name="app_name">Codync</string>
     <string name="app_tagline">Autonomous AI Agent Hub</string>
-    <string name="onboarding_title">Synapse AI Studio</string>
+    <string name="onboarding_title">Codync AI Studio</string>
     <string name="onboarding_subtitle">Pilotez vos agents IA autonomes depuis votre mobile</string>
     <string name="connect_server">Configurer mon serveur</string>
     <string name="demo_mode">Explorer le mode démo</string>

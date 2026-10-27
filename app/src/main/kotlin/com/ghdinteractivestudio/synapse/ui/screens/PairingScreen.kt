@@ -92,7 +92,7 @@ fun PairingScreen(
             // Header explanation
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    "Connecter Synapse à Termux",
+                    "Connecter à Termux",
                     style = Type.title2.bold,
                     color = Palette.text
                 )
@@ -125,7 +125,7 @@ fun PairingScreen(
                             style = Type.footnote.semibold,
                             color = Palette.secondary
                         )
-                        CommandBlockRow("/root/CodeStation/start_code_station.sh start")
+                        CommandBlockRow("/root/Codyn/start_code_station.sh start")
                     }
                 }
                 row {
@@ -135,7 +135,7 @@ fun PairingScreen(
                             style = Type.footnote.semibold,
                             color = Palette.secondary
                         )
-                        CommandBlockRow("/root/CodeStation/start_code_station.sh pair")
+                        CommandBlockRow("/root/Codyn/start_code_station.sh pair")
                     }
                 }
             }

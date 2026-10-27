@@ -20,7 +20,6 @@ import com.ghdinteractivestudio.synapse.ui.screens.GroupEditorScreen
 import com.ghdinteractivestudio.synapse.ui.screens.MemoryScreen
 import com.ghdinteractivestudio.synapse.ui.screens.OnboardingScreen
 import com.ghdinteractivestudio.synapse.ui.screens.PairingScreen
-import com.ghdinteractivestudio.synapse.ui.screens.RemoteScreenUnavailable
 import com.ghdinteractivestudio.synapse.ui.screens.RosterScreen
 import com.ghdinteractivestudio.synapse.ui.screens.RoutinesScreen
 import com.ghdinteractivestudio.synapse.ui.screens.SettingsScreen
@@ -191,8 +190,7 @@ fun SynapseNavHost(
                 onOpenMemory = { navController.navigate(Screen.Memory.route) },
                 onOpenRoutines = { navController.navigate(Screen.Routines.route) },
                 onOpenExtensions = { navController.navigate(Screen.Extensions.route) },
-                onOpenVoice = { navController.navigate(Screen.Voice.route) },
-                onOpenRemoteScreen = { navController.navigate(Screen.RemoteScreen.route) }
+                onOpenVoice = { navController.navigate(Screen.Voice.route) }
             )
         }
 
@@ -208,9 +206,6 @@ fun SynapseNavHost(
         }
         composable(Screen.Voice.route) {
             VoiceScreen(onNavigateBack = { navController.popBackStack() })
-        }
-        composable(Screen.RemoteScreen.route) {
-            RemoteScreenUnavailable(onNavigateBack = { navController.popBackStack() })
         }
     }
 }

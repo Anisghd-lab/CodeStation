@@ -1,54 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Connecting neural links -->
+
+    <!-- Outer Hex Cyber Shield Frame -->
     <path
-        android:strokeColor="#00D2FF"
         android:strokeWidth="2.5"
         android:strokeLineCap="round"
-        android:pathData="M54,34 L54,74" />
-    <path
-        android:strokeColor="#9D4EDD"
-        android:strokeWidth="2.5"
-        android:strokeLineCap="round"
-        android:pathData="M34,54 L74,54" />
-    <path
-        android:strokeColor="#00D2FF"
-        android:strokeAlpha="0.6"
-        android:strokeWidth="1.8"
-        android:strokeLineCap="round"
-        android:pathData="M40,40 L68,68" />
-    <path
-        android:strokeColor="#9D4EDD"
-        android:strokeAlpha="0.6"
-        android:strokeWidth="1.8"
-        android:strokeLineCap="round"
-        android:pathData="M68,40 L40,68" />
+        android:strokeLineJoin="round"
+        android:pathData="M54,26 L76,38.5 L76,69.5 L54,82 L32,69.5 L32,38.5 Z">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="32"
+                android:startY="26"
+                android:endX="76"
+                android:endY="82"
+                android:type="linear">
+                <item android:color="#FF00F0FF" android:offset="0.0" />
+                <item android:color="#FF6366F1" android:offset="0.5" />
+                <item android:color="#FFA855F7" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- Outer Nodes -->
+    <!-- Codyn Stylized "C" Arc - Futuristic Neural Ring -->
     <path
-        android:fillColor="#00D2FF"
-        android:pathData="M54,30m-4.5,0a4.5,4.5 0,1 1,9 0a4.5,4.5 0,1 1,-9 0" />
-    <path
-        android:fillColor="#00D2FF"
-        android:pathData="M54,78m-4.5,0a4.5,4.5 0,1 1,9 0a4.5,4.5 0,1 1,-9 0" />
-    <path
-        android:fillColor="#9D4EDD"
-        android:pathData="M30,54m-4.5,0a4.5,4.5 0,1 1,9 0a4.5,4.5 0,1 1,-9 0" />
-    <path
-        android:fillColor="#9D4EDD"
-        android:pathData="M78,54m-4.5,0a4.5,4.5 0,1 1,9 0a4.5,4.5 0,1 1,-9 0" />
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round"
+        android:pathData="M66,41 C62.5,37.5 58.5,35.5 54,35.5 C43.8,35.5 35.5,43.8 35.5,54 C35.5,64.2 43.8,72.5 54,72.5 C58.5,72.5 62.5,70.5 66,67">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="35.5"
+                android:startY="35.5"
+                android:endX="66"
+                android:endY="72.5"
+                android:type="linear">
+                <item android:color="#FF38BDF8" android:offset="0.0" />
+                <item android:color="#FF818CF8" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- Central Synapse Core Diamond -->
+    <!-- Core AI Agent Spark (Quantum Diamond) -->
     <path
-        android:fillColor="#0A0E17"
-        android:strokeColor="#00D2FF"
-        android:strokeWidth="3"
-        android:pathData="M54,42 L66,54 L54,66 L42,54 Z" />
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,46 L57.5,54 L54,62 L50.5,54 Z" />
+
+    <!-- Satellite Synapse Connection Dots -->
     <path
-        android:fillColor="#00D2FF"
-        android:pathData="M54,54m-3.5,0a3.5,3.5 0,1 1,7 0a3.5,3.5 0,1 1,-7 0" />
+        android:fillColor="#FF00F0FF"
+        android:pathData="M68,41 a2.5,2.5 0 1,0 0.001,0 Z" />
+    <path
+        android:fillColor="#FFA855F7"
+        android:pathData="M68,67 a2.5,2.5 0 1,0 0.001,0 Z" />
+
+    <!-- Neural Data Beam -->
+    <path
+        android:strokeWidth="1.8"
+        android:strokeColor="#8000F0FF"
+        android:strokeLineCap="round"
+        android:pathData="M43,54 L50.5,54" />
+    <path
+        android:strokeWidth="1.8"
+        android:strokeColor="#80A855F7"
+        android:strokeLineCap="round"
+        android:pathData="M57.5,54 L65,54" />
+
 </vector>

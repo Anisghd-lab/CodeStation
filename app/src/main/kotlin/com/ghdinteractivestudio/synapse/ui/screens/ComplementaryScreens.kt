@@ -358,35 +358,3 @@ fun VoiceScreen(
         }
     }
 }
-
-// 5. État Honnête d'Indisponibilité de l'Écran Distant
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun RemoteScreenUnavailable(
-    onNavigateBack: () -> Unit
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Écran Distant", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
-        }
-    ) { padding ->
-        EmptyStateView(
-            title = "Fonctionnalité Indisponible",
-            description = "La visualisation et la télécommande d'écran WebRTC nécessitent un serveur hôte de bureau équipé d'une session graphique Wayland/X11 ou macOS avec pilote de capture H.264 actif.\n\nSur un hôte local Termux / PRoot sans serveur d'affichage X11, ce service n'est pas activé.",
-            symbolName = "laptopcomputer",
-            actionLabel = "Retour aux paramètres",
-            onActionClick = onNavigateBack,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        )
-    }
-}

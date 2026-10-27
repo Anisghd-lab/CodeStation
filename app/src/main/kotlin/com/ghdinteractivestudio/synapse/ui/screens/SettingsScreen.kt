@@ -39,7 +39,6 @@ fun SettingsScreen(
     onOpenRoutines: () -> Unit = {},
     onOpenExtensions: () -> Unit = {},
     onOpenVoice: () -> Unit = {},
-    onOpenRemoteScreen: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -115,9 +114,6 @@ fun SettingsScreen(
                 }
                 row {
                     SettingsNavigationRow("Moteur Vocal", "waveform", onOpenVoice)
-                }
-                row {
-                    SettingsNavigationRow("Écran Distant (WebRTC)", "desktopcomputer", onOpenRemoteScreen)
                 }
             }
 

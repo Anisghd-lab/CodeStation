@@ -20,5 +20,4 @@ sealed class Screen(val route: String) {
     data object Routines : Screen("routines")
     data object Extensions : Screen("extensions")
     data object Voice : Screen("voice")
-    data object RemoteScreen : Screen("remote_screen")
 }
