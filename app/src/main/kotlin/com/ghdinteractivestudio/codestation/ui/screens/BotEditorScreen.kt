@@ -1,6 +1,7 @@
 package com.ghdinteractivestudio.codestation.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
@@ -35,7 +37,6 @@ import com.ghdinteractivestudio.codestation.ui.components.AvatarPalette
 import com.ghdinteractivestudio.codestation.ui.components.CardForm
 import com.ghdinteractivestudio.codestation.ui.components.CardSection
 import com.ghdinteractivestudio.codestation.ui.components.CharacterAvatar
-import com.ghdinteractivestudio.codestation.ui.components.ChoicePicker
 import com.ghdinteractivestudio.codestation.ui.components.CodyncSwitch
 import com.ghdinteractivestudio.codestation.ui.components.PageHeader
 import com.ghdinteractivestudio.codestation.ui.components.PrimaryButton
@@ -176,38 +177,140 @@ fun BotEditorScreen(
 
             // AI Provider & Settings
             CardSection(title = "Moteur & Modèle") {
+                // Vertical list of engine options
                 row {
-                    Row(
+                    Column(
                         Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Fournisseur IA", style = Type.body, color = Palette.text, modifier = Modifier.weight(1f))
-                        ChoicePicker(
-                            selection = state.provider,
-                            options = ProviderType.entries.map { it to it.displayName },
-                            select = { viewModel.onProviderChanged(it) }
+                        Text(
+                            text = "Moteur d'exécution",
+                            style = Type.caption,
+                            color = Palette.secondary,
+                            modifier = Modifier.padding(bottom = 2.dp)
                         )
-                    }
-                }
+                        ProviderType.entries.forEach { provider ->
+                            val isSelected = state.provider == provider
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedRectangle(12.dp))
+                                    .background(if (isSelected) Palette.bubbleUser.copy(alpha = 0.6f) else Color.Transparent)
+                                    .border(
+                                        width = if (isSelected) 1.dp else 0.5.dp,
+                                        color = if (isSelected) Palette.emeraldAccent.copy(alpha = 0.7f) else Palette.glassBorder,
+                                        shape = RoundedRectangle(12.dp)
+                                    )
+                                    .clickable { viewModel.onProviderChanged(provider) }
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                // Selection radio indicator
+                                Box(
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clip(Capsule())
+                                        .border(
+                                            width = if (isSelected) 2.dp else 1.5.dp,
+                                            color = if (isSelected) Palette.emeraldAccent else Palette.tertiary,
+                                            shape = Capsule()
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSelected) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .clip(Capsule())
+                                                .background(Palette.emeraldAccent)
+                                        )
+                                    }
+                                }
 
-                row {
-                    CodyncSwitch(
-                        checked = state.isFastMode,
-                        onChange = { viewModel.onFastModeToggled(it) }
-                    ) {
-                        Column {
-                            Text("Fast Mode (Prioritaire)", style = Type.body, color = Palette.text)
-                            Text("Accélère les requêtes courtes", style = Type.caption, color = Palette.secondary)
+                                // Full engine name without truncation and default model
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = provider.displayName,
+                                        style = Type.body.semibold,
+                                        color = if (isSelected) Palette.text else Palette.secondary
+                                    )
+                                    Text(
+                                        text = "Modèle par défaut : ${provider.defaultModel}",
+                                        style = Type.caption,
+                                        color = Palette.tertiary
+                                    )
+                                }
+
+                                if (isSelected) {
+                                    Symbol("checkmark", size = 16.dp, tint = Palette.emeraldAccent)
+                                }
+                            }
                         }
                     }
                 }
 
+                // Fields corresponding to the selected engine under the list
                 row {
-                    CodyncSwitch(
-                        checked = state.isPinned,
-                        onChange = { viewModel.onPinnedToggled(it) }
+                    Column(
+                        Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text("Épingler en haut du roster", style = Type.body, color = Palette.text)
+                        Text(
+                            text = "Modèle (${state.provider.displayName})",
+                            style = Type.caption,
+                            color = Palette.secondary
+                        )
+                        BasicTextField(
+                            value = state.model,
+                            onValueChange = { viewModel.onModelChanged(it) },
+                            textStyle = Type.body.monospaced.copy(color = Palette.text),
+                            cursorBrush = SolidColor(Palette.accent),
+                            modifier = Modifier.fillMaxWidth(),
+                            decorationBox = { inner ->
+                                Box {
+                                    if (state.model.isEmpty()) {
+                                        Text(state.provider.defaultModel, style = Type.body.monospaced, color = Palette.tertiary)
+                                    }
+                                    inner()
+                                }
+                            }
+                        )
+                    }
+                }
+
+                // Fast Mode (Prioritaire) with switch on the right
+                row {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Fast Mode (Prioritaire)", style = Type.body, color = Palette.text)
+                            Text("Accélère les requêtes courtes", style = Type.caption, color = Palette.secondary)
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        CodyncSwitch(
+                            checked = state.isFastMode,
+                            onChange = { viewModel.onFastModeToggled(it) }
+                        ) {}
+                    }
+                }
+
+                // Épingler en haut du roster
+                row {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Épingler en haut du roster", style = Type.body, color = Palette.text, modifier = Modifier.weight(1f))
+                        Spacer(Modifier.width(12.dp))
+                        CodyncSwitch(
+                            checked = state.isPinned,
+                            onChange = { viewModel.onPinnedToggled(it) }
+                        ) {}
                     }
                 }
             }

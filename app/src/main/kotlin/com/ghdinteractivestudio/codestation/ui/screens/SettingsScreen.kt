@@ -8,6 +8,7 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +20,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import com.ghdinteractivestudio.codestation.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.codestation.ui.components.CardForm
 import com.ghdinteractivestudio.codestation.ui.components.CardSection
-import com.ghdinteractivestudio.codestation.ui.components.ChoicePicker
 import com.ghdinteractivestudio.codestation.ui.components.CodyncSwitch
 import com.ghdinteractivestudio.codestation.ui.components.IconButton
 import com.ghdinteractivestudio.codestation.ui.components.LinkButton
@@ -47,7 +51,9 @@ import com.ghdinteractivestudio.codestation.ui.components.SecondaryButton
 import com.ghdinteractivestudio.codestation.ui.components.Symbol
 import com.ghdinteractivestudio.codestation.ui.components.plainButton
 import com.ghdinteractivestudio.codestation.ui.components.tr
+import com.ghdinteractivestudio.codestation.ui.theme.Capsule
 import com.ghdinteractivestudio.codestation.ui.theme.Palette
+import com.ghdinteractivestudio.codestation.ui.theme.RoundedRectangle
 import com.ghdinteractivestudio.codestation.ui.theme.Type
 import com.ghdinteractivestudio.codestation.ui.theme.bold
 import com.ghdinteractivestudio.codestation.ui.theme.semibold
@@ -94,7 +100,7 @@ fun SettingsScreen(
         )
 
         CardForm(modifier = Modifier.weight(1f)) {
-            // Card 1: Ordinateurs
+            // Section 1: Ordinateurs
             CardSection(
                 title = "Ordinateurs",
                 footer = "Chaque bot fonctionne sur son propre ordinateur. Connectez-vous pour voir les ordinateurs de votre compte."
@@ -129,7 +135,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Card 2: Apparence
+            // Section 2: Apparence
             CardSection(
                 title = "Apparence",
                 footer = "Modifie uniquement l’apparence sur cet appareil."
@@ -141,21 +147,20 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("Thème", style = Type.body, color = Palette.text)
-                        ChoicePicker(
+                        CompactDropdownMenu(
                             selection = state.themeMode,
                             options = listOf(
                                 "system" to "Système",
                                 "dark" to "Sombre",
                                 "light" to "Clair"
                             ),
-                            select = { viewModel.setThemeMode(it) },
-                            modifier = Modifier.size(width = 200.dp, height = 36.dp)
+                            onSelect = { viewModel.setThemeMode(it) }
                         )
                     }
                 }
             }
 
-            // Card 3: Langue
+            // Section 3: Langue
             CardSection(
                 title = "Langue",
                 footer = "Choisissez la langue de cet appareil. Les langues système non prises en charge utilisent l’anglais."
@@ -167,42 +172,46 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("Langue de l'app", style = Type.body, color = Palette.text)
-                        ChoicePicker(
+                        CompactDropdownMenu(
                             selection = appLanguage,
                             options = listOf(
                                 "system" to "Suivre le système",
                                 "fr" to "Français",
                                 "en" to "English"
                             ),
-                            select = { appLanguage = it },
-                            modifier = Modifier.size(width = 200.dp, height = 36.dp)
+                            onSelect = { appLanguage = it }
                         )
                     }
                 }
             }
 
-            // Card 4: Discussion
+            // Section 4: Discussion
             CardSection(
                 title = "Discussion",
                 footer = "Permet de déplier la réflexion et les étapes d’un bot au travail depuis son statut dans la discussion. Ne change que cet appareil."
             ) {
                 row {
-                    CodyncSwitch(
-                        checked = state.showThinkingDetails,
-                        onChange = { viewModel.setShowThinkingDetails(it) }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
                             "Afficher les détails de la réflexion",
                             style = Type.body,
                             color = Palette.text,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            modifier = Modifier.weight(1f)
                         )
+                        Spacer(Modifier.width(12.dp))
+                        CodyncSwitch(
+                            checked = state.showThinkingDetails,
+                            onChange = { viewModel.setShowThinkingDetails(it) }
+                        ) {}
                     }
                 }
             }
 
-            // Card 5: Notifications
+            // Section 5: Notifications
             CardSection(
                 title = "Notifications",
                 footer = "Get a result summary, a request for input, or a failure notice. Notification previews follow your Android settings."
@@ -235,7 +244,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Card 6: Analytics
+            // Section 6: Analytics
             CardSection(
                 footer = "Les fonctionnalités que vous utilisez, jamais vos messages, votre code ni vos fichiers. Cela nous aide à repérer les bugs et à améliorer CodeStation."
             ) {
@@ -243,15 +252,24 @@ fun SettingsScreen(
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Partager des analyses d'utilisation", style = Type.body, color = Palette.text, modifier = Modifier.weight(1f))
-                        CodyncSwitch(checked = shareAnalytics, onChange = { shareAnalytics = it }) { }
+                        Text(
+                            "Partager des analyses d'utilisation",
+                            style = Type.body,
+                            color = Palette.text,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        CodyncSwitch(
+                            checked = shareAnalytics,
+                            onChange = { shareAnalytics = it }
+                        ) {}
                     }
                 }
             }
 
-            // Card 7: Informations
+            // Section 7: Informations
             CardSection {
                 row {
                     Row(
@@ -270,7 +288,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Card 8: Start over / Recommencer
+            // Section 8: Start over / Recommencer
             CardSection {
                 row {
                     Row(
@@ -316,5 +334,77 @@ fun SettingsScreen(
             },
             containerColor = Palette.surface
         )
+    }
+}
+
+@Composable
+private fun <T> CompactDropdownMenu(
+    selection: T,
+    options: List<Pair<T, String>>,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val currentLabel = options.firstOrNull { it.first == selection }?.second ?: ""
+
+    Box(modifier) {
+        Row(
+            Modifier
+                .clip(Capsule())
+                .background(Palette.bubbleUser)
+                .border(0.5.dp, Palette.glassBorder, Capsule())
+                .clickable { expanded = true }
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = currentLabel,
+                style = Type.body,
+                color = Palette.text,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Symbol(
+                name = "chevron.down",
+                size = 12.dp,
+                tint = Palette.secondary
+            )
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .background(Palette.surface)
+                .border(0.5.dp, Palette.glassBorder, RoundedRectangle(12.dp))
+        ) {
+            options.forEach { (key, label) ->
+                val isSelected = key == selection
+                DropdownMenuItem(
+                    text = {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = label,
+                                style = Type.body,
+                                color = if (isSelected) Palette.emeraldAccent else Palette.text,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (isSelected) {
+                                Symbol("checkmark", size = 14.dp, tint = Palette.emeraldAccent)
+                            }
+                        }
+                    },
+                    onClick = {
+                        onSelect(key)
+                        expanded = false
+                    }
+                )
+            }
+        }
     }
 }
