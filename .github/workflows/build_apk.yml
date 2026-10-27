@@ -1,4 +1,4 @@
-name: Build Synapse Android Native APK
+name: Build CodeStation Android Native APK
 
 on:
   push:
@@ -47,18 +47,20 @@ jobs:
       - name: Rename APK Artifact
         run: |
           mkdir -p output_artifacts
-          cp app/build/outputs/apk/debug/app-debug.apk output_artifacts/Synapse-v1.0.0-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk output_artifacts/CodeStation-v1.0.0-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk output_artifacts/CodeStation-debug.apk
           cd output_artifacts
-          sha256sum Synapse-v1.0.0-debug.apk > Synapse-v1.0.0-debug.apk.sha256
-          cat Synapse-v1.0.0-debug.apk.sha256
+          sha256sum CodeStation-debug.apk CodeStation-v1.0.0-debug.apk > CodeStation-debug.apk.sha256
+          cat CodeStation-debug.apk.sha256
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Synapse-v1.0.0-debug-apk
+          name: CodeStation-v1.0.0-debug-apk
           path: |
-            output_artifacts/Synapse-v1.0.0-debug.apk
-            output_artifacts/Synapse-v1.0.0-debug.apk.sha256
+            output_artifacts/CodeStation-v1.0.0-debug.apk
+            output_artifacts/CodeStation-debug.apk
+            output_artifacts/CodeStation-debug.apk.sha256
           retention-days: 14
 
       - name: Upload Test Reports (on failure)

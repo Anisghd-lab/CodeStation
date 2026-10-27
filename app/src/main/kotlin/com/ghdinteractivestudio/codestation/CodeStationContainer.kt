@@ -1,0 +1,90 @@
+package com.ghdinteractivestudio.codestation
+
+import android.content.Context
+import com.ghdinteractivestudio.codestation.data.local.BotRepositoryImpl
+import com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl
+import com.ghdinteractivestudio.codestation.data.local.ServerRepositoryImpl
+import com.ghdinteractivestudio.codestation.data.local.CodeStationDatabase
+import com.ghdinteractivestudio.codestation.data.preferences.PreferencesRepositoryImpl
+import com.ghdinteractivestudio.codestation.data.remote.CodeStationApiService
+import com.ghdinteractivestudio.codestation.domain.repository.BotRepository
+import com.ghdinteractivestudio.codestation.domain.repository.ChatRepository
+import com.ghdinteractivestudio.codestation.domain.repository.PreferencesRepository
+import com.ghdinteractivestudio.codestation.domain.repository.ServerRepository
+import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import retrofit2.Retrofit
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.util.concurrent.TimeUnit
+
+interface AppContainer {
+    val botRepository: BotRepository
+    val chatRepository: ChatRepository
+    val serverRepository: ServerRepository
+    val preferencesRepository: PreferencesRepository
+}
+
+class CodeStationContainer(private val context: Context) : AppContainer {
+
+    private val database: CodeStationDatabase by lazy {
+        CodeStationDatabase.getDatabase(context)
+    }
+
+    override val preferencesRepository: PreferencesRepositoryImpl by lazy {
+        PreferencesRepositoryImpl(context)
+    }
+
+    private val okHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .writeTimeout(10, TimeUnit.SECONDS)
+            .build()
+    }
+
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        encodeDefaults = true
+        coerceInputValues = true
+    }
+
+    private fun createApiService(baseUrl: String): CodeStationApiService? {
+        return try {
+            val contentType = "application/json".toMediaType()
+            Retrofit.Builder()
+                .baseUrl(if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/")
+                .client(okHttpClient)
+                .addConverterFactory(json.asConverterFactory(contentType))
+                .build()
+                .create(CodeStationApiService::class.java)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    override val serverRepository: ServerRepository by lazy {
+        ServerRepositoryImpl(
+            preferencesRepository = preferencesRepository,
+            apiServiceProvider = { url -> createApiService(url) }
+        )
+    }
+
+    override val botRepository: BotRepository by lazy {
+        BotRepositoryImpl(database.botDao())
+    }
+
+    override val chatRepository: ChatRepository by lazy {
+        ChatRepositoryImpl(
+            messageDao = database.messageDao(),
+            approvalDao = database.approvalDao(),
+            botDao = database.botDao(),
+            apiServiceProvider = {
+                val config = serverRepository.getServerConfig()
+                createApiService(config.url)
+            },
+            serverRepository = serverRepository
+        )
+    }
+}

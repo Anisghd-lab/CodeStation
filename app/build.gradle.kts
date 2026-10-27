@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.ghdinteractivestudio.synapse"
+    namespace = "com.ghdinteractivestudio.codestation"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.ghdinteractivestudio.synapse"
+        applicationId = "com.ghdinteractivestudio.codestation"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

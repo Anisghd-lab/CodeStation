@@ -49,7 +49,7 @@
         android:fillColor="#FFFFFFFF"
         android:pathData="M54,46 L57.5,54 L54,62 L50.5,54 Z" />
 
-    <!-- Satellite Synapse Connection Dots -->
+    <!-- Satellite CodeStation Connection Dots -->
     <path
         android:fillColor="#FF00F0FF"
         android:pathData="M68,41 a2.5,2.5 0 1,0 0.001,0 Z" />

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="synapse_primary">#00D2FF</color>
-    <color name="synapse_secondary">#9D4EDD</color>
-    <color name="synapse_dark_background">#0A0E17</color>
-    <color name="synapse_dark_surface">#111726</color>
-    <color name="synapse_accent_gold">#FFB703</color>
-    <color name="synapse_success">#00E676</color>
-    <color name="synapse_error">#FF5252</color>
+    <color name="codestation_primary">#00D2FF</color>
+    <color name="codestation_secondary">#9D4EDD</color>
+    <color name="codestation_dark_background">#0A0E17</color>
+    <color name="codestation_dark_surface">#111726</color>
+    <color name="codestation_accent_gold">#FFB703</color>
+    <color name="codestation_success">#00E676</color>
+    <color name="codestation_error">#FF5252</color>
 </resources>

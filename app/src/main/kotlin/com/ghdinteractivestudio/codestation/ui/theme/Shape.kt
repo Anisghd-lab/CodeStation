@@ -1,0 +1,17 @@
+package com.ghdinteractivestudio.codestation.ui.theme
+
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Shapes
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+
+fun Capsule() = RoundedCornerShape(percent = 50)
+fun RoundedRectangle(radius: Dp) = RoundedCornerShape(radius)
+
+val CodeStationShapes = Shapes(
+    extraSmall = RoundedCornerShape(6.dp),
+    small = RoundedCornerShape(10.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(22.dp),
+    extraLarge = RoundedCornerShape(28.dp)
+)
