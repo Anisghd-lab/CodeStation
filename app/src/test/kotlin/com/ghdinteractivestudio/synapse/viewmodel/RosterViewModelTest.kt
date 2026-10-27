@@ -12,7 +12,9 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -54,6 +56,7 @@ class RosterViewModelTest {
     @Test
     fun `test roster sorts lead bot on top followed by pinned bots`() = runTest(testDispatcher) {
         val viewModel = RosterViewModel(botRepository, serverRepository)
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect() }
         testDispatcher.scheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
@@ -71,6 +74,7 @@ class RosterViewModelTest {
     @Test
     fun `test roster search query filters bot list by name`() = runTest(testDispatcher) {
         val viewModel = RosterViewModel(botRepository, serverRepository)
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect() }
         testDispatcher.scheduler.advanceUntilIdle()
 
         viewModel.onSearchQueryChanged("Pinned")
