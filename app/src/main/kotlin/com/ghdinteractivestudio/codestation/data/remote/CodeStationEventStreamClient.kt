@@ -91,7 +91,7 @@ class CodeStationEventStreamClient(
                     val source = response.body?.source() ?: return@use
                     val reader = BufferedReader(source.inputStream().reader())
 
-                    var line: String?
+                    var line: String? = ""
                     while (scope.isActive && reader.readLine().also { line = it } != null) {
                         val currentLine = line?.trim() ?: continue
                         if (currentLine.startsWith("data:")) {
@@ -132,8 +132,8 @@ class CodeStationEventStreamClient(
 
                     val mappedStatus = when (rawStatus) {
                         "working" -> BotStatus.WORKING
-                        "needs_input" -> BotStatus.WORKING // En attente d'approbation ou saisie
-                        "error" -> BotStatus.ERROR
+                        "needs_input" -> BotStatus.WORKING
+                        "error" -> BotStatus.OFFLINE
                         else -> BotStatus.IDLE
                     }
 
@@ -186,7 +186,9 @@ class CodeStationEventStreamClient(
                             text = text,
                             timestamp = System.currentTimeMillis(),
                             isFinal = true,
-                            replyToId = null
+                            replyToMessageId = null,
+                            replyToAuthor = null,
+                            replyToText = null
                         )
                         messageDao.insertMessage(entity)
                         botDao.updateLastMessage(botId, text, entity.timestamp)
@@ -205,7 +207,7 @@ class CodeStationEventStreamClient(
                             diffPreview = dataObj["diff"]?.jsonPrimitive?.content,
                             timestamp = System.currentTimeMillis(),
                             status = ApprovalStatus.PENDING.name,
-                            alwaysApprove = false
+                            isAlwaysApproved = false
                         )
                         approvalDao.insertApproval(approvalEntity)
 

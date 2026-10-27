@@ -627,12 +627,14 @@ private fun LiveUpdateGallery(chip: Boolean) {
                     TaskPhase.NeedsInput -> TaskNotificationPhase.NEEDS_APPROVAL
                     TaskPhase.Completed -> TaskNotificationPhase.COMPLETED
                     TaskPhase.Failed -> TaskNotificationPhase.FAILED
+                    else -> TaskNotificationPhase.WORKING
                 },
                 summary = when (phase) {
                     TaskPhase.Working -> "Exécution d'instructions CLI en cours..."
                     TaskPhase.NeedsInput -> "Autorisation requise pour commande shell"
                     TaskPhase.Completed -> "Tâche exécutée avec succès"
                     TaskPhase.Failed -> "Sortie d'erreur CLI"
+                    else -> "Activité en cours..."
                 },
                 startedAtMs = if (phase == TaskPhase.Working) started else null
             )
