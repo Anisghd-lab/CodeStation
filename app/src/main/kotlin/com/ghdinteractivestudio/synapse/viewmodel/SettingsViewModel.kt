@@ -61,6 +61,15 @@ class SettingsViewModel(
         }
     }
 
+    fun resetPreferences() {
+        viewModelScope.launch {
+            preferencesRepository.setThemeMode("SYSTEM")
+            preferencesRepository.setShowThinkingDetails(true)
+            preferencesRepository.setHapticFeedbackEnabled(true)
+            preferencesRepository.setOnboardingCompleted(false)
+        }
+    }
+
     companion object {
         fun provideFactory(
             serverRepository: ServerRepository,

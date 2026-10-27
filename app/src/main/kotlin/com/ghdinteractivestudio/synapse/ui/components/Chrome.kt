@@ -139,10 +139,10 @@ class TabItem<T>(
     val value: T,
     val title: String,
     val systemImage: String,
-    val iconSize: Dp = 24.dp
+    val iconSize: Dp = 28.dp
 )
 
-private val TAB_WIDTH = 84.dp
+private val TAB_WIDTH = 90.dp
 
 @Composable
 fun <T> GlassTabBar(
@@ -162,24 +162,32 @@ fun <T> GlassTabBar(
         Box(
             Modifier
                 .offset(x = pill)
-                .size(TAB_WIDTH, 44.dp)
+                .size(TAB_WIDTH, 54.dp)
                 .clip(Capsule())
                 .background(Palette.text.copy(alpha = 0.12f))
         )
         Row {
             for (tab in tabs) {
                 val on = tab.value == selection
-                Box(
+                androidx.compose.foundation.layout.Column(
                     Modifier
-                        .size(TAB_WIDTH, 44.dp)
+                        .size(TAB_WIDTH, 54.dp)
                         .clip(Capsule())
                         .selectable(on, role = Role.Tab) { select(tab.value) },
-                    contentAlignment = Alignment.Center
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
                     Symbol(
                         tab.systemImage,
                         size = tab.iconSize,
                         tint = if (on) Palette.text else Palette.secondary
+                    )
+                    Text(
+                        tr(tab.title),
+                        style = Type.system(10f),
+                        color = if (on) Palette.text else Palette.secondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

@@ -42,12 +42,22 @@ fun ChatMessageItem(
         horizontalAlignment = alignment
     ) {
         if (!isUser && message.author.type == MessageAuthorType.BOT) {
-            Text(
-                message.author.displayName,
-                style = Type.caption2.semibold,
-                color = Palette.secondary,
-                modifier = Modifier.padding(start = 12.dp, bottom = 2.dp)
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+            ) {
+                CharacterAvatar(
+                    shape = if (message.author.avatarGlyph.isNotEmpty()) message.author.avatarGlyph else "blob",
+                    color = "blue",
+                    size = 22.dp
+                )
+                Text(
+                    message.author.displayName,
+                    style = Type.caption2.semibold,
+                    color = Palette.secondary
+                )
+            }
         }
 
         Box(

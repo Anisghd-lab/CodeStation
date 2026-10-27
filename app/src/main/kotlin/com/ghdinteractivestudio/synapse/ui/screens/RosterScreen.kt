@@ -1,6 +1,5 @@
 package com.ghdinteractivestudio.synapse.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,33 +28,31 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.ghdinteractivestudio.synapse.domain.model.Bot
 import com.ghdinteractivestudio.synapse.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.synapse.ui.components.BotCard
+import com.ghdinteractivestudio.synapse.ui.components.CharacterAvatar
+import com.ghdinteractivestudio.synapse.ui.components.Edge
 import com.ghdinteractivestudio.synapse.ui.components.GlassStage
 import com.ghdinteractivestudio.synapse.ui.components.GlassTabBar
 import com.ghdinteractivestudio.synapse.ui.components.IconButton
+import com.ghdinteractivestudio.synapse.ui.components.PrimaryButton
 import com.ghdinteractivestudio.synapse.ui.components.ScrollEdge
-import com.ghdinteractivestudio.synapse.ui.components.Edge
 import com.ghdinteractivestudio.synapse.ui.components.Spinner
 import com.ghdinteractivestudio.synapse.ui.components.Symbol
 import com.ghdinteractivestudio.synapse.ui.components.TabItem
-import com.ghdinteractivestudio.synapse.ui.components.rememberPress
-import com.ghdinteractivestudio.synapse.ui.components.pressScale
 import com.ghdinteractivestudio.synapse.ui.components.glass
-import com.ghdinteractivestudio.synapse.ui.components.PrimaryButton
-import com.ghdinteractivestudio.synapse.ui.components.SecondaryButton
 import com.ghdinteractivestudio.synapse.ui.theme.Capsule
 import com.ghdinteractivestudio.synapse.ui.theme.Palette
 import com.ghdinteractivestudio.synapse.ui.theme.Type
-import com.ghdinteractivestudio.synapse.ui.theme.bold
 import com.ghdinteractivestudio.synapse.ui.theme.medium
 import com.ghdinteractivestudio.synapse.ui.theme.semibold
 import com.ghdinteractivestudio.synapse.viewmodel.RosterViewModel
@@ -72,7 +69,8 @@ fun RosterScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     var isNewMenuOpen by remember { mutableStateOf(false) }
-    var selectedTab by remember { mutableStateOf("bots") }
+    var isComputerMenuOpen by remember { mutableStateOf(false) }
+    var selectedTab by rememberSaveable { mutableStateOf("bots") }
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val isConnected = state.serverConfig.status == ServerConnectionStatus.CONNECTED
@@ -83,83 +81,128 @@ fun RosterScreen(
             .fillMaxSize()
             .background(Palette.background),
         chrome = {
-            ScrollEdge(Edge.Top, topInset + 64.dp)
+            if (selectedTab == "bots") {
+                ScrollEdge(Edge.Top, topInset + 64.dp)
 
-            // Top Header Bar
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(top = 6.dp)
-                    .padding(horizontal = 16.dp)
-                    .height(44.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Left: Synapse Identity / Account Button
+                // Top Header Bar
                 Row(
                     Modifier
-                        .clip(Capsule())
-                        .clickable { onConfigureServerClick() }
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(top = 6.dp)
+                        .padding(horizontal = 16.dp)
+                        .height(44.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Symbol("sparkles", size = 18.dp, tint = Palette.accent)
-                    Text("Synapse", style = Type.body.semibold, color = Palette.text)
-                }
-
-                // Center: Termux Host connection badge
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    // Left: Account Switcher Capsule (👤 ˅)
                     Row(
                         Modifier
-                            .clip(Capsule())
-                            .background(Palette.surface)
-                            .clickable { onConfigureServerClick() }
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                            .height(40.dp)
+                            .glass(Capsule())
+                            .clickable(role = Role.Button, onClick = onSettingsClick)
+                            .padding(start = 6.dp, end = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        if (isConnecting) {
-                            Spinner(10.dp)
-                        } else {
-                            Symbol(
-                                if (isConnected) "wifi" else "wifi.slash",
-                                size = 12.dp,
-                                tint = if (isConnected) Palette.added else Palette.danger
+                        Symbol("person.crop.circle", size = 26.dp, tint = Palette.text)
+                        Symbol("chevron.down", size = 14.dp, tint = Palette.secondary)
+                    }
+
+                    // Center: Computers Filter Header (Computers ˅)
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        Row(
+                            Modifier
+                                .clip(Capsule())
+                                .clickable { isComputerMenuOpen = true }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            if (isConnecting) {
+                                Spinner(12.dp)
+                            }
+                            Text(
+                                "Computers",
+                                style = Type.system(12f).medium,
+                                color = Palette.secondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Symbol("chevron.down", size = 13.dp, tint = Palette.secondary)
+                        }
+
+                        DropdownMenu(
+                            expanded = isComputerMenuOpen,
+                            onDismissRequest = { isComputerMenuOpen = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        if (isConnected) "Termux (127.0.0.1) · En ligne" else "Termux (127.0.0.1) · Déconnecté",
+                                        style = Type.body
+                                    )
+                                },
+                                leadingIcon = {
+                                    Symbol(
+                                        if (isConnected) "checkmark.circle.fill" else "exclamationmark.circle.fill",
+                                        size = 18.dp,
+                                        tint = if (isConnected) Palette.added else Palette.danger
+                                    )
+                                },
+                                onClick = { isComputerMenuOpen = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Reconnecter", style = Type.body) },
+                                leadingIcon = { Symbol("arrow.clockwise", size = 18.dp, tint = Palette.text) },
+                                onClick = {
+                                    isComputerMenuOpen = false
+                                    viewModel.refresh()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Gérer les ordinateurs", style = Type.body) },
+                                leadingIcon = { Symbol("desktopcomputer", size = 18.dp, tint = Palette.text) },
+                                onClick = {
+                                    isComputerMenuOpen = false
+                                    onConfigureServerClick()
+                                }
                             )
                         }
-                        Text(
-                            if (isConnected) "Termux (127.0.0.1)" else "Termux Déconnecté",
-                            style = Type.caption.medium,
-                            color = Palette.secondary
-                        )
                     }
-                }
 
-                // Right: New bot/group menu button (+)
-                Box {
-                    IconButton("New", "plus", action = { isNewMenuOpen = true })
+                    // Right: New bot/group menu button (+)
+                    Box {
+                        Box(
+                            Modifier
+                                .size(40.dp)
+                                .glass(Capsule())
+                                .clickable(role = Role.Button) { isNewMenuOpen = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Symbol("plus", size = 22.dp, tint = Palette.text)
+                        }
 
-                    DropdownMenu(
-                        expanded = isNewMenuOpen,
-                        onDismissRequest = { isNewMenuOpen = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Nouvel Agent", style = Type.body) },
-                            leadingIcon = { Symbol("person.fill", size = 18.dp, tint = Palette.text) },
-                            onClick = {
-                                isNewMenuOpen = false
-                                onCreateBotClick()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Nouveau Groupe", style = Type.body) },
-                            leadingIcon = { Symbol("person.2", size = 18.dp, tint = Palette.text) },
-                            onClick = {
-                                isNewMenuOpen = false
-                                onCreateGroupClick()
-                            }
-                        )
+                        DropdownMenu(
+                            expanded = isNewMenuOpen,
+                            onDismissRequest = { isNewMenuOpen = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("New bot", style = Type.body) },
+                                leadingIcon = { Symbol("plus", size = 18.dp, tint = Palette.text) },
+                                onClick = {
+                                    isNewMenuOpen = false
+                                    onCreateBotClick()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("New group chat", style = Type.body) },
+                                leadingIcon = { Symbol("person.2", size = 18.dp, tint = Palette.text) },
+                                onClick = {
+                                    isNewMenuOpen = false
+                                    onCreateGroupClick()
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -168,101 +211,98 @@ fun RosterScreen(
             Box(
                 Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 24.dp)
+                    .padding(bottom = 14.dp)
             ) {
                 GlassTabBar(
                     selection = selectedTab,
                     tabs = listOf(
-                        TabItem("bots", "Agents", "bubble.left.and.bubble.right.fill", iconSize = 22.dp),
-                        TabItem("settings", "Paramètres", "gearshape", iconSize = 22.dp)
+                        TabItem("bots", "Bots", "bubble.left.and.bubble.right.fill", iconSize = 24.dp),
+                        TabItem("state", "État", "rectangle.stack.fill", iconSize = 22.dp)
                     ),
-                    select = {
-                        selectedTab = it
-                        if (it == "settings") onSettingsClick()
-                    }
+                    select = { selectedTab = it }
                 )
             }
         }
     ) {
-        val allBots = buildList {
-            state.leadBot?.let { add(it) }
-            addAll(state.pinnedBots)
-            addAll(state.otherBots)
-        }
-
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = topInset + 56.dp,
-                bottom = 100.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            if (!isConnected && !isConnecting) {
-                item("offline_banner") {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                            .clip(Capsule())
-                            .background(Palette.danger.copy(alpha = 0.12f))
-                            .clickable { onConfigureServerClick() }
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Symbol("wifi.exclamationmark", size = 16.dp, tint = Palette.danger)
-                            Text(
-                                "Serveur local Termux hors-ligne (127.0.0.1:19222). Touchez pour reconnecter.",
-                                style = Type.footnote,
-                                color = Palette.danger,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
+        if (selectedTab == "state") {
+            StateScreen(
+                onUsageLimitsClick = { },
+                bottomInset = 96.dp,
+                isHostConnected = isConnected
+            )
+        } else {
+            val allBots = buildList {
+                state.leadBot?.let { add(it) }
+                addAll(state.pinnedBots)
+                addAll(state.otherBots)
             }
 
-            if (allBots.isEmpty()) {
-                item("empty") {
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(top = 80.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Symbol("bubble.left.and.bubble.right", size = 48.dp, tint = Palette.tertiary)
-                        Text(
-                            "Aucun agent actif",
-                            style = Type.title3.bold,
-                            color = Palette.text
-                        )
-                        Text(
-                            "Vos agents IA s'exécutent dans Termux / Ubuntu PRoot.\nCréez un agent ou vérifiez la connexion locale.",
-                            style = Type.subheadline,
-                            color = Palette.secondary,
-                            modifier = Modifier.padding(horizontal = 32.dp),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            PrimaryButton("Créer un Agent", action = onCreateBotClick)
-                            SecondaryButton("Connexion", action = onConfigureServerClick)
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = topInset + 56.dp,
+                    bottom = 100.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (!isConnected && !isConnecting) {
+                    item("offline_banner") {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                                .clip(Capsule())
+                                .background(Palette.danger.copy(alpha = 0.12f))
+                                .clickable { onConfigureServerClick() }
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Symbol("wifi.exclamationmark", size = 16.dp, tint = Palette.danger)
+                                Text(
+                                    "Serveur local Termux hors-ligne (127.0.0.1:19222). Touchez pour reconnecter.",
+                                    style = Type.footnote,
+                                    color = Palette.danger,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
                 }
-            } else {
-                items(allBots, key = { it.id }) { bot ->
-                    BotCard(
-                        bot = bot,
-                        bots = allBots,
-                        onClick = { onBotClick(bot.id) }
-                    )
+
+                if (allBots.isEmpty()) {
+                    item("empty") {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(top = 80.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            CharacterAvatar("cloud", "green", 72.dp)
+                            Text("No bots yet", style = Type.title3.semibold, color = Palette.text)
+                            Text(
+                                "Ask one of your account's computers for access, or pair one with its code.",
+                                style = Type.subheadline,
+                                color = Palette.secondary,
+                                textAlign = TextAlign.Center
+                            )
+                            PrimaryButton("Ordinateurs", action = onConfigureServerClick)
+                        }
+                    }
+                } else {
+                    items(allBots, key = { it.id }) { bot ->
+                        BotCard(
+                            bot = bot,
+                            bots = allBots,
+                            onClick = { onBotClick(bot.id) }
+                        )
+                    }
                 }
             }
         }
