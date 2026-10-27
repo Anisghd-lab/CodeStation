@@ -125,7 +125,7 @@ fun PairingScreen(
                             style = Type.footnote.semibold,
                             color = Palette.secondary
                         )
-                        CommandBlockRow("/root/Codyn/start_code_station.sh start")
+                        CommandBlockRow("/root/CodeStation/start_code_station.sh start")
                     }
                 }
                 row {
@@ -135,7 +135,17 @@ fun PairingScreen(
                             style = Type.footnote.semibold,
                             color = Palette.secondary
                         )
-                        CommandBlockRow("/root/Codyn/start_code_station.sh pair")
+                        CommandBlockRow("/root/CodeStation/start_code_station.sh pair")
+                    }
+                }
+                row {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            "3. Afficher le jeton d'authentification",
+                            style = Type.footnote.semibold,
+                            color = Palette.secondary
+                        )
+                        CommandBlockRow("/root/CodeStation/start_code_station.sh token")
                     }
                 }
             }

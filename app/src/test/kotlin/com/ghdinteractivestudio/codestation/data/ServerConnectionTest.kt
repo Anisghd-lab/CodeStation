@@ -82,4 +82,37 @@ class ServerConnectionTest {
         assertNotNull(errorConfig.errorMessage)
         assertTrue(errorConfig.errorMessage!!.contains("401"))
     }
+
+    @Test
+    fun `test connection failure when token is missing`() = runTest {
+        every { preferencesRepository.pairingTokenStream } returns flowOf("")
+        val repo = ServerRepositoryImpl(preferencesRepository) { apiService }
+
+        coEvery { apiService.getHealth() } returns Response.success(
+            HealthResponse(ok = true, version = "2.28.0", busy = false)
+        )
+
+        val result = repo.testConnection()
+        assertTrue(result.isSuccess)
+
+        val errorConfig = result.getOrThrow()
+        assertEquals(ServerConnectionStatus.ERROR, errorConfig.status)
+        assertNotNull(errorConfig.errorMessage)
+        assertTrue(errorConfig.errorMessage!!.contains("manquant"))
+    }
+
+    @Test
+    fun `test connection failure when server is unreachable`() = runTest {
+        val repo = ServerRepositoryImpl(preferencesRepository) { apiService }
+
+        coEvery { apiService.getHealth() } throws java.net.ConnectException("Connection refused")
+
+        val result = repo.testConnection()
+        assertTrue(result.isSuccess)
+
+        val errorConfig = result.getOrThrow()
+        assertEquals(ServerConnectionStatus.ERROR, errorConfig.status)
+        assertNotNull(errorConfig.errorMessage)
+        assertTrue(errorConfig.errorMessage!!.contains("inaccessible"))
+    }
 }

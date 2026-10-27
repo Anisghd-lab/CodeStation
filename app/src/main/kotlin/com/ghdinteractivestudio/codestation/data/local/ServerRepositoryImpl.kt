@@ -74,7 +74,7 @@ class ServerRepositoryImpl(
             } catch (e: Exception) {
                 val errorConfig = current.copy(
                     status = ServerConnectionStatus.ERROR,
-                    errorMessage = "Impossible de joindre l'hôte (${e.message ?: "Connexion refusée"}). Vérifiez que le serveur écoute sur ${current.url}."
+                    errorMessage = "Serveur inaccessible (${e.javaClass.simpleName}: ${e.message ?: "Connexion refusée"}). Vérifiez que CodeStation est démarré sur ${current.url}."
                 )
                 _serverState.value = errorConfig
                 return@runCatching errorConfig
@@ -84,7 +84,7 @@ class ServerRepositoryImpl(
             if (!healthResponse.isSuccessful || healthResponse.body() == null) {
                 val errorConfig = current.copy(
                     status = ServerConnectionStatus.ERROR,
-                    errorMessage = "Réponse HTTP invalide de l'hôte (${healthResponse.code()})"
+                    errorMessage = "Erreur HTTP de l'hôte (${healthResponse.code()} ${healthResponse.message()})."
                 )
                 _serverState.value = errorConfig
                 return@runCatching errorConfig
@@ -94,27 +94,56 @@ class ServerRepositoryImpl(
             var activeBots = 0
             var verifiedVersion = health.version
 
-            // 2. Si un token d'appairage est fourni, valider POST /api/hello
-            if (!current.token.isNullOrBlank()) {
-                try {
-                    val helloResponse = api.hello("Bearer ${current.token}")
-                    if (helloResponse.isSuccessful && helloResponse.body() != null) {
-                        val hello = helloResponse.body()!!
-                        verifiedVersion = hello.version ?: verifiedVersion
-                    } else if (helloResponse.code() == 401) {
-                        val errorConfig = current.copy(
-                            status = ServerConnectionStatus.ERROR,
-                            latencyMs = duration,
-                            serverVersion = verifiedVersion,
-                            errorMessage = "Jeton d'appairage invalide (401 Unauthorized)."
-                        )
-                        _serverState.value = errorConfig
-                        return@runCatching errorConfig
-                    }
-                } catch (_: Exception) {
-                    // Si hello échoue pour une raison mineure alors que health a réussi
-                }
+            // 2. Vérification rigoureuse de l'authentification avec le jeton
+            if (current.token.isNullOrBlank()) {
+                val errorConfig = current.copy(
+                    status = ServerConnectionStatus.ERROR,
+                    latencyMs = duration,
+                    serverVersion = verifiedVersion,
+                    errorMessage = "Serveur en ligne (v$verifiedVersion), mais jeton d'authentification manquant. Saisissez le jeton local (~/.codestation/token) ou générez le lien d'appairage."
+                )
+                _serverState.value = errorConfig
+                return@runCatching errorConfig
             }
+
+            val helloResponse = try {
+                api.hello("Bearer ${current.token}")
+            } catch (e: Exception) {
+                val errorConfig = current.copy(
+                    status = ServerConnectionStatus.ERROR,
+                    latencyMs = duration,
+                    serverVersion = verifiedVersion,
+                    errorMessage = "Erreur de communication lors de l'authentification (${e.javaClass.simpleName}: ${e.message})."
+                )
+                _serverState.value = errorConfig
+                return@runCatching errorConfig
+            }
+
+            if (helloResponse.code() in listOf(401, 403)) {
+                val errorConfig = current.copy(
+                    status = ServerConnectionStatus.ERROR,
+                    latencyMs = duration,
+                    serverVersion = verifiedVersion,
+                    errorMessage = "Erreur d'authentification (${helloResponse.code()}) : jeton d'appairage invalide ou non autorisé."
+                )
+                _serverState.value = errorConfig
+                return@runCatching errorConfig
+            }
+
+            if (!helloResponse.isSuccessful || helloResponse.body() == null) {
+                val errorConfig = current.copy(
+                    status = ServerConnectionStatus.ERROR,
+                    latencyMs = duration,
+                    serverVersion = verifiedVersion,
+                    errorMessage = "Erreur HTTP du serveur lors de la validation (${helloResponse.code()} ${helloResponse.message()})."
+                )
+                _serverState.value = errorConfig
+                return@runCatching errorConfig
+            }
+
+            val hello = helloResponse.body()!!
+            verifiedVersion = hello.version ?: verifiedVersion
+            activeBots = hello.backends?.size ?: 0
 
             val connected = current.copy(
                 status = ServerConnectionStatus.CONNECTED,

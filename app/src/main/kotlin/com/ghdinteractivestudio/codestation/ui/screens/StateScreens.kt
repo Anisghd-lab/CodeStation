@@ -25,7 +25,7 @@ fun OfflineStateScreen(
     ) {
         EmptyStateView(
             title = "Connexion hôte interrompue",
-            description = "Impossible de joindre le serveur Termux (127.0.0.1:19222). Assurez-vous que CodeStation est démarré avec ./start_code_station.sh start.",
+            description = "Impossible de joindre le serveur Termux (127.0.0.1:19222). Assurez-vous que CodeStation est démarré avec /root/CodeStation/start_code_station.sh start.",
             symbolName = "wifi.slash",
             actionLabel = "Reconfigurer le serveur",
             onActionClick = onConfigureServer
