@@ -226,3 +226,49 @@ Le projet respecte à 100% les contraintes imposées :
   - Dump UI et capture d'écran validés (`verify_1.png` et `ui_synapse.xml`) : Composants d'interface, typographie Inter, onglets `Widget` / `Live update` / `Status bar`, jauges de ticks et dock flottant `Bots` / `État` observables et interactifs.
   - Backend local opérationnel : daemon `codync-host` actif sur `127.0.0.1:19222` (`/health` OK).
 
+---
+
+### Phase 10 — Audit des Écarts, Renommage Global CodeStation & Validation E2E
+
+- **Migration Complète de l'Identité Android** :
+  - **Identifiant de package (applicationId / namespace)** : Migré de `com.ghdinteractivestudio.synapse` vers `com.ghdinteractivestudio.codestation`.
+  - **Nom d'application (`strings.xml`)** : « CodeStation ».
+  - **Thème et styles** : `Theme.CodeStation` configuré dans `themes.xml` (avec alias rétrocompatible `Theme.Synapse`).
+  - **Schémas d'URI d'appairage (`AndroidManifest.xml`)** : `codestation://pair` et `codestation-dev://pair` (support rétrocompatible `synapse://pair` et `codync://pair`).
+  - **Base de données Room** : Renommée en `CodeStationDatabase` (`codestation.db`), intégrant une migration automatique des données depuis l'ancienne base `synapse.db` si présente.
+  - **Préférences DataStore** : `codestation_preferences` configuré dans `CodeStationPreferences.kt`.
+  - **Tokens de design & Composants** : Renommage complet de `SynapseDark*` / `SynapseLight*` vers `CodeStationDark*` / `CodeStationLight*`, `CodeStationShapes`, `CodeStationSpacing`.
+
+- **Réorganisation et Racine du Projet** :
+  - Répertoire racine officiel du projet : `/root/CodeStation` (arborescence Git active liée à `https://github.com/Anisghd-lab/CodeStation.git`).
+  - Préservation intégrale et non destructive de l'ancien répertoire `/root/synapse` et du dépôt de référence `/root/Codyn`.
+
+- **Backend Rust & Adaptateur CodeStation** :
+  - Inspection de `/root/Codyn/host` et validation de la toolchain Rust (`cargo 1.93.1`).
+  - Ajout du target binaire `[[bin]] name = "codestation-host"` dans `Cargo.toml`.
+  - Compilation native réussie du binaire `/usr/local/bin/codestation-host` (69 Mo).
+  - Création de l'adaptateur CLI officiel `/usr/local/bin/codestation` avec support des commandes :
+    - `codestation serve` (démarrage du daemon sur 127.0.0.1:19222 avec répertoire de données `~/.codestation`)
+    - `codestation pair [--json]` (génération d'URL d'appairage `codestation-dev://pair?...` / QR code)
+    - `codestation status` (vérification de santé HTTP 200)
+    - `codestation token` (résolution du jeton sans affichage non sollicité)
+    - `codestation stop` (arrêt propre du service)
+
+- **Gestion des Jetons et Sécurité Android** :
+  - Migration sécurisée du jeton et des configurations vers `~/.codestation/token`.
+  - Prise en compte explicite de l'isolation UID sous Android : l'application Android s'exécute dans un bac à sable Linux distinct et ne peut pas lire le système de fichiers privé de Termux. L'appairage s'effectue via deep-link `codestation://pair` ou par saisie du jeton.
+
+- **Tests de Bout en Bout Réels (`test_e2e_codestation.py`)** :
+  - **Étape 1 : Santé** : `GET /health` -> HTTP 200 (`version=2.28.0`, `hostId=61bfb07b-f953-4dbc-8a56-4f7516695cdf`).
+  - **Étape 2 : Authentification** : Chargement sécurisé du jeton 64 caractères depuis `~/.codestation/token`.
+  - **Étape 3 : Découverte des Agents** : `POST /api/hello` -> 46 backends détectés, dont Google Antigravity (`antigravity`), Codex (`codex`) et OpenCode (`opencode`) disponibles.
+  - **Étape 4 : Arrêt d'une Tâche** : `POST /api/stop` -> Endpoint actif et fonctionnel.
+  - **Étape 5 : Flux SSE** : `GET /events?since=0` -> Connexion établie HTTP 200 `text/event-stream`, trame événementielle initiale reçue (`data: {"type":"hello", ...}`).
+
+- **Pipeline CI/CD GitHub Actions (`.github/workflows/build_apk.yml`)** :
+  - Mise à jour du pipeline pour compiler et publier :
+    - `CodeStation-debug.apk`
+    - `CodeStation-v1.0.0-debug.apk`
+    - `CodeStation-debug.apk.sha256`
+  - Nom d'artefact : `CodeStation-v1.0.0-debug-apk`.
+
