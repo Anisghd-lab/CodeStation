@@ -41,6 +41,18 @@ class BotRepositoryImpl(
         }
     }
 
+    override suspend fun saveBot(bot: Bot): Result<Bot> {
+        return runCatching {
+            val existing = botDao.getBotById(bot.id)
+            if (existing == null) {
+                botDao.insertBot(BotEntity.fromDomain(bot))
+            } else {
+                botDao.updateBot(BotEntity.fromDomain(bot))
+            }
+            bot
+        }
+    }
+
     override suspend fun deleteBot(id: String): Result<Unit> {
         return runCatching {
             val bot = botDao.getBotById(id)

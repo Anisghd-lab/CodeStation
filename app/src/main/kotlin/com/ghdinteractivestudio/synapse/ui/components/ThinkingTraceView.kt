@@ -74,7 +74,7 @@ fun ThinkingTraceView(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (isWorking) {
-                        ThinkingOrb(size = 12.dp, isPulsing = true)
+                        ThinkingOrb(size = 12.dp)
                     } else {
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
@@ -118,7 +118,7 @@ fun ThinkingTraceView(
 @Composable
 private fun StepItem(step: ExecutionStep) {
     val icon = when (step.type) {
-        StepType.THOUGHT -> Icons.Default.Psychology
+        StepType.THOUGHT, StepType.THINKING, StepType.PLANNING -> Icons.Default.Psychology
         StepType.TOOL_CALL -> Icons.Default.Build
         StepType.TOOL_RESULT -> Icons.Default.CheckCircle
         StepType.NARRATION -> Icons.Default.CheckCircle

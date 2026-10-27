@@ -43,6 +43,7 @@ val TextStyle.monospaced get() = copy(fontFamily = FontFamily.Monospace, letterS
 private val families = HashMap<Int, FontFamily>()
 
 /** Inter's optical size follows the text size. */
+@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
 private fun family(size: Float): FontFamily = families.getOrPut(size.toInt().coerceIn(14, 32)) {
     val opsz = size.coerceIn(14f, 32f)
     try {

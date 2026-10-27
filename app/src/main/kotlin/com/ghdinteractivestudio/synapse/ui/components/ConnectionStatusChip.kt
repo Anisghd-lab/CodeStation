@@ -58,7 +58,7 @@ fun ConnectionStatusChip(
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         if (serverConfig.status == ServerConnectionStatus.CONNECTING) {
-            ThinkingOrb(size = 8.dp, color = dotColor, isPulsing = true)
+            ThinkingOrb(size = 8.dp, color = dotColor)
         } else {
             Box(
                 modifier = Modifier

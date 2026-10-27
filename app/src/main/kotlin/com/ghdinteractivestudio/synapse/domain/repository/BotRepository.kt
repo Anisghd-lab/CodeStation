@@ -10,6 +10,7 @@ interface BotRepository {
     suspend fun getBotById(id: String): Bot?
     suspend fun createBot(bot: Bot): Result<Bot>
     suspend fun updateBot(bot: Bot): Result<Bot>
+    suspend fun saveBot(bot: Bot): Result<Bot>
     suspend fun deleteBot(id: String): Result<Unit>
     suspend fun togglePin(id: String): Result<Unit>
     suspend fun updateBotStatus(id: String, status: BotStatus): Result<Unit>

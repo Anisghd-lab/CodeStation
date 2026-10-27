@@ -311,10 +311,10 @@ fun VoiceScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(24.dp),
-            horizontalAlignment = Alignment.CenterVertically,
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(horizontalAlignment = Alignment.CenterVertically) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Session Vocale Synapse", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -333,7 +333,7 @@ fun VoiceScreen(
                     .border(2.dp, if (isListening) SynapseDarkPrimary else MaterialTheme.colorScheme.outline, CircleShape)
             ) {
                 if (isListening) {
-                    ThinkingOrb(size = 80.dp, color = SynapseDarkPrimary, isPulsing = true)
+                    ThinkingOrb(size = 80.dp, color = Palette.accent)
                 }
                 IconButton(
                     onClick = { isListening = !isListening },
@@ -380,7 +380,7 @@ fun RemoteScreenUnavailable(
         EmptyStateView(
             title = "Fonctionnalité Indisponible",
             description = "La visualisation et la télécommande d'écran WebRTC nécessitent un serveur hôte de bureau équipé d'une session graphique Wayland/X11 ou macOS avec pilote de capture H.264 actif.\n\nSur un hôte local Termux / PRoot sans serveur d'affichage X11, ce service n'est pas activé.",
-            icon = Icons.Default.Cast,
+            symbolName = "laptopcomputer",
             actionLabel = "Retour aux paramètres",
             onActionClick = onNavigateBack,
             modifier = Modifier

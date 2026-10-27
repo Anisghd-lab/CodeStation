@@ -44,23 +44,42 @@ class ChatViewModel(
     private val _workingSteps = MutableStateFlow<List<ExecutionStep>>(emptyList())
     private val _errorMessage = MutableStateFlow<String?>(null)
 
-    val uiState: StateFlow<ChatUiState> = combine(
+    private data class InputState(
+        val draft: String,
+        val reply: QuotedReply?,
+        val working: Boolean,
+        val steps: List<ExecutionStep>
+    )
+
+    private val _botDataFlow = combine(
         botRepository.getBotByIdStream(botId),
         chatRepository.getMessagesStream(botId),
-        chatRepository.getPendingApprovalsStream(botId),
+        chatRepository.getPendingApprovalsStream(botId)
+    ) { bot, messages, approvals ->
+        Triple(bot, messages, approvals)
+    }
+
+    private val _uiInputFlow = combine(
         _inputDraft,
         _quotedReply,
         _isBotWorking,
         _workingSteps
-    ) { bot, messages, approvals, draft, reply, working, steps ->
+    ) { draft, reply, working, steps ->
+        InputState(draft, reply, working, steps)
+    }
+
+    val uiState: StateFlow<ChatUiState> = combine(
+        _botDataFlow,
+        _uiInputFlow
+    ) { (bot, messages, approvals), input ->
         ChatUiState(
             bot = bot,
             messages = messages,
             pendingApprovals = approvals,
-            isBotWorking = working || bot?.status == BotStatus.WORKING,
-            currentWorkingSteps = steps,
-            inputDraft = draft,
-            quotedReply = reply,
+            isBotWorking = input.working || bot?.status == BotStatus.WORKING,
+            currentWorkingSteps = input.steps,
+            inputDraft = input.draft,
+            quotedReply = input.reply,
             errorMessage = _errorMessage.value
         )
     }.stateIn(

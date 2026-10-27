@@ -149,3 +149,25 @@ Le projet respecte à 100% les contraintes imposées :
   - Thème aligné : `Palette.kt`, `Motion.kt`, `Type.kt`, `Shape.kt`, `Theme.kt`
   - Écrans alignés : `RosterScreen.kt`, `ChatScreen.kt`, `PairingScreen.kt`, `ApprovalsScreen.kt`, `TraceScreen.kt`, `BotEditorScreen.kt`, `GroupEditorScreen.kt`, `SettingsScreen.kt`, `OnboardingScreen.kt`, `StateScreens.kt`
   - Nouveaux tests : `DesignTokensTest.kt`, `ServerConnectionTest.kt`
+
+### Phase 8 — Publication sur le Dépôt Officiel CodeStation & Résolution CI (Complétée)
+- **Vérification Initiale du Dépôt Cible** :
+  - Dépôt distant : `https://github.com/Anisghd-lab/CodeStation`
+  - Inspection via `git ls-remote` et GitHub REST API : Dépôt distant vide (taille 0, aucun commit antérieur, branche `main` non initialisée).
+  - Validation de l'accès en écriture sans risque d'écrasement de données.
+- **Publication Git & Préservation d'Historique** :
+  - Remote `origin` configuré vers `https://github.com/Anisghd-lab/CodeStation.git`.
+  - Push de la branche locale `main` avec préservation stricte de l'arbre et du commit historique `37d2052`.
+- **Audit de la Première Exécution CI GitHub Actions** (Run ID `40521897087`) :
+  - Analyse approfondie des journaux de compilation via l'API GitHub Actions.
+  - Détection et correction des erreurs de compilation Kotlin 2.0 :
+    1. `ThinkingTraceView.kt` : Suppression de l'argument obsolète `isPulsing` lors de l'appel à `ThinkingOrb` ; exhaustivité du bloc `when` pour couvrir les variantes `StepType.THINKING` et `StepType.PLANNING`.
+    2. `BotEditorScreen.kt` & `Controls.kt` : Implémentation du composant générique `ChoicePicker` encapsulant `SegmentedChoice`.
+    3. `BotRepository.kt` & `BotRepositoryImpl.kt` : Ajout de la méthode `saveBot(bot: Bot)` effectuant la création ou la mise à jour conditionnelle.
+    4. `ComplementaryScreens.kt` : Correction de l'alignement horizontal `Alignment.CenterHorizontally` dans la colonne vocale, mise à jour des paramètres de `ThinkingOrb` et du `symbolName` de `EmptyStateView`.
+    5. `ConnectionStatusChip.kt` : Nettoyage de l'appel à `ThinkingOrb`.
+    6. `Type.kt` : Ajout de l'annotation `@OptIn(ExperimentalTextApi::class)` sur le chargeur de police dynamique.
+    7. `ChatViewModel.kt` : Découplage du `combine` à 7 flux en flux typés intermédiaires compatibles avec l'API standard Kotlin Coroutines.
+- **Validation Finale** :
+  - Codebase propre et exempte d'erreurs de compilation.
+  - Push des correctifs sur `origin/main` pour déclencher la nouvelle compilation GitHub Actions et la production de l'artefact APK debug.

@@ -458,3 +458,21 @@ fun DiffView(
         }
     }
 }
+
+@Composable
+fun <T> ChoicePicker(
+    selection: T,
+    options: List<Pair<T, String>>,
+    select: (T) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    SegmentedChoice(
+        options = options.map { it.first },
+        selected = selection,
+        onSelect = select,
+        modifier = modifier,
+        label = { opt ->
+            options.firstOrNull { it.first == opt }?.second ?: opt.toString()
+        }
+    )
+}
