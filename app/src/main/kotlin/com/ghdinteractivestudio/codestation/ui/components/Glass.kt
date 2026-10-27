@@ -78,7 +78,7 @@ fun ScrollEdge(edge: Edge, height: Dp, modifier: Modifier = Modifier) {
     )
 }
 
-enum class GlassStyle { Regular, Clear, Menu }
+enum class GlassStyle { Regular, Clear, Menu, Card, Accent }
 
 @Composable
 fun Modifier.glass(
@@ -89,8 +89,22 @@ fun Modifier.glass(
     shadow: Boolean = true
 ): Modifier {
     val dark = LocalDark.current
-    val base = if (tint.isSpecified) tint else if (dark) Color(0x33262626) else Color(0xD9FFFFFF)
-    val borderCol = if (dark) Color(0x33FFFFFF) else Color(0x1A000000)
+    val base = if (tint.isSpecified) {
+        tint
+    } else {
+        when (style) {
+            GlassStyle.Regular -> if (dark) Color(0x38222222) else Color(0xD9FFFFFF)
+            GlassStyle.Clear -> if (dark) Color(0x241C1C1E) else Color(0xB3FFFFFF)
+            GlassStyle.Menu -> if (dark) Color(0x521A1A1A) else Color(0xEBFAFAFA)
+            GlassStyle.Card -> if (dark) Color(0x2B1A1A1A) else Color(0xE6FAFAFA)
+            GlassStyle.Accent -> if (dark) Color(0x3310B981) else Color(0x26059669)
+        }
+    }
+    val borderCol = if (dark) {
+        if (style == GlassStyle.Accent) Color(0x6610B981) else Color(0x2EFFFFFF)
+    } else {
+        if (style == GlassStyle.Accent) Color(0x40059669) else Color(0x18000000)
+    }
     return this
         .clip(shape)
         .background(if (pressed) base.copy(alpha = 0.95f) else base)

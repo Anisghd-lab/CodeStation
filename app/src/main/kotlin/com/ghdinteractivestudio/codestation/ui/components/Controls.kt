@@ -165,6 +165,7 @@ private fun StyledButton(
             .graphicsLayer { alpha = if (enabled) (if (pressed) 0.85f else 1f) else 0.4f }
             .clip(Capsule())
             .background(fill)
+            .border(0.5.dp, Palette.glassBorder, Capsule())
             .clickable(source, null, enabled = enabled, role = Role.Button, onClick = action)
             .padding(horizontal = 18.dp, vertical = 11.dp),
         contentAlignment = Alignment.Center
@@ -203,9 +204,9 @@ fun CodyncSwitch(
     enabled: Boolean = true,
     label: @Composable RowScope.() -> Unit
 ) {
-    val track by animateColorAsState(if (checked) Palette.accentFill else Palette.bubbleUser, Motion.hover(), label = "Track")
+    val track by animateColorAsState(if (checked) Palette.emeraldAccent else Palette.bubbleUser, Motion.hover(), label = "Track")
     val knob by animateDpAsState(if (checked) 14.dp else 0.dp, Motion.hover(), label = "Knob")
-    val knobInk = if (checked) Palette.onAccent else Color.White
+    val knobInk = Color.White
     Row(
         modifier
             .toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
@@ -232,6 +233,15 @@ fun CodyncSwitch(
         }
     }
 }
+
+@Composable
+fun CodeStationSwitch(
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    label: @Composable RowScope.() -> Unit
+) = CodyncSwitch(checked, onChange, modifier, enabled, label)
 
 @Composable
 fun Spinner(
@@ -380,8 +390,7 @@ fun CardSection(
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedRectangle(16.dp))
-                .background(Palette.surface)
+                .glass(shape = RoundedRectangle(16.dp), style = GlassStyle.Card)
         ) {
             for ((index, item) in list.withIndex()) {
                 if (index > 0) {
@@ -390,7 +399,7 @@ fun CardSection(
                             .fillMaxWidth()
                             .height(0.5.dp)
                             .padding(start = 16.dp)
-                            .background(Palette.border)
+                            .background(Palette.glassDivider)
                     )
                 }
                 Box(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {

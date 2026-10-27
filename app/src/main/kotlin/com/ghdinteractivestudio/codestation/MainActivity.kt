@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val themeMode by container.preferencesRepository.themeModeStream.collectAsState(initial = "SYSTEM")
-            val isDark = when (themeMode) {
+            val isDark = when (themeMode.uppercase()) {
                 "DARK" -> true
                 "LIGHT" -> false
                 else -> isSystemInDarkTheme()

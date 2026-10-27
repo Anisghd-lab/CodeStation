@@ -164,7 +164,8 @@ fun <T> GlassTabBar(
                 .offset(x = pill)
                 .size(TAB_WIDTH, 54.dp)
                 .clip(Capsule())
-                .background(Palette.text.copy(alpha = 0.12f))
+                .background(if (com.ghdinteractivestudio.codestation.ui.theme.LocalDark.current) Palette.emeraldAccent.copy(alpha = 0.16f) else Palette.text.copy(alpha = 0.08f))
+                .border(0.5.dp, if (com.ghdinteractivestudio.codestation.ui.theme.LocalDark.current) Palette.emeraldAccent.copy(alpha = 0.35f) else Palette.glassBorder, Capsule())
         )
         Row {
             for (tab in tabs) {
@@ -180,12 +181,12 @@ fun <T> GlassTabBar(
                     Symbol(
                         tab.systemImage,
                         size = tab.iconSize,
-                        tint = if (on) Palette.text else Palette.secondary
+                        tint = if (on) (if (com.ghdinteractivestudio.codestation.ui.theme.LocalDark.current) Palette.emeraldAccent else Palette.text) else Palette.secondary
                     )
                     Text(
                         tr(tab.title),
                         style = Type.system(10f),
-                        color = if (on) Palette.text else Palette.secondary,
+                        color = if (on) (if (com.ghdinteractivestudio.codestation.ui.theme.LocalDark.current) Palette.emeraldAccent else Palette.text) else Palette.secondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )

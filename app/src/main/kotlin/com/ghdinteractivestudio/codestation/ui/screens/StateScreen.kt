@@ -68,6 +68,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.ghdinteractivestudio.codestation.ui.components.CharacterAvatar
 import com.ghdinteractivestudio.codestation.ui.components.ChoicePicker
 import com.ghdinteractivestudio.codestation.ui.components.CodyncSwitch
+import com.ghdinteractivestudio.codestation.ui.components.GlassStyle
 import com.ghdinteractivestudio.codestation.ui.components.IconButton
 import com.ghdinteractivestudio.codestation.ui.components.LinkButton
 import com.ghdinteractivestudio.codestation.ui.components.PrimaryButton
@@ -76,6 +77,7 @@ import com.ghdinteractivestudio.codestation.ui.components.SegmentedChoice
 import com.ghdinteractivestudio.codestation.ui.components.Symbol
 import com.ghdinteractivestudio.codestation.ui.components.ThinkingOrb
 import com.ghdinteractivestudio.codestation.ui.components.ThinkingOrbState
+import com.ghdinteractivestudio.codestation.ui.components.glass
 import com.ghdinteractivestudio.codestation.ui.components.plainButton
 import com.ghdinteractivestudio.codestation.ui.theme.Capsule
 import com.ghdinteractivestudio.codestation.ui.theme.Motion
@@ -222,8 +224,7 @@ private fun WidgetGallery(
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedRectangle(22.dp))
-            .background(Palette.surface)
+            .glass(RoundedRectangle(22.dp), style = GlassStyle.Card)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)
@@ -249,13 +250,12 @@ private fun WidgetGallery(
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedRectangle(18.dp))
-                .background(Palette.surface)
+                .glass(RoundedRectangle(18.dp), style = GlassStyle.Card)
         ) {
             SetupRow("Connect a computer", isHostConnected)
-            Box(Modifier.fillMaxWidth().height(0.5.dp).padding(start = 42.dp).background(Palette.border))
+            Box(Modifier.fillMaxWidth().height(0.5.dp).padding(start = 42.dp).background(Palette.glassDivider))
             SetupRow("Add a CodeStation widget", false)
-            Box(Modifier.fillMaxWidth().height(0.5.dp).padding(start = 42.dp).background(Palette.border))
+            Box(Modifier.fillMaxWidth().height(0.5.dp).padding(start = 42.dp).background(Palette.glassDivider))
             SetupRow(
                 title = if (!allowed && asked > 0) "Turn on notifications in Settings" else "Turn on notifications",
                 complete = allowed,
@@ -327,8 +327,7 @@ private fun WidgetGallery(
                 Modifier
                     .then(if (isSmall) Modifier.width(158.dp) else Modifier.fillMaxWidth())
                     .height(if (currentSize == "large" && kind != "team") 338.dp else 158.dp)
-                    .clip(RoundedRectangle(22.dp))
-                    .background(Palette.surface)
+                    .glass(RoundedRectangle(22.dp), style = GlassStyle.Card)
                     .padding(14.dp)
             ) {
                 when (kind) {
@@ -549,8 +548,7 @@ private fun LiveUpdateGallery(chip: Boolean) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedRectangle(20.dp))
-            .background(Palette.surface)
+            .glass(RoundedRectangle(20.dp), style = GlassStyle.Card)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -636,8 +634,7 @@ private fun LiveUpdatePreview(phase: TaskPhase, started: Long) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedRectangle(22.dp))
-            .background(Palette.surface)
+            .glass(RoundedRectangle(22.dp), style = GlassStyle.Card)
             .padding(14.dp)
             .animateContentSize(Motion.layoutSize),
         verticalArrangement = Arrangement.spacedBy(10.dp)

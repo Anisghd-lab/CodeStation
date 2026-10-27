@@ -40,4 +40,15 @@ object Palette {
     val codeBackground: Color @Composable @ReadOnlyComposable get() = pair(0xF4F4F4, 0x111111)
     val added: Color @Composable @ReadOnlyComposable get() = pair(0x2E7D32, 0x8FD18B)
     val removed: Color @Composable @ReadOnlyComposable get() = pair(0xC62828, 0xF0A7A7)
+
+    // Glassmorphism design tokens (Dark: smoked glass on obsidian black; Light: frosted luminous clear glass)
+    val glassSurface: Color @Composable @ReadOnlyComposable get() = if (LocalDark.current) Color(0x381E1E1E) else Color(0xD9FFFFFF)
+    val glassCard: Color @Composable @ReadOnlyComposable get() = if (LocalDark.current) Color(0x2B1A1A1A) else Color(0xE6FAFAFA)
+    val glassBorder: Color @Composable @ReadOnlyComposable get() = if (LocalDark.current) Color(0x2EFFFFFF) else Color(0x18000000)
+    val glassDivider: Color @Composable @ReadOnlyComposable get() = if (LocalDark.current) Color(0x1FFFFFFF) else Color(0x0F000000)
+
+    // Emerald green accents (Dark: vivid emerald #10B981; Light: deep emerald #059669)
+    val emeraldAccent: Color @Composable @ReadOnlyComposable get() = if (LocalDark.current) Color(0xFF10B981) else Color(0xFF059669)
+    val emeraldGlow: Color @Composable @ReadOnlyComposable get() = if (LocalDark.current) Color(0x2610B981) else Color(0x1A059669)
+    val onEmerald: Color @Composable @ReadOnlyComposable get() = Color.White
 }
