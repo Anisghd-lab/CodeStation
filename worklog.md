@@ -193,3 +193,36 @@ Le projet respecte à 100% les contraintes imposées :
   ```text
   c5fcb8ac0b3f61d112f158c01723bb35a1856bfce48ab2df89d1f4ef506d5846  Synapse-v1.0.0-debug.apk
   ```
+
+---
+
+### Phase 9 — Réplication Complète UI/UX Codync, Validation CI/CD et Déploiement Appareil Réel (Complétée avec Succès)
+
+- **Audit Comparatif des 6 Captures d'Écran Codync Officielles** :
+  1. `1_welcome.jpg` (Écran d'Accueil / Onboarding) : Équipage de 5 mascottes en grille de points animées (`bobbingCrew`), bulle d'échange d'invite ("Un script pour synchroniser..."), typographie française soignée ("Vos ordinateurs, au même endroit."), boutons d'action "Watch the demo" et "Commencer".
+  2. `2_bots_roster.jpg` (Écran Bots / Roster) : En-tête minimaliste (`👤 ˅` compte/paramètres, `Computers ˅` sélecteur d'agent local, `+` nouveau bot/groupe), état vide illustré par l'avatar nuage de points verts (`CodyncDotsCanvas`), boutons "New bot" / "New group", dock en verre flottant (`GlassTabBar` 54dp, pilule glissante 90dp : `Bots` 💬 + `État` 🗂️).
+  3. `3_state_widget.jpg` (Écran État — Onglet Widget) : Sélecteur de segments de modèle, carte de limites d'utilisation avec jauges de ticks dynamiques (`UsageTicks`) et ligne de progression, titre "Codync, at a glance.", checklist, sélecteur de style ("Personnage" vs "Icone originale"), carte de démonstration widget bureau 9:41, bouton "Ajouter à l'écran d'accueil".
+  4. `4_state_liveupdate.jpg` (Écran État — Onglet Live update) : Carte d'activation live update avec commutateur, sélecteur d'états ("Réflexion", "Au travail", "En attente", "Terminé"), carte de prévisualisation de notification à 4 segments avec jauges de progression réelles, actions de contrôle (arrêter / inspecter).
+  5. `5_state_statusbar.jpg` (Écran État — Onglet Status bar) : Carte de prévisualisation îlot dynamique / barre d'état noire (`9:41 [icon 2:37] wifi batterie`), options de configuration d'affichage.
+  6. `6_settings.jpg` (Ordinateurs et paramètres) : Feuille modale complète avec drag handle, sections Ordinateurs (appairage et gestion Termux local `127.0.0.1:19222`), Apparence (Système / Sombre / Clair), Langue (Français / Anglais), Discussion (commutateur Détails de réflexion), Notifications (tâches en cours, permissions), Informations (version v2.28.0, licence Apache-2.0, statut Open Source), bouton destructeur rouge "Recommencer" avec dialogue de confirmation.
+- **Résolutions de Compilation et Améliorations de Robustesse** :
+  - `ChatMessageItem.kt` : Sécurisation du `avatarGlyph` nullable via `message.author.avatarGlyph?.takeIf { it.isNotEmpty() } ?: "blob"`.
+  - `Controls.kt` : Définition de l'extension `Modifier.plainButton` pour les composants tactiles sans sur-effet ripple.
+  - `res/drawable/` : Réplication de l'icône de lancement officielle Codync et drawables vectoriels associés.
+  - Découplage strict des résidus cloud/distants au profit exclusif de la connexion locale Termux/PRoot (`127.0.0.1:19222`).
+- **Validation CI/CD GitHub Actions sur Commit `971d978`** :
+  - **Pipeline GitHub Actions** : [Run #40563757572](https://github.com/Anisghd-lab/CodeStation/actions/runs/40563757572)
+  - **Statut** : `success` (Compilation JDK 21, Kotlin 2.0, Gradle 8.9).
+  - **Tests unitaires (`testDebugUnitTest`)** : 13/13 tests validés (100%).
+  - **Artefact généré** : `Synapse-v1.0.0-debug-apk` (ID `12761633229`).
+  - **Empreinte SHA-256 de l'APK officiel** :
+    ```text
+    2c0ea8305116904adfc02dc4a9837625c1eb0e67184f9aa5da6c1eba9ff847bf  Synapse-v1.0.0-debug.apk
+    ```
+- **Déploiement et Preuve d'Exécution sur Appareil Réel** :
+  - Installation réussie via ADB (`Streamed Install` -> `Success`).
+  - Identifiant de package : `com.ghdinteractivestudio.synapse.debug`.
+  - Processus Android actif vérifié : PID `17855`.
+  - Dump UI et capture d'écran validés (`verify_1.png` et `ui_synapse.xml`) : Composants d'interface, typographie Inter, onglets `Widget` / `Live update` / `Status bar`, jauges de ticks et dock flottant `Bots` / `État` observables et interactifs.
+  - Backend local opérationnel : daemon `codync-host` actif sur `127.0.0.1:19222` (`/health` OK).
+
