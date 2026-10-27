@@ -50,7 +50,7 @@ class ServerConnectionTest {
             HealthResponse(ok = true, version = "2.28.0", busy = false)
         )
         coEvery { apiService.hello("Bearer test-token-xyz") } returns Response.success(
-            HelloResponse(ok = true, version = "2.28.0", host = "termux-dev")
+            HelloResponse(name = "termux-dev", version = "2.28.0")
         )
 
         val result = repo.testConnection()
@@ -59,7 +59,7 @@ class ServerConnectionTest {
         val connectedConfig = result.getOrThrow()
         assertEquals(ServerConnectionStatus.CONNECTED, connectedConfig.status)
         assertEquals("2.28.0", connectedConfig.serverVersion)
-        assertTrue(connectedConfig.latencyMs >= 0)
+        assertTrue((connectedConfig.latencyMs ?: 0L) >= 0)
     }
 
     @Test
@@ -75,7 +75,7 @@ class ServerConnectionTest {
         )
 
         val result = repo.testConnection()
-        assertTrue(result.isSuccess) // testConnection returns Result with error state inside config
+        assertTrue(result.isSuccess)
 
         val errorConfig = result.getOrThrow()
         assertEquals(ServerConnectionStatus.ERROR, errorConfig.status)
