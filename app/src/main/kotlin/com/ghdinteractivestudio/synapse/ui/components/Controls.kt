@@ -74,6 +74,18 @@ import com.ghdinteractivestudio.synapse.ui.theme.semibold
 
 fun tr(text: String): String = text
 
+/** A tappable row that dims while pressed. */
+@Composable
+fun Modifier.plainButton(
+    enabled: Boolean = true,
+    role: Role = Role.Button,
+    action: () -> Unit
+): Modifier {
+    val (source, pressed) = rememberPress()
+    return clickable(source, null, enabled = enabled, role = role, onClick = action)
+        .graphicsLayer { alpha = if (pressed) 0.6f else 1f }
+}
+
 /** Plain icon button that lights up on press. */
 @Composable
 fun IconButton(

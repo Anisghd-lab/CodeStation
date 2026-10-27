@@ -48,7 +48,7 @@ fun ChatMessageItem(
                 modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
             ) {
                 CharacterAvatar(
-                    shape = if (message.author.avatarGlyph.isNotEmpty()) message.author.avatarGlyph else "blob",
+                    shape = message.author.avatarGlyph?.takeIf { it.isNotEmpty() } ?: "blob",
                     color = "blue",
                     size = 22.dp
                 )
