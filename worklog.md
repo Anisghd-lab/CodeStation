@@ -171,12 +171,12 @@ Le projet respecte à 100% les contraintes imposées :
   4. **Run 4 (`40529860314`) sur commit `e3868a2`** :
      - Compilation complète validée. 10 tests unitaires sur 13 réussis, 3 échecs d'assertion dus à la stratégie `SharingStarted.WhileSubscribed(5000)` des `StateFlow` dans `RosterViewModel` et `ChatViewModel` (en l'absence de collecteur actif en test unitaire, le flux amont ne démarre pas).
      - Corrections apportées : Démarrage d'un collecteur en arrière-plan via `backgroundScope.launch(testDispatcher) { viewModel.uiState.collect() }` dans `RosterViewModelTest` et `ChatViewModelTest`. (Commit `7c17dd8`).
-  5. **Run 5 (`40532712267`) sur commit `7c17dd8` — SUCCÈS TOTAL** :
-     - **Tests unitaires (`testDebugUnitTest`)** : 13/13 tests exécutés et validés avec succès (100% de réussite en 2m 18s).
-     - **Compilation Debug APK (`assembleDebug`)** : BUILD SUCCESSFUL en 1m 17s (36 tâches Gradle exécutées/à jour).
-     - **Artefact généré** : `Synapse-v1.0.0-debug.apk` (18 968 581 octets).
-     - **Empreinte d'intégrité SHA-256** : `d320b6e03a24532a24e4c5485ce83ac492c051234f854c4091f1022346953916`
-     - **Artefact GitHub Actions** : `Synapse-v1.0.0-debug-apk` (ID `12747057215`).
+  5. **Run 5 (`40532712267`) sur commit `7c17dd8` & Run 6 (`40534471967`) sur commit `28c16d6` — SUCCÈS TOTAL** :
+     - **Tests unitaires (`testDebugUnitTest`)** : 13/13 tests exécutés et validés avec succès (100% de réussite).
+     - **Compilation Debug APK (`assembleDebug`)** : BUILD SUCCESSFUL (36 tâches Gradle exécutées/à jour).
+     - **Artefacts générés & Empreintes SHA-256** :
+       - Sur commit `7c17dd8` : `d320b6e03a24532a24e4c5485ce83ac492c051234f854c4091f1022346953916` (Artifact ID `12747057215`)
+       - Sur commit `28c16d6` : `c5fcb8ac0b3f61d112f158c01723bb35a1856bfce48ab2df89d1f4ef506d5846` (Artifact ID `12748485895`)
 
 ---
 
@@ -184,11 +184,12 @@ Le projet respecte à 100% les contraintes imposées :
 
 - **Dépôt GitHub Officiel** : [https://github.com/Anisghd-lab/CodeStation](https://github.com/Anisghd-lab/CodeStation)
 - **Branche Principale** : `main`
-- **Commit Historique Préservé** : [`37d2052`](https://github.com/Anisghd-lab/CodeStation/commit/37d2052)
-- **Commit de Validation Finale** : [`7c17dd8`](https://github.com/Anisghd-lab/CodeStation/commit/7c17dd8)
-- **Pipeline CI GitHub Actions (Succès)** : [Run #40532712267](https://github.com/Anisghd-lab/CodeStation/actions/runs/40532712267)
-- **Téléchargement de l'Artefact APK Debug** : [Synapse-v1.0.0-debug-apk (ID 12747057215)](https://github.com/Anisghd-lab/CodeStation/actions/runs/40532712267/artifacts/12747057215)
-- **Empreinte SHA-256 de l'APK** :
+- **Commit Historique de Référence** : [`37d2052`](https://github.com/Anisghd-lab/CodeStation/commit/37d2052)
+- **Commit de Validation du Code** : [`7c17dd8`](https://github.com/Anisghd-lab/CodeStation/commit/7c17dd8)
+- **Pipelines CI GitHub Actions (Succès)** :
+  - [Run #40532712267 (Validation code)](https://github.com/Anisghd-lab/CodeStation/actions/runs/40532712267) — Artefact ID [12747057215](https://github.com/Anisghd-lab/CodeStation/actions/runs/40532712267/artifacts/12747057215)
+  - [Run #40534471967 (Validation doc)](https://github.com/Anisghd-lab/CodeStation/actions/runs/40534471967) — Artefact ID [12748485895](https://github.com/Anisghd-lab/CodeStation/actions/runs/40534471967/artifacts/12748485895)
+- **Empreinte SHA-256 de l'APK (Dernière version)** :
   ```text
-  d320b6e03a24532a24e4c5485ce83ac492c051234f854c4091f1022346953916  Synapse-v1.0.0-debug.apk
+  c5fcb8ac0b3f61d112f158c01723bb35a1856bfce48ab2df89d1f4ef506d5846  Synapse-v1.0.0-debug.apk
   ```
