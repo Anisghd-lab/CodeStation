@@ -23,6 +23,7 @@ interface AppContainer {
     val chatRepository: ChatRepository
     val serverRepository: ServerRepository
     val preferencesRepository: PreferencesRepository
+    val eventStreamClient: com.ghdinteractivestudio.codestation.data.remote.CodeStationEventStreamClient
 }
 
 class CodeStationContainer(private val context: Context) : AppContainer {
@@ -85,6 +86,16 @@ class CodeStationContainer(private val context: Context) : AppContainer {
                 createApiService(config.url)
             },
             serverRepository = serverRepository
+        )
+    }
+
+    override val eventStreamClient: com.ghdinteractivestudio.codestation.data.remote.CodeStationEventStreamClient by lazy {
+        com.ghdinteractivestudio.codestation.data.remote.CodeStationEventStreamClient(
+            context = context,
+            serverRepository = serverRepository,
+            botDao = database.botDao(),
+            messageDao = database.messageDao(),
+            approvalDao = database.approvalDao()
         )
     }
 }

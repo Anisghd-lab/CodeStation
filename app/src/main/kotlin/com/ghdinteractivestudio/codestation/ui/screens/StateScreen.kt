@@ -48,6 +48,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import com.ghdinteractivestudio.codestation.notification.CodeStationNotificationManager
+import com.ghdinteractivestudio.codestation.notification.TaskNotificationPhase
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -607,6 +609,33 @@ private fun LiveUpdateGallery(chip: Boolean) {
             contentAlignment = Alignment.Center
         ) {
             if (chip) StatusBarPreview(phase, started) else LiveUpdatePreview(phase, started)
+        }
+
+        // Déclencheur direct de la notification système Android réelle
+        LinkButton(
+            title = "Diffuser dans la barre de notifications Android",
+            style = Type.footnote.medium,
+            color = Palette.emeraldAccent
+        ) {
+            CodeStationNotificationManager.updateTaskNotification(
+                context = context,
+                botId = "bot-lead-codestation",
+                botName = "CodeStation Core",
+                agentBackend = "agy",
+                phase = when (phase) {
+                    TaskPhase.Working -> TaskNotificationPhase.WORKING
+                    TaskPhase.NeedsInput -> TaskNotificationPhase.NEEDS_APPROVAL
+                    TaskPhase.Completed -> TaskNotificationPhase.COMPLETED
+                    TaskPhase.Failed -> TaskNotificationPhase.FAILED
+                },
+                summary = when (phase) {
+                    TaskPhase.Working -> "Exécution d'instructions CLI en cours..."
+                    TaskPhase.NeedsInput -> "Autorisation requise pour commande shell"
+                    TaskPhase.Completed -> "Tâche exécutée avec succès"
+                    TaskPhase.Failed -> "Sortie d'erreur CLI"
+                },
+                startedAtMs = if (phase == TaskPhase.Working) started else null
+            )
         }
     }
 

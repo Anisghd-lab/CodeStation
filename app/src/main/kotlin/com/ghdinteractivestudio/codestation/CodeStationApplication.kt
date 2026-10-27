@@ -14,9 +14,13 @@ class CodeStationApplication : Application() {
         super.onCreate()
         container = CodeStationContainer(this)
 
-        // Initialisation douce du repository en arrière-plan
+        // Initialisation des canaux de notification Android
+        com.ghdinteractivestudio.codestation.notification.CodeStationNotificationManager.createChannels(this)
+
+        // Initialisation douce du repository et démarrage du flux SSE
         CoroutineScope(Dispatchers.IO).launch {
             container.botRepository.refreshBots()
+            container.eventStreamClient.start()
         }
     }
 }
