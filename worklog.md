@@ -2,39 +2,118 @@
 
 > **Projet** : Synapse (`com.ghdinteractivestudio.synapse`)  
 > **Auteur** : Antigravity (Google DeepMind Advanced Agentic Coding)  
-> **Démarrage** : 27 Octobre 2026
+> **Date de session** : 27 Octobre 2026
 
 ---
 
-## Entrées Chronologiques
+## 1. Synthèse Exécutive
 
-### 2026-10-27 — Étape 1 : Audit Initial & Analyse des Références (Phase 1)
-* **Inspection du Système & de l'Environnement** :
-  - Système d'exploitation : Ubuntu PRoot sous Android ARM64 dans Termux.
-  - Détection de Java 21 Temurin (`21.0.12.1`), Git (`2.53.0`), Python 3.14.
-  - Confirmation absolue de la contrainte : **ne pas installer de lourdes toolchains Android SDK sur le téléphone**.
-  - Respect scrupuleux des projets existants (`Codyn`, `CimentFlow`) : aucune suppression, aucune modification destructive.
-* **Audit des Références Codync** :
-  - Étude exhaustive des spécifications d'interface (`ui-conventions.md`, `chat-messages.md`, `groups-and-replies.md`, `lead-bot.md`, `artifacts.md`, `routines.md`, `context-and-memory.md`, `voice-call.md`).
-  - Analyse des captures d'écran réelles (`android-roster.png`, `android-account.png`, `desktop-macos.png`).
-  - Délimitation rigoureuse des faits vérifiés, déductions et inconnues.
-* **Rédaction des Documents de Spécification** :
-  - `docs/REFERENCE_AUDIT.md` : Audit complet des références et de l'environnement.
-  - `docs/SCREEN_INVENTORY.md` : Cartographie intégrale des 11 écrans et parcours fonctionnels.
-  - `docs/REFERENCE_GAPS.md` : Justification technique des écarts et solutions Android natives.
-  - `docs/DESIGN_SYSTEM.md` : Système de design centralisé Material 3 (Tokens, Palette Dark/Light, Typo, Spacing, Animations).
-  - `docs/ARCHITECTURE.md` : Spécification d'architecture propre MVVM, UDF, Room, DataStore et client réseau.
-  - `docs/TEST_PLAN.md` : Stratégie de qualification et tests unitaires / Compose.
-  - `docs/KNOWN_LIMITATIONS.md` : Documentation transparente des limites techniques.
-  - `README.md` : Présentation du projet et guide complet.
+Création intégrale de **Synapse**, une application mobile Android native en **Kotlin 2.0** et **Jetpack Compose**, inspirée de l'UI/UX d'orchestration d'agents autonomes de Codync. L'application possède une architecture indépendante, un design system Material 3 sur-mesure (Thème Sombre Obsidian & Thème Clair Platine), une marque et une icône de lanceur vectorielle originales.
+
+Le projet respecte à 100% les contraintes imposées :
+- Aucun recours à Flutter, Dart, React Native ou WebView principale.
+- Aucune toolchain lourde installée sur le téléphone (l'environnement de travail restant un conteneur PRoot léger sous Android ARM64).
+- Les projets préexistants (`Codyn`, `CimentFlow`) ont été scrupuleusement préservés sans aucune modification destructive.
+- Pipeline CI/CD GitHub Actions configuré (`.github/workflows/build_apk.yml`) sur `ubuntu-latest` avec JDK 21 Temurin pour la production d'artefacts APK debug téléchargeables.
 
 ---
 
-### Prochaines Étapes Planifiées
-* Initialisation de la structure du projet Android dans `/root/synapse`.
-* Configuration du Gradle Wrapper, `settings.gradle.kts`, `build.gradle.kts` et `libs.versions.toml`.
-* Création des ressources graphiques, icônes adaptatives et thèmes Jetpack Compose.
-* Implémentation des modèles de domaine, base de données Room et DataStore.
-* Implémentation des composants Compose réutilisables (`BotCard`, `ChatMessage`, `ApprovalCard`...).
-* Implémentation des 11 écrans et de la navigation.
-* Écriture des tests unitaires et configuration du pipeline GitHub Actions (`build_apk.yml`).
+## 2. Historique des Réalisations
+
+### Phase 1 — Audit & Spécifications (Complétée)
+- **Inspection de l'Environnement** : Détection d'Ubuntu PRoot Linux ARM64, JDK 21 Temurin, Git 2.53.0 et Python 3.14.
+- **Audit des Références Codync** : Analyse détaillée de `docs/design/ui-conventions.md`, `docs/features/chat-messages.md`, `groups-and-replies.md`, `lead-bot.md`, `artifacts.md`, `routines.md`, `context-and-memory.md` et des captures d'écran.
+- **Rédaction des Documents de Référence** :
+  - [`docs/REFERENCE_AUDIT.md`](file:///root/synapse/docs/REFERENCE_AUDIT.md) : Faits vérifiés, déductions et inconnues.
+  - [`docs/SCREEN_INVENTORY.md`](file:///root/synapse/docs/SCREEN_INVENTORY.md) : Inventaire exhaustif des 11 écrans et parcours.
+  - [`docs/REFERENCE_GAPS.md`](file:///root/synapse/docs/REFERENCE_GAPS.md) : Écarts techniques et justification de l'abandon des shaders Kyant/protocole binaire C.
+  - [`docs/DESIGN_SYSTEM.md`](file:///root/synapse/docs/DESIGN_SYSTEM.md) : Système de design Material 3 (Tokens, Palette Dark/Light, Typo, Spacings).
+  - [`docs/ARCHITECTURE.md`](file:///root/synapse/docs/ARCHITECTURE.md) : Architecture MVVM, StateFlow, Room et DataStore.
+  - [`docs/TEST_PLAN.md`](file:///root/synapse/docs/TEST_PLAN.md) : Stratégie de qualification et tests unitaires / Compose.
+  - [`docs/KNOWN_LIMITATIONS.md`](file:///root/synapse/docs/KNOWN_LIMITATIONS.md) : Limites et découplage documentés.
+  - [`README.md`](file:///root/synapse/README.md) : Documentation principale et instructions de compilation.
+
+### Phase 2 — Système de Build & Ressources Android (Complétée)
+- **Initialisation du Projet** dans `/root/synapse`.
+- **Scripts Gradle** : `settings.gradle.kts`, `build.gradle.kts` racine, `gradle.properties`, `gradle/libs.versions.toml` (Catalog de dépendances moderne), `app/build.gradle.kts` (targetSdk 35, Java 21, Compose activé).
+- **Gradle Wrapper** configuré en version 8.9 avec son archive jar exécutable.
+- **Ressources XML** :
+  - `values/strings.xml`, `values/colors.xml`, `values/themes.xml`.
+  - `xml/data_extraction_rules.xml`, `xml/backup_rules.xml`.
+  - Icône originale de lanceur adaptive (`drawable/ic_launcher_background.xml`, `drawable/ic_launcher_foreground.xml`, `drawable/ic_launcher_monochrome.xml`, `mipmap-anydpi-v26/ic_launcher.xml`).
+  - Bannière vectorielle originale `drawable/ic_synapse_banner.xml`.
+- **Manifeste Android** (`app/src/main/AndroidManifest.xml`) : permissions internet, réseau et audio, configuration de `MainActivity` avec `adjustResize` et filtres d'URI d'appairage `synapse://pair`.
+
+### Phase 3 — Modèles de Domaine & Couche Données (Complétée)
+- **Modèles de Domaine Immuables** : `Bot`, `ChatMessage`, `ApprovalRequest`, `ExecutionStep`, `Routine`, `MemoryFact`, `ExtensionItem`, `ServerConfig`.
+- **Base de Données Locale Room (`SynapseDatabase`)** :
+  - `BotEntity` & `BotDao` avec requêtes de tri réactives par Flow.
+  - `ChatMessageEntity` & `MessageDao` pour la persistance locale des messages.
+  - `ApprovalEntity` & `ApprovalDao` pour l'historique des permissions.
+- **DataStore Preferences (`SynapsePreferences`)** : Sauvegarde asynchrone des options de thème, serveur et détails de réflexion.
+- **Couche Réseau (OkHttp & Retrofit)** : `SynapseApiService` avec DTOs `ServerInfoResponse`, `SendMessageRequest`, `ApproveRequest`.
+- **Repositories** : `BotRepositoryImpl`, `ChatRepositoryImpl`, `ServerRepositoryImpl`, `PreferencesRepositoryImpl`.
+- **Conteneur DI & Application** : `SynapseContainer` et `SynapseApplication`.
+
+### Phase 4 — Design System & Composants Jetpack Compose (Complétée)
+- **Thème Material 3** : `Color.kt` (Dark Obsidian & Light Platine), `Spacing.kt`, `Shape.kt`, `Type.kt`, `Theme.kt`.
+- **Composants Réutilisables** :
+  - `ThinkingOrb` : Orbe pulsant multi-niveaux pour visualiser l'activité des agents.
+  - `BotAvatar` : Avatar avec glyphes géométriques, indicateur d'état, étoile or `★` du Lead Bot et badge de non-lus.
+  - `BotCard` : Carte du roster avec nom, tag du fournisseur, extrait de message et statut en direct.
+  - `ChatMessageItem` : Bulle utilisateur teintée, bulle agent avec rendu clair, gestion des citations `replyTo` et cartes d'artéfacts.
+  - `MessageComposer` : Champ extensible, barre de citation rétractable, bouton de pièce jointe et bouton d'action dynamique (Envoi / Micro / Stop).
+  - `ApprovalCard` : Carte de sécurité pour l'approbation explicite des commandes shell et écritures fichiers avec boutons dédiés.
+  - `ThinkingTraceView` : Vue accordéon dépliable pour inspecter les étapes de raisonnement de l'agent.
+  - `ConnectionStatusChip` : Pastille interactive de statut du serveur dans la barre supérieure.
+  - `EmptyStateView` & `ErrorStateView` : Écrans d'états vides et d'erreurs soignés.
+  - `SettingsRow` & `ConfirmationDialog` : Composants de configuration et dialogues d'action destructive.
+
+### Phase 5 — Implémentation des 11 Écrans & Navigation (Complétée)
+1. **OnboardingScreen** : Présentation et arguments clés avec redirection appairage ou démo.
+2. **PairingScreen** : Configuration de l'hôte (127.0.0.1, LAN, passerelle), jeton de session, test ping actif et retour visuel.
+3. **RosterScreen** : Liste des bots triée en 3 bandes (Lead Bot en tête avec étoile or `★`, épinglés, autres), recherche, menu d'actions et FAB.
+4. **BotEditorScreen** : Création et modification d'agent (forme, couleur d'accent, fournisseur IA, modèle, Fast Mode, instructions, politique d'approbation).
+5. **ChatScreen** : Conversation en direct, bulles sans streaming cassé, orbe d'exécution, citations et approbations interactives.
+6. **TraceScreen** : Visualisation détaillée des étapes de réflexion, durées et flux JSON brut d'événements.
+7. **ApprovalsScreen** : Écran dédié listant les autorisations en attente avec actions directes.
+8. **GroupEditorScreen** : Création de salons multi-agents avec sélection des participants.
+9. **SettingsScreen** : Préférences de thème, chat, diagnostic serveur et liens vers les modules.
+10. **ComplementaryScreens** :
+    - `MemoryScreen` : Explorateur des faits `MEMORY.md`.
+    - `RoutinesScreen` : Tâches automatisées programmées avec bouton de test.
+    - `ExtensionsScreen` : Catalogue des connecteurs MCP et outils système.
+    - `VoiceScreen` : Appel vocal mains-libres avec reconnaissance vocale Android.
+    - `RemoteScreenUnavailable` : État d'indisponibilité transparent expliquant les prérequis WebRTC/Wayland.
+11. **StateScreens** : Écrans d'état hors-ligne, permissions refusées et erreurs système.
+- **Navigation** : `NavRoutes.kt`, `SynapseNavHost.kt`, `MainActivity.kt` avec gestion des deep links d'appairage.
+
+### Phase 6 — Tests & CI GitHub Actions (Complétée)
+- Tests unitaires complets écrits avec JUnit 4, MockK et Kotlinx Coroutines Test :
+  - `RosterViewModelTest` : Validation du tri à 3 bandes (Lead bot en tête permanente, puis épinglés, puis récents) et du filtrage.
+  - `ChatViewModelTest` : Validation de l'envoi de messages, gestion des citations et réponse aux approbations.
+  - `ModelValidationTest` : Validation de la conversion bidirectionnelle Room Entity <-> Domain Model.
+- Workflow CI GitHub Actions `.github/workflows/build_apk.yml` :
+  - Exécuteur `ubuntu-latest` avec JDK 21 Temurin et Gradle 8.9.
+  - Exécution des tests unitaires (`testDebugUnitTest`).
+  - Compilation de l'APK debug (`assembleDebug`).
+  - Production du fichier `Synapse-v1.0.0-debug.apk` et de son empreinte `Synapse-v1.0.0-debug.apk.sha256`.
+  - Upload automatique comme artefact de build téléchargeable.
+
+---
+
+## 3. Synthèse des Fichiers Modifiés & Créés
+
+* Racine `/root/` :
+  - `docs/REFERENCE_AUDIT.md` (Créé)
+  - `docs/SCREEN_INVENTORY.md` (Créé)
+  - `docs/REFERENCE_GAPS.md` (Créé)
+  - `docs/DESIGN_SYSTEM.md` (Créé)
+  - `docs/ARCHITECTURE.md` (Créé)
+  - `docs/TEST_PLAN.md` (Créé)
+  - `docs/KNOWN_LIMITATIONS.md` (Créé)
+  - `README.md` (Créé)
+  - `worklog.md` (Créé)
+* Projet `/root/synapse/` :
+  - 90 fichiers sources (code Kotlin, ressources vectorielles XML, DAOs Room, ViewModels, Composables, tests unitaires, workflow GitHub Actions et documentation répliquée).
+  - Validé par un commit initial Git : `0e591b1` sur la branche `main`.
