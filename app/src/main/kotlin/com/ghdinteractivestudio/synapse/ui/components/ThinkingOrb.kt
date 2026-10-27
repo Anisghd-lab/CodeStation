@@ -1,77 +1,80 @@
 package com.ghdinteractivestudio.synapse.ui.components
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.ghdinteractivestudio.synapse.ui.theme.SynapseDarkPrimary
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import com.ghdinteractivestudio.synapse.ui.theme.Palette
 
+enum class ThinkingOrbState { Working, Searching, Listening, Connecting, Shaping }
+
+/**
+ * 3D wireframe geometric thinking orb with dynamic dot geometry and depth shading.
+ */
 @Composable
 fun ThinkingOrb(
-    modifier: Modifier = Modifier,
+    state: ThinkingOrbState = ThinkingOrbState.Working,
     size: Dp = 16.dp,
-    color: Color = SynapseDarkPrimary,
-    isPulsing: Boolean = true
+    color: Color = Palette.text,
+    animated: Boolean = true,
+    modifier: Modifier = Modifier
 ) {
-    if (!isPulsing) {
-        Box(
-            modifier = modifier
-                .size(size)
-                .background(color, CircleShape)
-        )
-        return
+    val points = with(LocalDensity.current) { size.toPx() }.toDouble()
+    var time by remember { mutableDoubleStateOf(0.6) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+
+    if (animated) {
+        LaunchedEffect(state, points) {
+            val speed = ThinkingOrbGeometry.speed(state, size.value.toDouble())
+            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                val start = withFrameNanos { it }
+                var last = 0L
+                while (true) {
+                    withFrameNanos { now ->
+                        if (now - last >= 33_000_000L) {
+                            last = now
+                            time = 0.6 + (now - start) / 1e9 * speed
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    val transition = rememberInfiniteTransition(label = "orbTransition")
-    val scale by transition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "orbScale"
-    )
-    val alpha by transition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 0.95f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "orbAlpha"
-    )
+    val scale = points / size.value
+    Canvas(modifier.size(size).clearAndSetSemantics {}) {
+        val frame = ThinkingOrbGeometry.frame(state, size.value.toDouble(), time)
+        fun ink(white: Double, alpha: Double) = ((1 - white.coerceIn(0.0, 1.0)) * alpha).toFloat()
 
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier.size(size * 1.5f)
-    ) {
-        // Outer halo
-        Box(
-            modifier = Modifier
-                .size(size)
-                .scale(scale)
-                .background(color.copy(alpha = alpha * 0.4f), CircleShape)
-        )
-        // Core node
-        Box(
-            modifier = Modifier
-                .size(size * 0.7f)
-                .background(color, CircleShape)
-        )
+        for (line in frame.lines) {
+            drawLine(
+                color.copy(alpha = color.alpha * ink(line.white, line.alpha)),
+                Offset((line.x1 * scale).toFloat(), (line.y1 * scale).toFloat()),
+                Offset((line.x2 * scale).toFloat(), (line.y2 * scale).toFloat()),
+                (line.width * scale).toFloat()
+            )
+        }
+        for (dot in frame.dots) {
+            drawCircle(
+                color.copy(alpha = color.alpha * ink(dot.white, dot.alpha)),
+                (dot.radius * scale).toFloat(),
+                Offset((dot.x * scale).toFloat(), (dot.y * scale).toFloat())
+            )
+        }
     }
 }

@@ -1,224 +1,187 @@
 package com.ghdinteractivestudio.synapse.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.ghdinteractivestudio.synapse.domain.model.ApprovalActionType
 import com.ghdinteractivestudio.synapse.domain.model.ApprovalRequest
 import com.ghdinteractivestudio.synapse.domain.model.ApprovalStatus
-import com.ghdinteractivestudio.synapse.ui.theme.SynapseDarkError
-import com.ghdinteractivestudio.synapse.ui.theme.SynapseDarkSuccess
-import com.ghdinteractivestudio.synapse.ui.theme.SynapseDarkWarning
+import com.ghdinteractivestudio.synapse.ui.theme.Capsule
+import com.ghdinteractivestudio.synapse.ui.theme.Palette
+import com.ghdinteractivestudio.synapse.ui.theme.RoundedRectangle
+import com.ghdinteractivestudio.synapse.ui.theme.Type
+import com.ghdinteractivestudio.synapse.ui.theme.medium
+import com.ghdinteractivestudio.synapse.ui.theme.monospaced
+import com.ghdinteractivestudio.synapse.ui.theme.semibold
 
+/**
+ * Approval card in Grok Bot's choice-card style: what the agent wants, where it runs, and choices.
+ */
 @Composable
-fun ApprovalCard(
-    approval: ApprovalRequest,
-    onApproveOnce: () -> Unit,
-    onApproveAlways: () -> Unit,
+fun ApprovalCardItem(
+    request: ApprovalRequest,
+    hostName: String = "localhost (Termux)",
+    isAnswering: Boolean = false,
+    onApprove: (Boolean) -> Unit,
     onReject: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, SynapseDarkWarning.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(16.dp)
+    val pending = request.status == ApprovalStatus.PENDING
+    var expanded by remember { mutableStateOf(false) }
+    var chosen by remember { mutableStateOf<String?>(null) }
+
+    val headline = when (request.actionType) {
+        ApprovalActionType.SHELL_COMMAND -> "Wants to run a command"
+        ApprovalActionType.FILE_WRITE -> "Wants to change files"
+        ApprovalActionType.NETWORK_ACCESS -> "Wants to access the network"
+    }
+
+    Column(
+        modifier
+            .padding(end = 40.dp)
+            .widthIn(max = 420.dp)
+            .clip(RoundedRectangle(22.dp))
+            .background(Palette.bubbleAgent)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // En-tête d'avertissement de sécurité
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Text(tr(headline), style = Type.headline, color = Palette.text)
+            if (pending) {
                 Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(SynapseDarkWarning.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Security,
-                        contentDescription = "Permission Requise",
-                        tint = SynapseDarkWarning,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                Column {
-                    Text(
-                        text = "Autorisation Requise",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = SynapseDarkWarning,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "${approval.botName} demande à exécuter :",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                    Modifier
+                        .size(7.dp)
+                        .clip(Capsule())
+                        .background(Palette.warning)
+                )
             }
+        }
 
-            Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            request.commandOrPath,
+            style = Type.subheadline.monospaced,
+            color = Palette.secondary,
+            maxLines = if (expanded) Int.MAX_VALUE else 3
+        )
 
-            // Boîte de commande / chemin en police monospace
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.Black.copy(alpha = 0.45f))
-                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
-                    .padding(10.dp)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Symbol("desktopcomputer", size = 14.dp, tint = Palette.tertiary)
+            Text(
+                "Runs on $hostName · ${request.botName}",
+                style = Type.caption,
+                color = Palette.tertiary
+            )
+        }
+
+        val hasDetail = !request.diffPreview.isNullOrEmpty() || request.commandOrPath.length > 60
+        if (hasDetail) {
+            Disclosure(
+                expanded = expanded,
+                onToggle = { expanded = !expanded },
+                label = {
+                    Text(tr("Details"), style = Type.caption.medium, color = Palette.secondary)
+                }
             ) {
-                Column {
-                    Text(
-                        text = approval.actionType.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = approval.commandOrPath,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp,
-                        color = Color.White
-                    )
-
-                    if (!approval.diffPreview.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = approval.diffPreview,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                Column(Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CodeBox(request.commandOrPath)
+                    if (!request.diffPreview.isNullOrEmpty()) {
+                        CodeBox(request.diffPreview)
                     }
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(12.dp))
+        if (pending) {
+            val options = listOf(
+                "allow_once" to "Allow once",
+                "allow_always" to "Always allow",
+                "reject_once" to "Deny"
+            )
 
-            // Statut ou Boutons d'action
-            when (approval.status) {
-                ApprovalStatus.PENDING -> {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = onApproveOnce,
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = SynapseDarkSuccess),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Approuver", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            }
-
-                            OutlinedButton(
-                                onClick = onReject,
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = SynapseDarkError),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = null, tint = SynapseDarkError, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Refuser", color = SynapseDarkError, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        OutlinedButton(
-                            onClick = onApproveAlways,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Text("Toujours autoriser pour cette session", fontSize = 11.sp)
-                        }
-                    }
-                }
-                ApprovalStatus.APPROVED -> {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(SynapseDarkSuccess.copy(alpha = 0.15f))
-                            .padding(8.dp)
-                    ) {
-                        Icon(Icons.Default.Check, contentDescription = null, tint = SynapseDarkSuccess, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (approval.isAlwaysApproved) "Autorisé définitivement pour cette session" else "Action autorisée",
-                            color = SynapseDarkSuccess,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
+            Column(
+                Modifier
+                    .padding(top = 4.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedRectangle(14.dp))
+                    .background(Palette.background)
+            ) {
+                for ((index, option) in options.withIndex()) {
+                    val (id, label) = option
+                    if (index > 0) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(0.5.dp)
+                                .background(Palette.border)
                         )
                     }
-                }
-                ApprovalStatus.REJECTED -> {
+                    val isWaiting = isAnswering && chosen != null
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
+                        Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(SynapseDarkError.copy(alpha = 0.15f))
-                            .padding(8.dp)
+                            .heightIn(min = 46.dp)
+                            .clickable(enabled = !isAnswering, role = Role.Button) {
+                                chosen = id
+                                when (id) {
+                                    "allow_once" -> onApprove(false)
+                                    "allow_always" -> onApprove(true)
+                                    "reject_once" -> onReject()
+                                }
+                            }
+                            .graphicsLayer { alpha = if (!isWaiting || chosen == id) 1f else 0.4f }
+                            .padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = null, tint = SynapseDarkError, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Action refusée par l'utilisateur",
-                            color = SynapseDarkError,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
+                            tr(label),
+                            Modifier.weight(1f),
+                            style = if (id == "allow_once") Type.body.semibold else Type.body,
+                            color = if (id.startsWith("allow")) Palette.text else Palette.danger
                         )
+                        if (isAnswering && chosen == id) {
+                            Spinner(14.dp)
+                        }
                     }
                 }
             }
+        } else {
+            val statusLabel = when (request.status) {
+                ApprovalStatus.APPROVED -> if (request.isAlwaysApproved) "Always approved" else "Approved"
+                ApprovalStatus.REJECTED -> "Denied"
+                else -> "Pending"
+            }
+            Text(
+                tr(statusLabel),
+                style = Type.caption.medium,
+                color = if (request.status == ApprovalStatus.APPROVED) Palette.added else Palette.danger
+            )
         }
     }
 }

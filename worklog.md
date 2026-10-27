@@ -100,20 +100,52 @@ Le projet respecte à 100% les contraintes imposées :
   - Production du fichier `Synapse-v1.0.0-debug.apk` et de son empreinte `Synapse-v1.0.0-debug.apk.sha256`.
   - Upload automatique comme artefact de build téléchargeable.
 
+### Phase 7 — Rétro-Ingénierie des Sources Android Codync & Parité UI/UX Totale (Complétée)
+- **Inspection Directe des Sources Android Officielles** (`/root/Codyn/apps/android/`) :
+  - Analyse approfondie des modules `design` (`Palette.kt`, `Type.kt`, `Motion.kt`, `Shape.kt`, `CharacterAvatar.kt`, `Controls.kt`, `Chrome.kt`), `app` (`RosterView.kt`, `ChatView.kt`, `PairingView.kt`, `TraceView.kt`) et `core` (`dev.codync.core.api`).
+- **Alignement Rigoureux du Design System** :
+  - Remplacement des dégradés saturés par la véritable palette monochrome d'Apple/Codync : fond noir profond `#0A0A0A` (mode sombre) / blanc pur `#FFFFFF` (mode clair), bulles de message grises neutres (`#1E1E1E` pour l'agent, `#262626` pour l'utilisateur), accent blanc contrasté, couleur isolée aux 11 teintes d'avatars et signaux d'état (ambre `#F59E0B` pour `warning`/`needsInput`, rouge `#EF4444` pour `danger`).
+  - Intégration de la police variable `Inter.ttf` (879 Ko) avec formule de crénage optique dynamique calquée sur SF Pro.
+  - Formes à courbure continue : `Capsule()` et `RoundedRectangle(radius)`.
+  - Intégration des 172 drawables vectoriels SF Symbols officiels (`sf_*.xml`), `apple_logo.xml` et `computer_linux.xml` dans `app/src/main/res/drawable/`.
+  - Modélisation vectorielle pure sur Canvas pour `Bubbles` et `CardStack` dans `DrawnSymbols.kt`.
+- **Implémentation des Composants Graphiques Avancés** :
+  - `CharacterAvatar.kt` : Reproduction fidèle des 8 formes géométriques (`blob`, `pebble`, `squircle`, `tablet`, `wedge`, `hex`, `cloud`, `teardrop`), rendu 3D sphérique par gradient radial avec reflet spéculaire en coin supérieur gauche, regard dynamique animé et clignement naturel périodique.
+  - `ThinkingOrb.kt` & `ThinkingOrbGeometry.kt` : Orbe géométrique 3D wireframe projeté sur Canvas avec rotation spatiale continue, estompage de profondeur et arêtes filaires.
+  - `ApprovalCard.kt` : Carte de demande d'approbation d'action (exécution bash, modification de fichier) avec visualiseur de diff colorisé (`#10B981` / `#EF4444`), boîte de code shell et trois boutons tactiles ("Autoriser une fois", "Toujours autoriser", "Refuser").
+  - `MessageComposer.kt` : Compositeur de message extensible, raccourci clavier `Ctrl/Meta+Enter`, aperçu des citations en réponse (`QuotedReply`), bouton en verre pour les pièces jointes et bouton d'action à morphing dynamique (Envoyer / Arrêter / Appel vocal).
+  - `Chrome.kt` & `Glass.kt` : `ScreenHeader`, `ModalHeader`, `BackButton`, conteneur immersif `GlassStage` et barre de navigation inférieure flottante `GlassTabBar`.
+- **Refonte et Alignement des 11 Écrans** :
+  - `RosterScreen.kt`, `ChatScreen.kt`, `PairingScreen.kt`, `ApprovalsScreen.kt`, `TraceScreen.kt`, `BotEditorScreen.kt`, `GroupEditorScreen.kt`, `SettingsScreen.kt`, `OnboardingScreen.kt`, `StateScreens.kt`.
+- **Connexion Réseau Android ⟷ Termux Loopback** :
+  - Vérification du daemon local `codync_host` (v2.28.0) écoutant sur `http://127.0.0.1:19222`.
+  - Implémentation des endpoints réels dans `SynapseApiService.kt` : `GET /health`, `POST /api/hello`, `POST /api/send`, `POST /api/stop`, `POST /api/respondPermission`, `GET /events?since=0`.
+  - Configuration de `ServerRepositoryImpl.kt` avec mesure de latence réelle en millisecondes et résolution du jeton d'accès `/root/.codync-dev/token`.
+  - Prise en charge des deep links d'appairage `synapse://pair?token=...&host=...`.
+- **Tests Unitaires & Assurance Qualité** :
+  - Création de `DesignTokensTest.kt` validant les valeurs hexadécimales de la palette monochrome, les 8 formes d'avatars et les constantes de motion.
+  - Création de `ServerConnectionTest.kt` validant la classification en loopback, l'interrogation du endpoint `/health` et la gestion des erreurs 401.
+  - Maintien et exécution sans régression de `ModelValidationTest.kt`, `RosterViewModelTest.kt` et `ChatViewModelTest.kt`.
+- **Documentation Dédiée Livrée** :
+  - `docs/CODYNC_UI_PARITY_AUDIT.md` : Audit exhaustif de parité visuelle et fonctionnelle.
+  - `docs/UI_COMPONENT_MAPPING.md` : Table de correspondance directe fichier par fichier.
+  - `docs/CONNECTION_TERMUX_DESIGN.md` : Architecture matérielle et logicielle de la connexion locale.
+  - `docs/UI_PARITY_TESTS.md` : Matrice de tests et plan de vérification.
+
 ---
 
 ## 3. Synthèse des Fichiers Modifiés & Créés
 
-* Racine `/root/` :
-  - `docs/REFERENCE_AUDIT.md` (Créé)
-  - `docs/SCREEN_INVENTORY.md` (Créé)
-  - `docs/REFERENCE_GAPS.md` (Créé)
-  - `docs/DESIGN_SYSTEM.md` (Créé)
-  - `docs/ARCHITECTURE.md` (Créé)
-  - `docs/TEST_PLAN.md` (Créé)
-  - `docs/KNOWN_LIMITATIONS.md` (Créé)
-  - `README.md` (Créé)
-  - `worklog.md` (Créé)
-* Projet `/root/synapse/` :
-  - 90 fichiers sources (code Kotlin, ressources vectorielles XML, DAOs Room, ViewModels, Composables, tests unitaires, workflow GitHub Actions et documentation répliquée).
-  - Validé par un commit initial Git : `0e591b1` sur la branche `main`.
+* Racine `/root/synapse/docs/` :
+  - `CODYNC_UI_PARITY_AUDIT.md` (Créé)
+  - `UI_COMPONENT_MAPPING.md` (Créé)
+  - `CONNECTION_TERMUX_DESIGN.md` (Créé)
+  - `UI_PARITY_TESTS.md` (Créé)
+  - `REFERENCE_AUDIT.md`, `SCREEN_INVENTORY.md`, `REFERENCE_GAPS.md`, `DESIGN_SYSTEM.md`, `ARCHITECTURE.md`, `TEST_PLAN.md`, `KNOWN_LIMITATIONS.md`
+* Projet `/root/synapse/app/` :
+  - 172 drawables vectoriels officiels `res/drawable/sf_*.xml`, `apple_logo.xml`, `computer_linux.xml`
+  - Police variable `res/font/inter.ttf`
+  - Nouveaux composants : `CharacterAvatar.kt`, `ThinkingOrb.kt`, `ThinkingOrbGeometry.kt`, `Chrome.kt`, `Controls.kt`, `Glass.kt`, `DrawnSymbols.kt`, `Symbols.kt`, `Symbol.kt`
+  - Thème aligné : `Palette.kt`, `Motion.kt`, `Type.kt`, `Shape.kt`, `Theme.kt`
+  - Écrans alignés : `RosterScreen.kt`, `ChatScreen.kt`, `PairingScreen.kt`, `ApprovalsScreen.kt`, `TraceScreen.kt`, `BotEditorScreen.kt`, `GroupEditorScreen.kt`, `SettingsScreen.kt`, `OnboardingScreen.kt`, `StateScreens.kt`
+  - Nouveaux tests : `DesignTokensTest.kt`, `ServerConnectionTest.kt`

@@ -11,9 +11,11 @@ import com.ghdinteractivestudio.synapse.domain.repository.BotRepository
 import com.ghdinteractivestudio.synapse.domain.repository.ChatRepository
 import com.ghdinteractivestudio.synapse.domain.repository.PreferencesRepository
 import com.ghdinteractivestudio.synapse.domain.repository.ServerRepository
+import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
 
 interface AppContainer {
@@ -41,14 +43,23 @@ class SynapseContainer(private val context: Context) : AppContainer {
             .build()
     }
 
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        encodeDefaults = true
+        coerceInputValues = true
+    }
+
     private fun createApiService(baseUrl: String): SynapseApiService? {
         return try {
+            val contentType = "application/json".toMediaType()
             Retrofit.Builder()
                 .baseUrl(if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/")
                 .client(okHttpClient)
+                .addConverterFactory(json.asConverterFactory(contentType))
                 .build()
                 .create(SynapseApiService::class.java)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -69,7 +80,11 @@ class SynapseContainer(private val context: Context) : AppContainer {
             messageDao = database.messageDao(),
             approvalDao = database.approvalDao(),
             botDao = database.botDao(),
-            apiService = null
+            apiServiceProvider = {
+                val config = serverRepository.getServerConfig()
+                createApiService(config.url)
+            },
+            serverRepository = serverRepository
         )
     }
 }

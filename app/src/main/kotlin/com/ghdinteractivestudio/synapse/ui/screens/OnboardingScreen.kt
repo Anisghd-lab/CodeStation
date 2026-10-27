@@ -1,7 +1,6 @@
 package com.ghdinteractivestudio.synapse.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,194 +11,154 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Hub
-import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Terminal
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.ghdinteractivestudio.synapse.ui.components.ThinkingOrb
-import com.ghdinteractivestudio.synapse.ui.theme.SynapseDarkPrimary
-import com.ghdinteractivestudio.synapse.ui.theme.SynapseDarkSecondary
+import com.ghdinteractivestudio.synapse.ui.components.CharacterAvatar
+import com.ghdinteractivestudio.synapse.ui.components.PrimaryButton
+import com.ghdinteractivestudio.synapse.ui.components.SecondaryButton
+import com.ghdinteractivestudio.synapse.ui.components.Symbol
+import com.ghdinteractivestudio.synapse.ui.theme.Capsule
+import com.ghdinteractivestudio.synapse.ui.theme.Palette
+import com.ghdinteractivestudio.synapse.ui.theme.Type
+import com.ghdinteractivestudio.synapse.ui.theme.bold
+import com.ghdinteractivestudio.synapse.ui.theme.semibold
 
 @Composable
 fun OnboardingScreen(
-    onConfigureServer: () -> Unit,
-    onExploreDemo: () -> Unit,
+    onConfigureServer: () -> Unit = {},
+    onExploreDemo: () -> Unit = {},
+    onContinue: () -> Unit = onConfigureServer,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 24.dp, vertical = 32.dp),
-        horizontalAlignment = Alignment.CenterVertically,
-        verticalArrangement = Arrangement.SpaceBetween
+            .background(Palette.background)
+            .statusBarsPadding()
+            .padding(horizontal = 24.dp, vertical = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // En-tête avec Hero Logo vectoriel
-        Column(
-            horizontalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(top = 16.dp)
+        Spacer(modifier = Modifier.height(40.dp))
+
+        // Center Animated Avatar
+        Box(
+            modifier = Modifier.size(100.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(90.dp)
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .border(2.dp, SynapseDarkPrimary.copy(alpha = 0.5f), RoundedCornerShape(26.dp))
-            ) {
-                ThinkingOrb(size = 36.dp, color = SynapseDarkPrimary, isPulsing = true)
-                Icon(
-                    imageVector = Icons.Default.Hub,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(42.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Text(
-                text = "Synapse AI Studio",
-                style = MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Pilotez vos agents IA autonomes depuis votre mobile. Conçu pour Claude Code, Codex, Gemini et vos environnements locaux.",
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            CharacterAvatar(
+                shape = "blob",
+                color = "blue",
+                size = 90.dp,
+                status = "working"
             )
         }
 
-        // Cartes d'arguments clés
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "Synapse",
+            style = Type.largeTitle.bold,
+            color = Palette.text
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Vos agents IA locaux dans Termux, directement sur votre téléphone Android.",
+            style = Type.body,
+            color = Palette.secondary,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(40.dp))
+
+        // Key Value Propositions
         Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            FeatureHighlightRow(
-                icon = Icons.Default.Terminal,
-                title = "Boucle Locale & Zéro Latence",
-                description = "Liaison directe avec Termux/PRoot 127.0.0.1 ou serveur dédié."
+            FeatureRow(
+                symbol = "brain",
+                title = "Agents Autonomes",
+                description = "Pilotez Google Antigravity, OpenAI Codex et OpenCode exécutés dans PRoot."
             )
-            FeatureHighlightRow(
-                icon = Icons.Default.Security,
-                title = "Approbations Explicites",
-                description = "Vous gardez le contrôle total sur chaque commande shell et patch."
+
+            FeatureRow(
+                symbol = "wifi",
+                title = "Boucle Locale 127.0.0.1",
+                description = "Communication directe ultra-rapide sans latence cloud ni proxy intermédiaire."
             )
-            FeatureHighlightRow(
-                icon = Icons.Default.Psychology,
-                title = "Orchestration Multi-Agents",
-                description = "Coordination entre agents avec salons de discussion collaboratifs."
+
+            FeatureRow(
+                symbol = "lock.fill",
+                title = "Confidentialité Absolue",
+                description = "Vos données, conversations et artefacts restent confinés sur votre appareil."
             )
         }
 
-        // Boutons d'action
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Button(
-                onClick = onConfigureServer,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SynapseDarkPrimary)
-            ) {
-                Text(
-                    text = "Configurer mon serveur",
-                    color = Color.Black,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-            }
-
-            OutlinedButton(
-                onClick = onExploreDemo,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Text(
-                    text = "Explorer avec des données d'exemple",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 15.sp
-                )
-            }
+            PrimaryButton(
+                title = "Configurer Termux",
+                action = onConfigureServer,
+                modifier = Modifier.weight(1f)
+            )
+            SecondaryButton(
+                title = "Mode Hors-ligne",
+                action = onExploreDemo
+            )
         }
     }
 }
 
 @Composable
-private fun FeatureHighlightRow(
-    icon: ImageVector,
+private fun FeatureRow(
+    symbol: String,
     title: String,
     description: String
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.Top
     ) {
         Box(
             modifier = Modifier
                 .size(40.dp)
-                .clip(CircleShape)
-                .background(SynapseDarkPrimary.copy(alpha = 0.15f)),
+                .clip(Capsule())
+                .background(Palette.surface),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = SynapseDarkPrimary,
-                modifier = Modifier.size(20.dp)
-            )
+            Symbol(name = symbol, size = 20.dp, tint = Palette.text)
         }
 
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface
+                style = Type.body.semibold,
+                color = Palette.text
             )
             Text(
                 text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = Type.subheadline,
+                color = Palette.secondary
             )
         }
     }

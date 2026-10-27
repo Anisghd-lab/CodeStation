@@ -1,6 +1,7 @@
 package com.ghdinteractivestudio.synapse.data.local
 
-import android.net.Uri
+import java.net.URI
+import java.net.URLDecoder
 import com.ghdinteractivestudio.synapse.data.preferences.PreferencesRepositoryImpl
 import com.ghdinteractivestudio.synapse.data.remote.SynapseApiService
 import com.ghdinteractivestudio.synapse.domain.model.ServerConfig
@@ -61,64 +62,92 @@ class ServerRepositoryImpl(
     override suspend fun testConnection(): Result<ServerConfig> {
         return runCatching {
             val current = getServerConfig()
-            _serverState.value = current.copy(status = ServerConnectionStatus.CONNECTING)
+            _serverState.value = current.copy(status = ServerConnectionStatus.CONNECTING, errorMessage = null)
 
             val startTime = System.currentTimeMillis()
             val api = apiServiceProvider(current.url)
+                ?: error("Client HTTP non initialisable pour l'URL: ${current.url}")
 
-            if (api != null) {
+            // 1. Appel du endpoint réel GET /health (ouvert sur loopback)
+            val healthResponse = try {
+                api.getHealth()
+            } catch (e: Exception) {
+                val errorConfig = current.copy(
+                    status = ServerConnectionStatus.ERROR,
+                    errorMessage = "Impossible de joindre l'hôte (${e.message ?: "Connexion refusée"}). Vérifiez que le serveur écoute sur ${current.url}."
+                )
+                _serverState.value = errorConfig
+                return@runCatching errorConfig
+            }
+
+            val duration = System.currentTimeMillis() - startTime
+            if (!healthResponse.isSuccessful || healthResponse.body() == null) {
+                val errorConfig = current.copy(
+                    status = ServerConnectionStatus.ERROR,
+                    errorMessage = "Réponse HTTP invalide de l'hôte (${healthResponse.code()})"
+                )
+                _serverState.value = errorConfig
+                return@runCatching errorConfig
+            }
+
+            val health = healthResponse.body()!!
+            var activeBots = 0
+            var verifiedVersion = health.version
+
+            // 2. Si un token d'appairage est fourni, valider POST /api/hello
+            if (!current.token.isNullOrBlank()) {
                 try {
-                    val response = api.getServerInfo(current.token?.let { "Bearer $it" })
-                    val duration = System.currentTimeMillis() - startTime
-                    if (response.isSuccessful && response.body() != null) {
-                        val body = response.body()!!
-                        val connected = current.copy(
-                            status = ServerConnectionStatus.CONNECTED,
+                    val helloResponse = api.hello("Bearer ${current.token}")
+                    if (helloResponse.isSuccessful && helloResponse.body() != null) {
+                        val hello = helloResponse.body()!!
+                        verifiedVersion = hello.version ?: verifiedVersion
+                    } else if (helloResponse.code() == 401) {
+                        val errorConfig = current.copy(
+                            status = ServerConnectionStatus.ERROR,
                             latencyMs = duration,
-                            serverVersion = body.version,
-                            activeBotCount = body.activeBotsCount,
-                            lastConnectedAt = System.currentTimeMillis()
+                            serverVersion = verifiedVersion,
+                            errorMessage = "Jeton d'appairage invalide (401 Unauthorized)."
                         )
-                        _serverState.value = connected
-                        return@runCatching connected
+                        _serverState.value = errorConfig
+                        return@runCatching errorConfig
                     }
-                } catch (e: Exception) {
-                    // Fallthrough to loopback / local check
+                } catch (_: Exception) {
+                    // Si hello échoue pour une raison mineure alors que health a réussi
                 }
             }
 
-            // Si c'est la boucle locale 127.0.0.1
-            if (current.url.contains("127.0.0.1")) {
-                val loopbackConnected = current.copy(
-                    status = ServerConnectionStatus.CONNECTED,
-                    latencyMs = 4L,
-                    serverVersion = "Synapse-Host 1.0.0 (Local PRoot)",
-                    activeBotCount = 3,
-                    lastConnectedAt = System.currentTimeMillis()
-                )
-                _serverState.value = loopbackConnected
-                return@runCatching loopbackConnected
-            }
-
-            val errorConfig = current.copy(
-                status = ServerConnectionStatus.ERROR,
-                errorMessage = "Impossible de joindre le serveur hôte."
+            val connected = current.copy(
+                status = ServerConnectionStatus.CONNECTED,
+                latencyMs = duration,
+                serverVersion = verifiedVersion,
+                activeBotCount = activeBots,
+                errorMessage = null,
+                lastConnectedAt = System.currentTimeMillis()
             )
-            _serverState.value = errorConfig
-            errorConfig
+            _serverState.value = connected
+            connected
         }
     }
 
     override suspend fun parseAndApplyPairingUri(uriString: String): Result<ServerConfig> {
         return runCatching {
-            val uri = Uri.parse(uriString.trim())
-            val scheme = uri.scheme?.lowercase()
+            val trimmed = uriString.trim()
+            val parsedUri = runCatching { URI.create(trimmed) }.getOrNull()
+            val scheme = (parsedUri?.scheme ?: trimmed.substringBefore("://", "")).lowercase()
             if (scheme != "synapse" && scheme != "codestation" && scheme != "codync") {
                 error("Schéma d'URI non reconnu ($scheme). Attendu: synapse://pair")
             }
 
-            val token = uri.getQueryParameter("token") ?: uri.getQueryParameter("v")
-            val host = uri.getQueryParameter("host") ?: uri.getQueryParameter("url") ?: "http://127.0.0.1:19222"
+            val query = parsedUri?.rawQuery ?: trimmed.substringAfter("?", "")
+            val queryParams = query.split("&")
+                .filter { it.contains("=") }
+                .associate {
+                    val parts = it.split("=", limit = 2)
+                    parts[0] to runCatching { URLDecoder.decode(parts[1], "UTF-8") }.getOrDefault(parts[1])
+                }
+
+            val token = queryParams["token"] ?: queryParams["v"]
+            val host = queryParams["host"] ?: queryParams["url"] ?: "http://127.0.0.1:19222"
 
             updateServerUrl(host)
             if (token != null) {

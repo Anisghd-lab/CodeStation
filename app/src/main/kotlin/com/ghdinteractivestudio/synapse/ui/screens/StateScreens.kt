@@ -1,16 +1,15 @@
 package com.ghdinteractivestudio.synapse.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.WifiOff
-import androidx.compose.material3.Scaffold
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.ghdinteractivestudio.synapse.ui.components.EmptyStateView
-import com.ghdinteractivestudio.synapse.ui.components.ErrorStateView
+import com.ghdinteractivestudio.synapse.ui.components.PageHeader
+import com.ghdinteractivestudio.synapse.ui.theme.Palette
 
 @Composable
 fun OfflineStateScreen(
@@ -18,20 +17,19 @@ fun OfflineStateScreen(
     onConfigureServer: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Scaffold(modifier = modifier) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            EmptyStateView(
-                title = "Connexion hôte interrompue",
-                description = "Impossible de joindre le daemon hôte. Assurez-vous que le script de démarrage local tourne dans Termux ou que votre Wi-Fi est actif.",
-                icon = Icons.Default.WifiOff,
-                actionLabel = "Reconfigurer le serveur",
-                onActionClick = onConfigureServer
-            )
-        }
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Palette.background)
+            .statusBarsPadding()
+    ) {
+        EmptyStateView(
+            title = "Connexion hôte interrompue",
+            description = "Impossible de joindre le serveur Termux (127.0.0.1:19222). Assurez-vous que CodeStation est démarré avec ./start_code_station.sh start.",
+            symbolName = "wifi.slash",
+            actionLabel = "Reconfigurer le serveur",
+            onActionClick = onConfigureServer
+        )
     }
 }
 
@@ -41,19 +39,18 @@ fun PermissionDeniedScreen(
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Scaffold(modifier = modifier) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            EmptyStateView(
-                title = "Autorisation nécessaire",
-                description = "L'accès à l'autorisation ($permissionName) a été refusé. Veuillez l'activer dans les réglages système pour utiliser cette fonction.",
-                icon = Icons.Default.MicOff,
-                actionLabel = "Ouvrir les réglages",
-                onActionClick = onOpenSettings
-            )
-        }
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Palette.background)
+            .statusBarsPadding()
+    ) {
+        EmptyStateView(
+            title = "Autorisation nécessaire",
+            description = "L'accès à l'autorisation ($permissionName) a été refusé. Veuillez l'activer dans les réglages système pour utiliser cette fonction.",
+            symbolName = "mic.slash",
+            actionLabel = "Ouvrir les réglages",
+            onActionClick = onOpenSettings
+        )
     }
 }

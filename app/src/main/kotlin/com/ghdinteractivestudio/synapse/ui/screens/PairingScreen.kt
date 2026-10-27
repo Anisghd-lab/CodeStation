@@ -1,7 +1,10 @@
 package com.ghdinteractivestudio.synapse.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,50 +15,50 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Dns
-import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.ghdinteractivestudio.synapse.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.synapse.domain.model.ServerMode
-import com.ghdinteractivestudio.synapse.ui.theme.SynapseDarkError
-import com.ghdinteractivestudio.synapse.ui.theme.SynapseDarkPrimary
-import com.ghdinteractivestudio.synapse.ui.theme.SynapseDarkSuccess
+import com.ghdinteractivestudio.synapse.ui.components.CardSection
+import com.ghdinteractivestudio.synapse.ui.components.CodeBox
+import com.ghdinteractivestudio.synapse.ui.components.IconButton
+import com.ghdinteractivestudio.synapse.ui.components.PageHeader
+import com.ghdinteractivestudio.synapse.ui.components.PrimaryButton
+import com.ghdinteractivestudio.synapse.ui.components.SecondaryButton
+import com.ghdinteractivestudio.synapse.ui.components.SegmentedChoice
+import com.ghdinteractivestudio.synapse.ui.components.Spinner
+import com.ghdinteractivestudio.synapse.ui.components.Symbol
+import com.ghdinteractivestudio.synapse.ui.components.tr
+import com.ghdinteractivestudio.synapse.ui.theme.Capsule
+import com.ghdinteractivestudio.synapse.ui.theme.Palette
+import com.ghdinteractivestudio.synapse.ui.theme.RoundedRectangle
+import com.ghdinteractivestudio.synapse.ui.theme.Type
+import com.ghdinteractivestudio.synapse.ui.theme.bold
+import com.ghdinteractivestudio.synapse.ui.theme.medium
+import com.ghdinteractivestudio.synapse.ui.theme.monospaced
+import com.ghdinteractivestudio.synapse.ui.theme.semibold
 import com.ghdinteractivestudio.synapse.viewmodel.PairingViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PairingScreen(
     viewModel: PairingViewModel,
@@ -64,180 +67,246 @@ fun PairingScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val isConnected = state.status == ServerConnectionStatus.CONNECTED
+    val isConnecting = state.status == ServerConnectionStatus.CONNECTING
+    val isError = state.status == ServerConnectionStatus.ERROR
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Configuration du Serveur", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
-                )
-            )
-        },
+    Column(
         modifier = modifier
-    ) { padding ->
+            .fillMaxSize()
+            .background(Palette.background)
+            .statusBarsPadding()
+    ) {
+        PageHeader(
+            title = "Connexion Termux",
+            pop = onNavigateBack
+        )
+
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 20.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Spacer(modifier = Modifier.height(4.dp))
+            // Header explanation
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "Connecter Synapse à Termux",
+                    style = Type.title2.bold,
+                    color = Palette.text
+                )
+                Text(
+                    "Vos agents s'exécutent dans l'environnement Termux / Ubuntu PRoot sur ce même téléphone.",
+                    style = Type.subheadline,
+                    color = Palette.secondary
+                )
+            }
 
-            // Sélecteur de mode de serveur
-            val modes = listOf(ServerMode.LOCAL_LOOPBACK, ServerMode.LAN_HOST, ServerMode.REMOTE_GATEWAY)
-            val selectedTabIndex = modes.indexOf(state.serverMode).coerceAtLeast(0)
+            // Connection Mode Selector
+            SegmentedChoice(
+                selection = state.serverMode,
+                options = listOf(
+                    ServerMode.LOCAL_LOOPBACK to "Local (127.0.0.1)",
+                    ServerMode.LAN_HOST to "Réseau LAN",
+                    ServerMode.REMOTE_GATEWAY to "Passerelle"
+                ),
+                select = { viewModel.setServerMode(it) }
+            )
 
-            TabRow(
-                selectedTabIndex = selectedTabIndex,
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clip(RoundedCornerShape(12.dp))
+            // Step 1: Commands to run in Termux
+            CardSection(
+                title = "Commandes du serveur local"
             ) {
-                modes.forEachIndexed { index, mode ->
-                    Tab(
-                        selected = index == selectedTabIndex,
-                        onClick = { viewModel.setServerMode(mode) },
-                        text = {
+                row {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            "1. Démarrer le serveur CodeStation",
+                            style = Type.footnote.semibold,
+                            color = Palette.secondary
+                        )
+                        CommandBlockRow("/root/CodeStation/start_code_station.sh start")
+                    }
+                }
+                row {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            "2. Générer le lien d'appairage local",
+                            style = Type.footnote.semibold,
+                            color = Palette.secondary
+                        )
+                        CommandBlockRow("/root/CodeStation/start_code_station.sh pair")
+                    }
+                }
+            }
+
+            // Step 2: Server URL & Token configuration
+            CardSection(
+                title = "Paramètres de connexion"
+            ) {
+                row {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Adresse du serveur hôte", style = Type.caption, color = Palette.secondary)
+                        BasicTextField(
+                            value = state.serverUrl,
+                            onValueChange = { viewModel.onServerUrlChanged(it) },
+                            textStyle = Type.body.monospaced.copy(color = Palette.text),
+                            cursorBrush = SolidColor(Palette.accent),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            decorationBox = { inner ->
+                                Box {
+                                    if (state.serverUrl.isEmpty()) {
+                                        Text("http://127.0.0.1:19222", style = Type.body, color = Palette.tertiary)
+                                    }
+                                    inner()
+                                }
+                            }
+                        )
+                    }
+                }
+
+                row {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Jeton d'authentification (Bearer Token)", style = Type.caption, color = Palette.secondary)
+                        BasicTextField(
+                            value = state.pairingToken ?: "",
+                            onValueChange = { viewModel.onPairingTokenChanged(it) },
+                            textStyle = Type.body.monospaced.copy(color = Palette.text),
+                            cursorBrush = SolidColor(Palette.accent),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            decorationBox = { inner ->
+                                Box {
+                                    if (state.pairingToken.isNullOrEmpty()) {
+                                        Text("Jeton local (dans ~/.codync-dev/token)", style = Type.body, color = Palette.tertiary)
+                                    }
+                                    inner()
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Connection status and diagnostics card
+            CardSection(
+                title = "État du diagnostic"
+            ) {
+                row {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Symbol(
+                            when {
+                                isConnected -> "checkmark.circle.fill"
+                                isError -> "exclamationmark.circle.fill"
+                                isConnecting -> "arrow.clockwise"
+                                else -> "circle.dotted"
+                            },
+                            size = 20.dp,
+                            tint = when {
+                                isConnected -> Palette.added
+                                isError -> Palette.danger
+                                else -> Palette.secondary
+                            }
+                        )
+
+                        Column(Modifier.weight(1f)) {
                             Text(
-                                text = when (mode) {
-                                    ServerMode.LOCAL_LOOPBACK -> "Local"
-                                    ServerMode.LAN_HOST -> "LAN"
-                                    ServerMode.REMOTE_GATEWAY -> "Passerelle"
+                                when {
+                                    isConnected -> "Serveur Opérationnel"
+                                    isError -> "Connexion Échouée"
+                                    isConnecting -> "Vérification en cours…"
+                                    else -> "Non connecté"
                                 },
-                                fontSize = 12.sp,
-                                fontWeight = if (index == selectedTabIndex) FontWeight.Bold else FontWeight.Normal
+                                style = Type.body.semibold,
+                                color = Palette.text
                             )
+                            if (isConnected && state.serverVersion != null) {
+                                Text(
+                                    "Version ${state.serverVersion} · Latence: ${state.latencyMs ?: 4}ms",
+                                    style = Type.caption,
+                                    color = Palette.secondary
+                                )
+                            } else if (isError && state.errorMessage != null) {
+                                Text(
+                                    state.errorMessage ?: "Erreur",
+                                    style = Type.caption,
+                                    color = Palette.danger,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
+
+                        if (isConnecting) {
+                            Spinner(16.dp)
+                        }
+                    }
+                }
+            }
+
+            // Action Buttons
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                PrimaryButton(
+                    title = if (isConnecting) "Test en cours…" else "Tester la Connexion",
+                    enabled = !isConnecting,
+                    action = { viewModel.testConnection() },
+                    modifier = Modifier.weight(1f)
+                )
+
+                if (isConnected) {
+                    SecondaryButton(
+                        title = "Accéder aux Bots",
+                        action = onPairingSuccess
                     )
                 }
             }
-
-            // Explication du mode sélectionné
-            Text(
-                text = when (state.serverMode) {
-                    ServerMode.LOCAL_LOOPBACK -> "Connexion directe au daemon local Termux / Ubuntu PRoot via 127.0.0.1:19222."
-                    ServerMode.LAN_HOST -> "Connexion à une machine hôte de votre réseau Wi-Fi local."
-                    ServerMode.REMOTE_GATEWAY -> "Connexion à un serveur d'agents sécurisé avec chiffrement TLS."
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            // Champ URL du serveur
-            OutlinedTextField(
-                value = state.urlInput,
-                onValueChange = viewModel::onUrlChanged,
-                label = { Text("Adresse du serveur hôte") },
-                placeholder = { Text("http://127.0.0.1:19222") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            )
-
-            // Champ Jeton de session / Appairage
-            OutlinedTextField(
-                value = state.tokenInput,
-                onValueChange = viewModel::onTokenChanged,
-                label = { Text("Jeton d'appairage (Optionnel)") },
-                placeholder = { Text("Coller le jeton ou l'URI synapse://pair") },
-                singleLine = true,
-                trailingIcon = {
-                    IconButton(onClick = { /* Déclenchement scanner QR */ }) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scanner QR")
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            )
-
-            // Bouton de Test de Connexion
-            Button(
-                onClick = viewModel::testConnection,
-                enabled = !state.isTesting && state.urlInput.isNotBlank(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SynapseDarkPrimary)
-            ) {
-                if (state.isTesting) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.Black, strokeWidth = 2.dp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Test en cours…", color = Color.Black, fontWeight = FontWeight.Bold)
-                } else {
-                    Icon(Icons.Default.Dns, contentDescription = null, tint = Color.Black)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Tester la connexion", color = Color.Black, fontWeight = FontWeight.Bold)
-                }
-            }
-
-            // Carte de résultat d'état
-            when (state.connectionStatus) {
-                ServerConnectionStatus.CONNECTED -> {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(SynapseDarkSuccess.copy(alpha = 0.15f))
-                            .border(1.dp, SynapseDarkSuccess.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SynapseDarkSuccess, modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Serveur connecté avec succès", color = SynapseDarkSuccess, fontWeight = FontWeight.Bold)
-                            Text(
-                                text = "${state.serverVersion ?: "Hôte actif"} • Latence: ${state.latencyMs ?: 0}ms",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-
-                    Button(
-                        onClick = onPairingSuccess,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Accéder à mes agents", fontWeight = FontWeight.Bold)
-                    }
-                }
-                ServerConnectionStatus.ERROR -> {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(SynapseDarkError.copy(alpha = 0.15f))
-                            .border(1.dp, SynapseDarkError.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Warning, contentDescription = null, tint = SynapseDarkError, modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text("Échec de connexion", color = SynapseDarkError, fontWeight = FontWeight.Bold)
-                            Text(
-                                text = state.errorMessage ?: "Vérifiez que le daemon hôte est démarré sur le port spécifié.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-                else -> Unit
-            }
         }
+    }
+}
+
+@Composable
+private fun CommandBlockRow(command: String) {
+    val context = LocalContext.current
+    val clipboard = context.getSystemService(ClipboardManager::class.java)
+    val scope = rememberCoroutineScope()
+    var isCopied by remember { mutableStateOf(false) }
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedRectangle(10.dp))
+            .background(Palette.codeBackground)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            command,
+            style = Type.footnote.monospaced,
+            color = Palette.text,
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(
+            title = if (isCopied) "Copié" else "Copier",
+            systemImage = if (isCopied) "checkmark" else "doc.on.doc",
+            action = {
+                clipboard?.setPrimaryClip(ClipData.newPlainText("Command", command))
+                scope.launch {
+                    isCopied = true
+                    delay(1500)
+                    isCopied = false
+                }
+            }
+        )
     }
 }

@@ -1,37 +1,33 @@
 package com.ghdinteractivestudio.synapse.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -42,23 +38,38 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.ghdinteractivestudio.synapse.domain.model.ApprovalStatus
+import com.ghdinteractivestudio.synapse.domain.model.Bot
 import com.ghdinteractivestudio.synapse.domain.model.BotStatus
-import com.ghdinteractivestudio.synapse.ui.components.ApprovalCard
+import com.ghdinteractivestudio.synapse.domain.model.ChatMessage
+import com.ghdinteractivestudio.synapse.domain.model.QuotedReply
+import com.ghdinteractivestudio.synapse.ui.components.ApprovalCardItem
 import com.ghdinteractivestudio.synapse.ui.components.BotAvatar
 import com.ghdinteractivestudio.synapse.ui.components.ChatMessageItem
-import com.ghdinteractivestudio.synapse.ui.components.ConfirmationDialog
-import com.ghdinteractivestudio.synapse.ui.components.EmptyStateView
+import com.ghdinteractivestudio.synapse.ui.components.GlassStage
+import com.ghdinteractivestudio.synapse.ui.components.IconButton
 import com.ghdinteractivestudio.synapse.ui.components.MessageComposer
+import com.ghdinteractivestudio.synapse.ui.components.ScrollEdge
+import com.ghdinteractivestudio.synapse.ui.components.Edge
+import com.ghdinteractivestudio.synapse.ui.components.Spinner
+import com.ghdinteractivestudio.synapse.ui.components.Symbol
 import com.ghdinteractivestudio.synapse.ui.components.ThinkingOrb
-import com.ghdinteractivestudio.synapse.ui.components.ThinkingTraceView
-import com.ghdinteractivestudio.synapse.ui.theme.SynapseDarkPrimary
+import com.ghdinteractivestudio.synapse.ui.components.glass
+import com.ghdinteractivestudio.synapse.ui.components.rememberPress
+import com.ghdinteractivestudio.synapse.ui.components.pressScale
+import com.ghdinteractivestudio.synapse.ui.components.tr
+import com.ghdinteractivestudio.synapse.ui.theme.Capsule
+import com.ghdinteractivestudio.synapse.ui.theme.Palette
+import com.ghdinteractivestudio.synapse.ui.theme.Type
+import com.ghdinteractivestudio.synapse.ui.theme.medium
+import com.ghdinteractivestudio.synapse.ui.theme.semibold
 import com.ghdinteractivestudio.synapse.viewmodel.ChatViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     viewModel: ChatViewModel,
@@ -70,173 +81,201 @@ fun ChatScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
-    var isMenuExpanded by remember { mutableStateOf(false) }
-    var showClearHistoryDialog by remember { mutableStateOf(false) }
+    var isMenuOpen by remember { mutableStateOf(false) }
+    var activeQuotedReply by remember { mutableStateOf<QuotedReply?>(null) }
 
-    // Défilement automatique vers le dernier message
+    val bot = state.bot
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+
+    // Auto-scroll when messages arrive
     LaunchedEffect(state.messages.size, state.isBotWorking) {
         if (state.messages.isNotEmpty()) {
             listState.animateScrollToItem(state.messages.size - 1)
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { state.bot?.id?.let { onEditBot(it) } }
-                    ) {
-                        state.bot?.let { bot ->
-                            BotAvatar(
-                                name = bot.name,
-                                glyph = bot.avatarGlyph,
-                                colorHex = bot.avatarColorHex,
-                                status = bot.status,
-                                isLead = bot.isLead,
-                                size = 38.dp
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
+    GlassStage(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Palette.background),
+        chrome = {
+            ScrollEdge(Edge.Top, topInset + 64.dp)
+
+            // Thread Header
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(top = 6.dp)
+                    .padding(horizontal = 16.dp)
+                    .height(44.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Back Button (Glass capsule)
+                val (backSource, backPressed) = rememberPress()
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .glass(Capsule(), pressed = backPressed)
+                        .clickable(backSource, null, role = Role.Button, onClick = onNavigateBack)
+                        .semantics { contentDescription = "Back" },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Symbol("chevron.left", size = 28.dp, tint = Palette.text)
+                }
+
+                // Centered Bot Identity & Host Subtitle
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .clickable { bot?.id?.let { onEditBot(it) } },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(7.dp)
+                        ) {
+                            if (bot != null) {
+                                BotAvatar(bot = bot, size = 22.dp)
                                 Text(
-                                    text = bot.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = when {
-                                        state.isBotWorking -> "En cours d'exécution…"
-                                        bot.status == BotStatus.WORKING -> "Réflexion en cours…"
-                                        else -> "${bot.provider.displayName} • ${bot.model}"
-                                    },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (state.isBotWorking) SynapseDarkPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    bot.name,
+                                    style = Type.system(14f).semibold,
+                                    color = Palette.text,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Symbol("wifi", size = 10.dp, tint = Palette.secondary)
+                            Text(
+                                "Termux 127.0.0.1",
+                                style = Type.system(10f).medium,
+                                color = Palette.secondary
+                            )
+                        }
                     }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onViewTrace) {
-                        Icon(Icons.Default.Psychology, contentDescription = "Détails de réflexion", tint = MaterialTheme.colorScheme.primary)
-                    }
-                    IconButton(onClick = { isMenuExpanded = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Options")
-                    }
+                }
+
+                // Right: Computer / Trace / Actions
+                Box {
+                    IconButton("More", "ellipsis.circle", action = { isMenuOpen = true })
+
                     DropdownMenu(
-                        expanded = isMenuExpanded,
-                        onDismissRequest = { isMenuExpanded = false }
+                        expanded = isMenuOpen,
+                        onDismissRequest = { isMenuOpen = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Paramètres de l'agent") },
+                            text = { Text("Traces d'exécution", style = Type.body) },
+                            leadingIcon = { Symbol("terminal", size = 18.dp, tint = Palette.text) },
                             onClick = {
-                                isMenuExpanded = false
-                                state.bot?.id?.let { onEditBot(it) }
+                                isMenuOpen = false
+                                onViewTrace()
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Effacer l'historique", color = MaterialTheme.colorScheme.error) },
+                            text = { Text("Paramètres du Bot", style = Type.body) },
+                            leadingIcon = { Symbol("gearshape", size = 18.dp, tint = Palette.text) },
                             onClick = {
-                                isMenuExpanded = false
-                                showClearHistoryDialog = true
+                                isMenuOpen = false
+                                bot?.id?.let { onEditBot(it) }
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Effacer l'historique", style = Type.body, color = Palette.danger) },
+                            leadingIcon = { Symbol("trash", size = 18.dp, tint = Palette.danger) },
+                            onClick = {
+                                isMenuOpen = false
+                                viewModel.clearHistory()
                             }
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                }
+            }
+
+            // Bottom Message Composer
+            Column(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .imePadding()
+                    .navigationBarsPadding()
+            ) {
+                MessageComposer(
+                    botName = bot?.name ?: "Agent",
+                    isWorking = state.isBotWorking,
+                    replyTo = activeQuotedReply,
+                    onCancelReply = { activeQuotedReply = null },
+                    onSend = { text ->
+                        viewModel.onInputChanged(text)
+                        viewModel.sendMessage()
+                        activeQuotedReply = null
+                    },
+                    onStop = { viewModel.stopTurn() },
+                    onAttach = { /* Sélecteur de fichiers */ }
                 )
-            )
-        },
-        bottomBar = {
-            MessageComposer(
-                text = state.inputDraft,
-                onTextChanged = viewModel::onInputChanged,
-                onSend = viewModel::sendMessage,
-                onVoiceClick = onVoiceCall,
-                onStopClick = viewModel::stopTurn,
-                isBotWorking = state.isBotWorking,
-                quotedReply = state.quotedReply,
-                onDismissReply = viewModel::dismissQuotedReply
-            )
-        },
-        modifier = modifier
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+            }
+        }
+    ) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = topInset + 64.dp,
+                bottom = 120.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // Cartes d'approbation en attente épinglées en haut du chat si existantes
-            state.pendingApprovals.forEach { approval ->
-                ApprovalCard(
-                    approval = approval,
-                    onApproveOnce = { viewModel.respondApproval(approval.id, com.ghdinteractivestudio.synapse.domain.model.ApprovalStatus.APPROVED, false) },
-                    onApproveAlways = { viewModel.respondApproval(approval.id, com.ghdinteractivestudio.synapse.domain.model.ApprovalStatus.APPROVED, true) },
-                    onReject = { viewModel.respondApproval(approval.id, com.ghdinteractivestudio.synapse.domain.model.ApprovalStatus.REJECTED, false) },
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+            // Approval cards
+            items(state.pendingApprovals, key = { it.id }) { approval ->
+                ApprovalCardItem(
+                    request = approval,
+                    onApprove = { always ->
+                        viewModel.respondApproval(approval.id, ApprovalStatus.APPROVED, always)
+                    },
+                    onReject = {
+                        viewModel.respondApproval(approval.id, ApprovalStatus.REJECTED, false)
+                    }
                 )
             }
 
-            // Fil des messages
-            if (state.messages.isEmpty() && !state.isBotWorking) {
-                EmptyStateView(
-                    title = "Démarrez la conversation",
-                    description = "Posez une question, confiez une tâche de code ou lancez une routine à ${state.bot?.name ?: "cet agent"}.",
-                    icon = Icons.Default.Info,
-                    modifier = Modifier.weight(1f)
-                )
-            } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                ) {
-                    items(state.messages, key = { it.id }) { message ->
-                        ChatMessageItem(
-                            message = message,
-                            onReply = { viewModel.onReplyTo(message) }
+            // Chat Messages
+            items(state.messages, key = { it.id }) { msg ->
+                ChatMessageItem(
+                    message = msg,
+                    onQuoteReply = {
+                        activeQuotedReply = QuotedReply(
+                            messageId = it.id,
+                            authorName = it.author.displayName,
+                            textExcerpt = it.text.take(60)
                         )
                     }
+                )
+            }
 
-                    // Pilule de réflexion animée pendant qu'un tour est actif
-                    if (state.isBotWorking) {
-                        item {
-                            ThinkingTraceView(
-                                steps = state.currentWorkingSteps,
-                                isWorking = true,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-                            )
-                        }
+            // Live reasoning thinking orb indicator
+            if (state.isBotWorking) {
+                item("thinking") {
+                    Row(
+                        Modifier.padding(start = 16.dp, top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        ThinkingOrb(size = 18.dp, color = Palette.secondary)
+                        Text(
+                            "Réflexion en cours…",
+                            style = Type.caption,
+                            color = Palette.secondary
+                        )
                     }
-
-                    item { Spacer(modifier = Modifier.height(10.dp)) }
                 }
             }
         }
-    }
-
-    if (showClearHistoryDialog) {
-        ConfirmationDialog(
-            title = "Effacer l'historique ?",
-            message = "Tous les messages échangés avec cet agent seront supprimés.",
-            confirmLabel = "Effacer",
-            isDestructive = true,
-            onConfirm = {
-                viewModel.clearHistory()
-                showClearHistoryDialog = false
-            },
-            onDismiss = { showClearHistoryDialog = false }
-        )
     }
 }

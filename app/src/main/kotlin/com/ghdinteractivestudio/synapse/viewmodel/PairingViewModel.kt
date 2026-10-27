@@ -24,7 +24,11 @@ data class PairingUiState(
     val isTesting: Boolean = false,
     val errorMessage: String? = null,
     val isPairingSuccess: Boolean = false
-)
+) {
+    val serverUrl: String get() = urlInput
+    val pairingToken: String? get() = tokenInput.takeIf { it.isNotEmpty() }
+    val status: ServerConnectionStatus get() = connectionStatus
+}
 
 class PairingViewModel(
     private val serverRepository: ServerRepository
@@ -72,10 +76,14 @@ class PairingViewModel(
         _errorMessage.value = null
     }
 
+    fun onServerUrlChanged(url: String) = onUrlChanged(url)
+
     fun onTokenChanged(token: String) {
         _tokenInput.value = token
         _errorMessage.value = null
     }
+
+    fun onPairingTokenChanged(token: String) = onTokenChanged(token)
 
     fun setServerMode(mode: ServerMode) {
         val suggestedUrl = when (mode) {
@@ -98,23 +106,19 @@ class PairingViewModel(
             _isTesting.value = false
 
             if (result.isFailure) {
-                _errorMessage.value = result.exceptionOrNull()?.message ?: "Erreur de connexion"
+                _errorMessage.value = result.exceptionOrNull()?.message ?: "Impossible de joindre le serveur hôte."
             }
         }
     }
 
-    fun parsePairingUri(uriString: String) {
+    fun applyPairingUri(uriString: String) {
         viewModelScope.launch {
             _isTesting.value = true
+            _errorMessage.value = null
             val result = serverRepository.parseAndApplyPairingUri(uriString)
             _isTesting.value = false
-
-            if (result.isSuccess) {
-                val config = result.getOrThrow()
-                _urlInput.value = config.url
-                _tokenInput.value = config.token ?: ""
-            } else {
-                _errorMessage.value = result.exceptionOrNull()?.message
+            if (result.isFailure) {
+                _errorMessage.value = result.exceptionOrNull()?.message ?: "URI d'appairage invalide."
             }
         }
     }

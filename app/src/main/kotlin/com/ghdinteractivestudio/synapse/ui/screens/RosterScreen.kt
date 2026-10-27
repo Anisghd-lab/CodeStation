@@ -1,41 +1,29 @@
 package com.ghdinteractivestudio.synapse.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.GroupAdd
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,20 +33,33 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.ghdinteractivestudio.synapse.domain.model.Bot
+import com.ghdinteractivestudio.synapse.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.synapse.ui.components.BotCard
-import com.ghdinteractivestudio.synapse.ui.components.ConfirmationDialog
-import com.ghdinteractivestudio.synapse.ui.components.ConnectionStatusChip
-import com.ghdinteractivestudio.synapse.ui.components.EmptyStateView
-import com.ghdinteractivestudio.synapse.ui.theme.SynapseDarkPrimary
-import com.ghdinteractivestudio.synapse.viewmodel.BotFilter
+import com.ghdinteractivestudio.synapse.ui.components.GlassStage
+import com.ghdinteractivestudio.synapse.ui.components.GlassTabBar
+import com.ghdinteractivestudio.synapse.ui.components.IconButton
+import com.ghdinteractivestudio.synapse.ui.components.ScrollEdge
+import com.ghdinteractivestudio.synapse.ui.components.Edge
+import com.ghdinteractivestudio.synapse.ui.components.Spinner
+import com.ghdinteractivestudio.synapse.ui.components.Symbol
+import com.ghdinteractivestudio.synapse.ui.components.TabItem
+import com.ghdinteractivestudio.synapse.ui.components.rememberPress
+import com.ghdinteractivestudio.synapse.ui.components.pressScale
+import com.ghdinteractivestudio.synapse.ui.components.glass
+import com.ghdinteractivestudio.synapse.ui.components.PrimaryButton
+import com.ghdinteractivestudio.synapse.ui.components.SecondaryButton
+import com.ghdinteractivestudio.synapse.ui.theme.Capsule
+import com.ghdinteractivestudio.synapse.ui.theme.Palette
+import com.ghdinteractivestudio.synapse.ui.theme.Type
+import com.ghdinteractivestudio.synapse.ui.theme.bold
+import com.ghdinteractivestudio.synapse.ui.theme.medium
+import com.ghdinteractivestudio.synapse.ui.theme.semibold
 import com.ghdinteractivestudio.synapse.viewmodel.RosterViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RosterScreen(
     viewModel: RosterViewModel,
@@ -70,211 +71,200 @@ fun RosterScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
-    var isFabMenuExpanded by remember { mutableStateOf(false) }
-    var selectedBotForAction by remember { mutableStateOf<Bot?>(null) }
-    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var isNewMenuOpen by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableStateOf("bots") }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Synapse", fontWeight = FontWeight.Bold, fontSize = 22.sp)
-                        Spacer(modifier = Modifier.width(10.dp))
-                        ConnectionStatusChip(
-                            serverConfig = state.serverConfig,
-                            onClick = onConfigureServerClick
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val isConnected = state.serverConfig.status == ServerConnectionStatus.CONNECTED
+    val isConnecting = state.serverConfig.status == ServerConnectionStatus.CONNECTING
+
+    GlassStage(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Palette.background),
+        chrome = {
+            ScrollEdge(Edge.Top, topInset + 64.dp)
+
+            // Top Header Bar
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(top = 6.dp)
+                    .padding(horizontal = 16.dp)
+                    .height(44.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Left: Synapse Identity / Account Button
+                Row(
+                    Modifier
+                        .clip(Capsule())
+                        .clickable { onConfigureServerClick() }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Symbol("sparkles", size = 18.dp, tint = Palette.accent)
+                    Text("Synapse", style = Type.body.semibold, color = Palette.text)
+                }
+
+                // Center: Termux Host connection badge
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Row(
+                        Modifier
+                            .clip(Capsule())
+                            .background(Palette.surface)
+                            .clickable { onConfigureServerClick() }
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        if (isConnecting) {
+                            Spinner(10.dp)
+                        } else {
+                            Symbol(
+                                if (isConnected) "wifi" else "wifi.slash",
+                                size = 12.dp,
+                                tint = if (isConnected) Palette.added else Palette.danger
+                            )
+                        }
+                        Text(
+                            if (isConnected) "Termux (127.0.0.1)" else "Termux Déconnecté",
+                            style = Type.caption.medium,
+                            color = Palette.secondary
                         )
                     }
-                },
-                actions = {
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = "Paramètres")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
-                )
-            )
-        },
-        floatingActionButton = {
-            Box {
-                FloatingActionButton(
-                    onClick = { isFabMenuExpanded = true },
-                    containerColor = SynapseDarkPrimary,
-                    contentColor = Color.Black,
-                    shape = CircleShape
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Nouveau")
                 }
 
-                DropdownMenu(
-                    expanded = isFabMenuExpanded,
-                    onDismissRequest = { isFabMenuExpanded = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Nouvel Agent") },
-                        leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
-                        onClick = {
-                            isFabMenuExpanded = false
-                            onCreateBotClick()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Nouveau Salon Multi-Bots") },
-                        leadingIcon = { Icon(Icons.Default.GroupAdd, contentDescription = null) },
-                        onClick = {
-                            isFabMenuExpanded = false
-                            onCreateGroupClick()
-                        }
-                    )
+                // Right: New bot/group menu button (+)
+                Box {
+                    IconButton("New", "plus", action = { isNewMenuOpen = true })
+
+                    DropdownMenu(
+                        expanded = isNewMenuOpen,
+                        onDismissRequest = { isNewMenuOpen = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Nouvel Agent", style = Type.body) },
+                            leadingIcon = { Symbol("person.fill", size = 18.dp, tint = Palette.text) },
+                            onClick = {
+                                isNewMenuOpen = false
+                                onCreateBotClick()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Nouveau Groupe", style = Type.body) },
+                            leadingIcon = { Symbol("person.2", size = 18.dp, tint = Palette.text) },
+                            onClick = {
+                                isNewMenuOpen = false
+                                onCreateGroupClick()
+                            }
+                        )
+                    }
                 }
             }
-        },
-        modifier = modifier
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            // Barre de Recherche
-            OutlinedTextField(
-                value = state.searchQuery,
-                onValueChange = viewModel::onSearchQueryChanged,
-                placeholder = { Text("Rechercher un agent, mot-clé…", fontSize = 13.sp) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                shape = RoundedCornerShape(12.dp)
-            )
 
-            // Liste principale avec sections hiérarchisées
-            if (state.totalCount == 0) {
-                EmptyStateView(
-                    title = "Aucun agent trouvé",
-                    description = if (state.searchQuery.isNotBlank()) "Aucun bot ne correspond à votre recherche." else "Configurez votre premier agent pour débuter.",
-                    actionLabel = "Créer un agent",
-                    onActionClick = onCreateBotClick,
-                    modifier = Modifier.weight(1f)
+            // Floating Glass Tab Bar at the bottom
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 24.dp)
+            ) {
+                GlassTabBar(
+                    selection = selectedTab,
+                    tabs = listOf(
+                        TabItem("bots", "Agents", "bubble.left.and.bubble.right.fill", iconSize = 22.dp),
+                        TabItem("settings", "Paramètres", "gearshape", iconSize = 22.dp)
+                    ),
+                    select = {
+                        selectedTab = it
+                        if (it == "settings") onSettingsClick()
+                    }
                 )
+            }
+        }
+    ) {
+        val allBots = buildList {
+            state.leadBot?.let { add(it) }
+            addAll(state.pinnedBots)
+            addAll(state.otherBots)
+        }
+
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = topInset + 56.dp,
+                bottom = 100.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (!isConnected && !isConnecting) {
+                item("offline_banner") {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                            .clip(Capsule())
+                            .background(Palette.danger.copy(alpha = 0.12f))
+                            .clickable { onConfigureServerClick() }
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Symbol("wifi.exclamationmark", size = 16.dp, tint = Palette.danger)
+                            Text(
+                                "Serveur local Termux hors-ligne (127.0.0.1:19222). Touchez pour reconnecter.",
+                                style = Type.footnote,
+                                color = Palette.danger,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (allBots.isEmpty()) {
+                item("empty") {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 80.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Symbol("bubble.left.and.bubble.right", size = 48.dp, tint = Palette.tertiary)
+                        Text(
+                            "Aucun agent actif",
+                            style = Type.title3.bold,
+                            color = Palette.text
+                        )
+                        Text(
+                            "Vos agents IA s'exécutent dans Termux / Ubuntu PRoot.\nCréez un agent ou vérifiez la connexion locale.",
+                            style = Type.subheadline,
+                            color = Palette.secondary,
+                            modifier = Modifier.padding(horizontal = 32.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            PrimaryButton("Créer un Agent", action = onCreateBotClick)
+                            SecondaryButton("Connexion", action = onConfigureServerClick)
+                        }
+                    }
+                }
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // 1. Section Lead Bot (Étoile dorée ★ en tête permanente)
-                    state.leadBot?.let { lead ->
-                        item {
-                            SectionHeader(title = "AGENT PRINCIPAL (LEAD)")
-                            Spacer(modifier = Modifier.height(4.dp))
-                            BotCard(
-                                bot = lead,
-                                onClick = { onBotClick(lead.id) },
-                                onLongClick = { selectedBotForAction = lead }
-                            )
-                        }
-                    }
-
-                    // 2. Section Pinned Bots
-                    if (state.pinnedBots.isNotEmpty()) {
-                        item {
-                            SectionHeader(title = "AGENTS ÉPINGLÉS (${state.pinnedBots.size})")
-                        }
-                        items(state.pinnedBots, key = { it.id }) { bot ->
-                            BotCard(
-                                bot = bot,
-                                onClick = { onBotClick(bot.id) },
-                                onLongClick = { selectedBotForAction = bot }
-                            )
-                        }
-                    }
-
-                    // 3. Section Autres Bots
-                    if (state.otherBots.isNotEmpty()) {
-                        item {
-                            SectionHeader(title = "TOUS LES AGENTS (${state.otherBots.size})")
-                        }
-                        items(state.otherBots, key = { it.id }) { bot ->
-                            BotCard(
-                                bot = bot,
-                                onClick = { onBotClick(bot.id) },
-                                onLongClick = { selectedBotForAction = bot }
-                            )
-                        }
-                    }
-
-                    item { Spacer(modifier = Modifier.height(72.dp)) }
+                items(allBots, key = { it.id }) { bot ->
+                    BotCard(
+                        bot = bot,
+                        bots = allBots,
+                        onClick = { onBotClick(bot.id) }
+                    )
                 }
             }
         }
     }
-
-    // Dialogue d'actions contextuelles lors d'un appui long
-    selectedBotForAction?.let { bot ->
-        DropdownMenu(
-            expanded = true,
-            onDismissRequest = { selectedBotForAction = null }
-        ) {
-            if (!bot.isLead) {
-                DropdownMenuItem(
-                    text = { Text(if (bot.isPinned) "Désépingler" else "Épingler") },
-                    onClick = {
-                        viewModel.togglePin(bot.id)
-                        selectedBotForAction = null
-                    }
-                )
-            }
-            DropdownMenuItem(
-                text = { Text("Interrompre le tour") },
-                onClick = {
-                    viewModel.stopBot(bot.id)
-                    selectedBotForAction = null
-                }
-            )
-            if (!bot.isLead) {
-                DropdownMenuItem(
-                    text = { Text("Supprimer l'agent", color = MaterialTheme.colorScheme.error) },
-                    onClick = {
-                        showDeleteConfirmDialog = true
-                    }
-                )
-            }
-        }
-    }
-
-    // Confirmation de suppression
-    if (showDeleteConfirmDialog && selectedBotForAction != null) {
-        val bot = selectedBotForAction!!
-        ConfirmationDialog(
-            title = "Supprimer ${bot.name} ?",
-            message = "Cette action supprimera définitivement cet agent et l'historique de ses conversations.",
-            confirmLabel = "Supprimer",
-            isDestructive = true,
-            onConfirm = {
-                viewModel.deleteBot(bot.id)
-                selectedBotForAction = null
-                showDeleteConfirmDialog = false
-            },
-            onDismiss = {
-                showDeleteConfirmDialog = false
-                selectedBotForAction = null
-            }
-        )
-    }
-}
-
-@Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-        modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 4.dp)
-    )
 }

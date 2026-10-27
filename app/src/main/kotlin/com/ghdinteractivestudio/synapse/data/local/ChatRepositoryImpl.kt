@@ -1,18 +1,17 @@
 package com.ghdinteractivestudio.synapse.data.local
 
-import com.ghdinteractivestudio.synapse.data.remote.ApproveRequest
+import com.ghdinteractivestudio.synapse.data.remote.RespondPermissionRequest
 import com.ghdinteractivestudio.synapse.data.remote.SendMessageRequest
+import com.ghdinteractivestudio.synapse.data.remote.StopTurnRequest
 import com.ghdinteractivestudio.synapse.data.remote.SynapseApiService
-import com.ghdinteractivestudio.synapse.domain.model.ApprovalActionType
 import com.ghdinteractivestudio.synapse.domain.model.ApprovalRequest
 import com.ghdinteractivestudio.synapse.domain.model.ApprovalStatus
 import com.ghdinteractivestudio.synapse.domain.model.ChatMessage
-import com.ghdinteractivestudio.synapse.domain.model.ExecutionStep
 import com.ghdinteractivestudio.synapse.domain.model.MessageAuthor
 import com.ghdinteractivestudio.synapse.domain.model.MessageAuthorType
 import com.ghdinteractivestudio.synapse.domain.model.QuotedReply
-import com.ghdinteractivestudio.synapse.domain.model.StepType
 import com.ghdinteractivestudio.synapse.domain.repository.ChatRepository
+import com.ghdinteractivestudio.synapse.domain.repository.ServerRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.util.UUID
@@ -21,7 +20,8 @@ class ChatRepositoryImpl(
     private val messageDao: MessageDao,
     private val approvalDao: ApprovalDao,
     private val botDao: BotDao,
-    private val apiService: SynapseApiService? = null
+    private val apiServiceProvider: (suspend () -> SynapseApiService?)? = null,
+    private val serverRepository: ServerRepository? = null
 ) : ChatRepository {
 
     override fun getMessagesStream(botId: String): Flow<List<ChatMessage>> {
@@ -57,12 +57,25 @@ class ChatRepositoryImpl(
             messageDao.insertMessage(ChatMessageEntity.fromDomain(userMsg))
             botDao.updateLastMessage(botId, text, userMsg.timestamp)
 
-            // Tentative d'envoi réseau vers apiService si configuré
-            if (apiService != null) {
+            // Tentative d'envoi réseau vers apiService si connecté
+            if (apiServiceProvider != null && serverRepository != null) {
                 try {
-                    apiService.sendMessage(SendMessageRequest(botId, text, replyTo?.messageId))
-                } catch (e: Exception) {
-                    // Fallback silencieux en mode hors-ligne
+                    val config = serverRepository.getServerConfig()
+                    val api = apiServiceProvider.invoke()
+                    if (api != null && !config.token.isNullOrBlank()) {
+                        val auth = "Bearer ${config.token}"
+                        api.sendMessage(
+                            SendMessageRequest(
+                                botId = botId,
+                                text = text,
+                                clientNonce = userMsg.id,
+                                replyTo = replyTo?.messageId
+                            ),
+                            authHeader = auth
+                        )
+                    }
+                } catch (_: Exception) {
+                    // Fallback silencieux en local
                 }
             }
 
@@ -77,10 +90,23 @@ class ChatRepositoryImpl(
     ): Result<Unit> {
         return runCatching {
             approvalDao.updateStatus(approvalId, status.name, alwaysApprove)
-            if (apiService != null) {
+            if (apiServiceProvider != null && serverRepository != null) {
                 try {
-                    apiService.respondApproval(ApproveRequest(approvalId, status.name, alwaysApprove))
-                } catch (e: Exception) {
+                    val config = serverRepository.getServerConfig()
+                    val api = apiServiceProvider.invoke()
+                    if (api != null && !config.token.isNullOrBlank()) {
+                        val auth = "Bearer ${config.token}"
+                        val optionId = when (status) {
+                            ApprovalStatus.APPROVED -> if (alwaysApprove) "allow_always" else "allow_once"
+                            ApprovalStatus.REJECTED -> if (alwaysApprove) "reject_always" else "reject_once"
+                            else -> "allow_once"
+                        }
+                        api.respondPermission(
+                            RespondPermissionRequest(entryId = approvalId, optionId = optionId),
+                            authHeader = auth
+                        )
+                    }
+                } catch (_: Exception) {
                     // Fallback
                 }
             }
@@ -95,7 +121,7 @@ class ChatRepositoryImpl(
 
     override suspend fun markChatRead(botId: String): Result<Unit> {
         return runCatching {
-            // Dans Room, les messages du bot sont marqués comme consultés
+            // Marquage local
         }
     }
 
@@ -103,19 +129,21 @@ class ChatRepositoryImpl(
         botId: String,
         botName: String,
         text: String,
-        traceSteps: List<ExecutionStep> = emptyList()
-    ) {
-        val agentMsg = ChatMessage(
-            id = UUID.randomUUID().toString(),
-            botId = botId,
-            author = MessageAuthor(MessageAuthorType.BOT, botId, botName),
-            text = text,
-            timestamp = System.currentTimeMillis(),
-            isFinal = true,
-            executionTrace = traceSteps
-        )
-        messageDao.insertMessage(ChatMessageEntity.fromDomain(agentMsg))
-        botDao.updateLastMessage(botId, text, agentMsg.timestamp)
+        traceSteps: List<com.ghdinteractivestudio.synapse.domain.model.ExecutionStep> = emptyList()
+    ): Result<ChatMessage> {
+        return runCatching {
+            val agentMsg = ChatMessage(
+                id = UUID.randomUUID().toString(),
+                botId = botId,
+                author = MessageAuthor(MessageAuthorType.BOT, botId, botName),
+                text = text,
+                timestamp = System.currentTimeMillis(),
+                isFinal = true
+            )
+            messageDao.insertMessage(ChatMessageEntity.fromDomain(agentMsg))
+            botDao.updateLastMessage(botId, text, agentMsg.timestamp)
+            agentMsg
+        }
     }
 
     suspend fun createApprovalRequest(
@@ -123,17 +151,20 @@ class ChatRepositoryImpl(
         botName: String,
         command: String,
         diff: String? = null
-    ) {
-        val req = ApprovalRequest(
-            id = UUID.randomUUID().toString(),
-            botId = botId,
-            botName = botName,
-            actionType = ApprovalActionType.SHELL_COMMAND,
-            commandOrPath = command,
-            diffPreview = diff,
-            timestamp = System.currentTimeMillis(),
-            status = ApprovalStatus.PENDING
-        )
-        approvalDao.insertApproval(ApprovalEntity.fromDomain(req))
+    ): Result<ApprovalRequest> {
+        return runCatching {
+            val approval = ApprovalRequest(
+                id = UUID.randomUUID().toString(),
+                botId = botId,
+                botName = botName,
+                actionType = com.ghdinteractivestudio.synapse.domain.model.ApprovalActionType.SHELL_COMMAND,
+                commandOrPath = command,
+                diffPreview = diff,
+                timestamp = System.currentTimeMillis(),
+                status = ApprovalStatus.PENDING
+            )
+            approvalDao.insertApproval(ApprovalEntity.fromDomain(approval))
+            approval
+        }
     }
 }
