@@ -467,12 +467,9 @@ fun <T> ChoicePicker(
     modifier: Modifier = Modifier
 ) {
     SegmentedChoice(
-        options = options.map { it.first },
-        selected = selection,
-        onSelect = select,
-        modifier = modifier,
-        label = { opt ->
-            options.firstOrNull { it.first == opt }?.second ?: opt.toString()
-        }
+        selection = selection,
+        options = options,
+        select = select,
+        modifier = modifier
     )
 }

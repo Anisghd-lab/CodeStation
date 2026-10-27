@@ -52,9 +52,9 @@ fun symbolRes(name: String): Int? = when (name) {
     "chevron.up" -> R.drawable.sf_chevron_up
     "circle" -> R.drawable.sf_circle
     "circle.dotted" -> R.drawable.sf_circle_dotted
-    "circle.fill" -> R.drawable.sf_circle_fill
-    "circle.grid.2x2" -> R.drawable.sf_circle_grid_2x2
-    "circle.lefthalf.striped.horizontal" -> R.drawable.sf_circle_lefthalf_striped_horizontal
+    "circle.fill" -> R.drawable.sf_circle
+    "circle.grid.2x2" -> R.drawable.sf_square_grid_2x2
+    "circle.lefthalf.striped.horizontal" -> R.drawable.sf_circle
     "clock" -> R.drawable.sf_clock
     "clock.fill" -> R.drawable.sf_clock_fill
     "cloud" -> R.drawable.sf_cloud
@@ -62,10 +62,10 @@ fun symbolRes(name: String): Int? = when (name) {
     "doc" -> R.drawable.sf_doc
     "doc.on.clipboard" -> R.drawable.sf_doc_on_clipboard
     "doc.on.doc" -> R.drawable.sf_doc_on_doc
-    "doc.plaintext" -> R.drawable.sf_doc_plaintext
+    "doc.plaintext" -> R.drawable.sf_doc_text
     "doc.text" -> R.drawable.sf_doc_text
     "ellipsis" -> R.drawable.sf_ellipsis
-    "ellipsis.circle" -> R.drawable.sf_ellipsis_circle
+    "ellipsis.circle" -> R.drawable.sf_ellipsis
     "exclamationmark" -> R.drawable.sf_exclamationmark
     "exclamationmark.circle" -> R.drawable.sf_exclamationmark_circle
     "exclamationmark.circle.fill" -> R.drawable.sf_exclamationmark_circle_fill
@@ -74,13 +74,13 @@ fun symbolRes(name: String): Int? = when (name) {
     "eye" -> R.drawable.sf_eye
     "eye.slash" -> R.drawable.sf_eye_slash
     "folder" -> R.drawable.sf_folder
-    "folder.badge.plus" -> R.drawable.sf_folder_badge_plus
-    "folder.fill" -> R.drawable.sf_folder_fill
+    "folder.badge.plus" -> R.drawable.sf_folder
+    "folder.fill" -> R.drawable.sf_folder
     "gearshape" -> R.drawable.sf_gearshape
     "globe" -> R.drawable.sf_globe
     "keyboard" -> R.drawable.sf_keyboard
     "laptopcomputer" -> R.drawable.sf_laptopcomputer
-    "link" -> R.drawable.sf_link
+    "link" -> R.drawable.sf_network
     "lock.fill" -> R.drawable.sf_lock_fill
     "magnifyingglass" -> R.drawable.sf_magnifyingglass
     "mic" -> R.drawable.sf_mic
@@ -102,10 +102,10 @@ fun symbolRes(name: String): Int? = when (name) {
     "plus.circle.fill" -> R.drawable.sf_plus_circle
     "qrcode" -> R.drawable.sf_qrcode
     "qrcode.viewfinder" -> R.drawable.sf_qrcode_viewfinder
-    "questionmark.circle" -> R.drawable.sf_questionmark_circle
-    "repeat" -> R.drawable.sf_repeat
+    "questionmark.circle" -> R.drawable.sf_info_circle
+    "repeat" -> R.drawable.sf_arrow_clockwise
     "shippingbox" -> R.drawable.sf_shippingbox
-    "sparkles" -> R.drawable.sf_sparkles
+    "sparkles" -> R.drawable.sf_star_fill
     "square.and.arrow.down" -> R.drawable.sf_square_and_arrow_down
     "square.and.arrow.up" -> R.drawable.sf_square_and_arrow_up
     "square.and.pencil" -> R.drawable.sf_square_and_pencil
