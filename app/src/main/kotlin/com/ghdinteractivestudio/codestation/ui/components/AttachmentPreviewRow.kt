@@ -71,11 +71,13 @@ fun AttachmentChip(
         val iconName = when {
             item.isImage -> "photo"
             item.isVideo -> "video"
+            item.isAudio -> "mic"
             else -> "doc"
         }
         val iconTint = when {
             item.isVideo -> Palette.warning
             item.isImage -> Palette.accent
+            item.isAudio -> Palette.accentSecondary
             else -> Palette.emeraldAccent
         }
 

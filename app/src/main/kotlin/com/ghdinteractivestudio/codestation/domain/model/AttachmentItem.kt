@@ -10,6 +10,7 @@ data class PendingAttachment(
     val sizeBytes: Long,
     val isImage: Boolean = mimeType.startsWith("image/"),
     val isVideo: Boolean = mimeType.startsWith("video/"),
+    val isAudio: Boolean = mimeType.startsWith("audio/"),
     val uploadId: String? = null,
     val isUploading: Boolean = false,
     val uploadProgress: Float = 0f,

@@ -240,11 +240,11 @@ fun ChatScreen(
                             viewModel.addAttachment(
                                 PendingAttachment(
                                     id = java.util.UUID.randomUUID().toString(),
-                                    name = "Message vocal (${duration}s).m4a",
-                                    sizeBytes = audioFile.length(),
-                                    mimeType = "audio/mp4",
                                     uri = fileUri,
-                                    type = com.ghdinteractivestudio.codestation.domain.model.AttachmentType.AUDIO
+                                    name = "Message vocal (${duration}s).m4a",
+                                    mimeType = "audio/mp4",
+                                    sizeBytes = audioFile.length(),
+                                    isAudio = true
                                 )
                             )
                             viewModel.setTranscribing(false)
@@ -261,11 +261,11 @@ fun ChatScreen(
             viewModel.addAttachment(
                 PendingAttachment(
                     id = java.util.UUID.randomUUID().toString(),
-                    name = "Message vocal (${duration}s).m4a",
-                    sizeBytes = audioFile.length(),
-                    mimeType = "audio/mp4",
                     uri = fileUri,
-                    type = com.ghdinteractivestudio.codestation.domain.model.AttachmentType.AUDIO
+                    name = "Message vocal (${duration}s).m4a",
+                    mimeType = "audio/mp4",
+                    sizeBytes = audioFile.length(),
+                    isAudio = true
                 )
             )
             viewModel.setTranscribing(false)
