@@ -77,8 +77,8 @@ fun AttachmentChip(
         val iconTint = when {
             item.isVideo -> Palette.warning
             item.isImage -> Palette.accent
-            item.isAudio -> Palette.accentSecondary
-            else -> Palette.emeraldAccent
+            item.isAudio -> Palette.emeraldAccent
+            else -> Palette.secondary
         }
 
         Symbol(iconName, size = 18.dp, tint = iconTint)
