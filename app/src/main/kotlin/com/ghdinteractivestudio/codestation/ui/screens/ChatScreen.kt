@@ -186,7 +186,7 @@ fun ChatScreen(
                                     TermuxSessionLauncher.openBotTerminalSession(
                                         context = context,
                                         botId = targetBot.id,
-                                        engine = targetBot.backend
+                                        engine = targetBot.provider.backendId
                                     )
                                 } else {
                                     TermuxSessionLauncher.openTermux(context)
@@ -264,7 +264,7 @@ fun ChatScreen(
                         ) {
                             Text("Réessayer", style = Type.caption.semibold, color = Palette.onAccent)
                         }
-                        IconButton("Fermer", "xmark", action = { viewModel.dismissError() }, size = 20.dp)
+                        IconButton("Fermer", "xmark", action = { viewModel.dismissError() })
                     }
                 }
 

@@ -47,8 +47,7 @@ fun BoxScope.DynamicIslandBar(
     modifier: Modifier = Modifier
 ) {
     val bots by botRepository.getBotsStream().collectAsState(initial = emptyList())
-    val activeBot = bots.firstOrNull { it.status == BotStatus.WORKING }
-        ?: bots.firstOrNull { it.status == BotStatus.APPROVAL_REQUESTED }
+    val activeBot = bots.firstOrNull { it.status == BotStatus.WORKING || it.status == BotStatus.BUSY }
 
     var lastCompletedBotId by remember { mutableStateOf<String?>(null) }
     var showCompletedBanner by remember { mutableStateOf(false) }
@@ -56,7 +55,7 @@ fun BoxScope.DynamicIslandBar(
     var startedAt by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(activeBot?.id, activeBot?.status) {
-        if (activeBot != null && activeBot.status == BotStatus.WORKING) {
+        if (activeBot != null && (activeBot.status == BotStatus.WORKING || activeBot.status == BotStatus.BUSY)) {
             if (previousWorkingBotId != activeBot.id) {
                 startedAt = System.currentTimeMillis()
                 previousWorkingBotId = activeBot.id
@@ -83,12 +82,10 @@ fun BoxScope.DynamicIslandBar(
             .statusBarsPadding()
             .padding(top = 4.dp)
     ) {
-        val isWorking = activeBot?.status == BotStatus.WORKING
-        val isNeedsApproval = activeBot?.status == BotStatus.APPROVAL_REQUESTED
-        val isCompleted = showCompletedBanner && !isWorking && !isNeedsApproval
+        val isWorking = activeBot?.status == BotStatus.WORKING || activeBot?.status == BotStatus.BUSY
+        val isCompleted = showCompletedBanner && !isWorking
 
         val capsuleBackground = when {
-            isNeedsApproval -> Palette.accent
             isCompleted -> Palette.added
             else -> Color(0xFF1E1E1E)
         }
@@ -108,19 +105,10 @@ fun BoxScope.DynamicIslandBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            val iconName = when {
-                isNeedsApproval -> "hand.raised.fill"
-                isCompleted -> "checkmark"
-                else -> "sparkles"
-            }
+            val iconName = if (isCompleted) "checkmark" else "sparkles"
             Symbol(iconName, size = 13.dp, tint = Color.White)
 
-            val statusText = when {
-                isNeedsApproval -> "Needs you"
-                isCompleted -> "Done"
-                isWorking -> formatIslandElapsed(startedAt)
-                else -> "Actif"
-            }
+            val statusText = if (isCompleted) "Done" else if (isWorking) formatIslandElapsed(startedAt) else "Actif"
 
             Text(
                 text = statusText,
