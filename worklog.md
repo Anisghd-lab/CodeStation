@@ -1,274 +1,99 @@
-# Journal des Travaux (Worklog) — Projet Synapse
+# CodeStation — Journal de Travail (worklog.md)
 
-> **Projet** : Synapse (`com.ghdinteractivestudio.synapse`)  
-> **Auteur** : Antigravity (Google DeepMind Advanced Agentic Coding)  
-> **Date de session** : 27 Octobre 2026
-
----
-
-## 1. Synthèse Exécutive
-
-Création intégrale de **Synapse**, une application mobile Android native en **Kotlin 2.0** et **Jetpack Compose**, inspirée de l'UI/UX d'orchestration d'agents autonomes de Codync. L'application possède une architecture indépendante, un design system Material 3 sur-mesure (Thème Sombre Obsidian & Thème Clair Platine), une marque et une icône de lanceur vectorielle originales.
-
-Le projet respecte à 100% les contraintes imposées :
-- Aucun recours à Flutter, Dart, React Native ou WebView principale.
-- Aucune toolchain lourde installée sur le téléphone (l'environnement de travail restant un conteneur PRoot léger sous Android ARM64).
-- Les projets préexistants (`Codyn`, `CimentFlow`) ont été scrupuleusement préservés sans aucune modification destructive.
-- Pipeline CI/CD GitHub Actions configuré (`.github/workflows/build_apk.yml`) sur `ubuntu-latest` avec JDK 21 Temurin pour la production d'artefacts APK debug téléchargeables.
+**Branche de travail :** `fix/agent-execution-and-termux-ui`  
+**Date :** 28 Octobre 2026  
+**Auteur :** Antigravity AI  
 
 ---
 
-## 2. Historique des Réalisations
+## 1. Cartographie des Composants et du Flux d'une Requête
 
-### Phase 1 — Audit & Spécifications (Complétée)
-- **Inspection de l'Environnement** : Détection d'Ubuntu PRoot Linux ARM64, JDK 21 Temurin, Git 2.53.0 et Python 3.14.
-- **Audit des Références Codync** : Analyse détaillée de `docs/design/ui-conventions.md`, `docs/features/chat-messages.md`, `groups-and-replies.md`, `lead-bot.md`, `artifacts.md`, `routines.md`, `context-and-memory.md` et des captures d'écran.
-- **Rédaction des Documents de Référence** :
-  - [`docs/REFERENCE_AUDIT.md`](file:///root/synapse/docs/REFERENCE_AUDIT.md) : Faits vérifiés, déductions et inconnues.
-  - [`docs/SCREEN_INVENTORY.md`](file:///root/synapse/docs/SCREEN_INVENTORY.md) : Inventaire exhaustif des 11 écrans et parcours.
-  - [`docs/REFERENCE_GAPS.md`](file:///root/synapse/docs/REFERENCE_GAPS.md) : Écarts techniques et justification de l'abandon des shaders Kyant/protocole binaire C.
-  - [`docs/DESIGN_SYSTEM.md`](file:///root/synapse/docs/DESIGN_SYSTEM.md) : Système de design Material 3 (Tokens, Palette Dark/Light, Typo, Spacings).
-  - [`docs/ARCHITECTURE.md`](file:///root/synapse/docs/ARCHITECTURE.md) : Architecture MVVM, StateFlow, Room et DataStore.
-  - [`docs/TEST_PLAN.md`](file:///root/synapse/docs/TEST_PLAN.md) : Stratégie de qualification et tests unitaires / Compose.
-  - [`docs/KNOWN_LIMITATIONS.md`](file:///root/synapse/docs/KNOWN_LIMITATIONS.md) : Limites et découplage documentés.
-  - [`README.md`](file:///root/synapse/README.md) : Documentation principale et instructions de compilation.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Utilisateur (Android)
+    participant ChatUI as ChatScreen & ChatViewModel
+    participant Room as Base locale Room (messageDao)
+    participant SSE as CodeStationEventStreamClient (/events)
+    participant Host as CodeStation Host (Rust :19222)
+    participant PRoot as Ubuntu PRoot (bot-opencode-glm / bot-antigravity)
+    participant CLI as Agent CLI (opencode / agy)
 
-### Phase 2 — Système de Build & Ressources Android (Complétée)
-- **Initialisation du Projet** dans `/root/synapse`.
-- **Scripts Gradle** : `settings.gradle.kts`, `build.gradle.kts` racine, `gradle.properties`, `gradle/libs.versions.toml` (Catalog de dépendances moderne), `app/build.gradle.kts` (targetSdk 35, Java 21, Compose activé).
-- **Gradle Wrapper** configuré en version 8.9 avec son archive jar exécutable.
-- **Ressources XML** :
-  - `values/strings.xml`, `values/colors.xml`, `values/themes.xml`.
-  - `xml/data_extraction_rules.xml`, `xml/backup_rules.xml`.
-  - Icône originale de lanceur adaptive (`drawable/ic_launcher_background.xml`, `drawable/ic_launcher_foreground.xml`, `drawable/ic_launcher_monochrome.xml`, `mipmap-anydpi-v26/ic_launcher.xml`).
-  - Bannière vectorielle originale `drawable/ic_synapse_banner.xml`.
-- **Manifeste Android** (`app/src/main/AndroidManifest.xml`) : permissions internet, réseau et audio, configuration de `MainActivity` avec `adjustResize` et filtres d'URI d'appairage `synapse://pair`.
-
-### Phase 3 — Modèles de Domaine & Couche Données (Complétée)
-- **Modèles de Domaine Immuables** : `Bot`, `ChatMessage`, `ApprovalRequest`, `ExecutionStep`, `Routine`, `MemoryFact`, `ExtensionItem`, `ServerConfig`.
-- **Base de Données Locale Room (`SynapseDatabase`)** :
-  - `BotEntity` & `BotDao` avec requêtes de tri réactives par Flow.
-  - `ChatMessageEntity` & `MessageDao` pour la persistance locale des messages.
-  - `ApprovalEntity` & `ApprovalDao` pour l'historique des permissions.
-- **DataStore Preferences (`SynapsePreferences`)** : Sauvegarde asynchrone des options de thème, serveur et détails de réflexion.
-- **Couche Réseau (OkHttp & Retrofit)** : `SynapseApiService` avec DTOs `ServerInfoResponse`, `SendMessageRequest`, `ApproveRequest`.
-- **Repositories** : `BotRepositoryImpl`, `ChatRepositoryImpl`, `ServerRepositoryImpl`, `PreferencesRepositoryImpl`.
-- **Conteneur DI & Application** : `SynapseContainer` et `SynapseApplication`.
-
-### Phase 4 — Design System & Composants Jetpack Compose (Complétée)
-- **Thème Material 3** : `Color.kt` (Dark Obsidian & Light Platine), `Spacing.kt`, `Shape.kt`, `Type.kt`, `Theme.kt`.
-- **Composants Réutilisables** :
-  - `ThinkingOrb` : Orbe pulsant multi-niveaux pour visualiser l'activité des agents.
-  - `BotAvatar` : Avatar avec glyphes géométriques, indicateur d'état, étoile or `★` du Lead Bot et badge de non-lus.
-  - `BotCard` : Carte du roster avec nom, tag du fournisseur, extrait de message et statut en direct.
-  - `ChatMessageItem` : Bulle utilisateur teintée, bulle agent avec rendu clair, gestion des citations `replyTo` et cartes d'artéfacts.
-  - `MessageComposer` : Champ extensible, barre de citation rétractable, bouton de pièce jointe et bouton d'action dynamique (Envoi / Micro / Stop).
-  - `ApprovalCard` : Carte de sécurité pour l'approbation explicite des commandes shell et écritures fichiers avec boutons dédiés.
-  - `ThinkingTraceView` : Vue accordéon dépliable pour inspecter les étapes de raisonnement de l'agent.
-  - `ConnectionStatusChip` : Pastille interactive de statut du serveur dans la barre supérieure.
-  - `EmptyStateView` & `ErrorStateView` : Écrans d'états vides et d'erreurs soignés.
-  - `SettingsRow` & `ConfirmationDialog` : Composants de configuration et dialogues d'action destructive.
-
-### Phase 5 — Implémentation des 11 Écrans & Navigation (Complétée)
-1. **OnboardingScreen** : Présentation et arguments clés avec redirection appairage ou démo.
-2. **PairingScreen** : Configuration de l'hôte (127.0.0.1, LAN, passerelle), jeton de session, test ping actif et retour visuel.
-3. **RosterScreen** : Liste des bots triée en 3 bandes (Lead Bot en tête avec étoile or `★`, épinglés, autres), recherche, menu d'actions et FAB.
-4. **BotEditorScreen** : Création et modification d'agent (forme, couleur d'accent, fournisseur IA, modèle, Fast Mode, instructions, politique d'approbation).
-5. **ChatScreen** : Conversation en direct, bulles sans streaming cassé, orbe d'exécution, citations et approbations interactives.
-6. **TraceScreen** : Visualisation détaillée des étapes de réflexion, durées et flux JSON brut d'événements.
-7. **ApprovalsScreen** : Écran dédié listant les autorisations en attente avec actions directes.
-8. **GroupEditorScreen** : Création de salons multi-agents avec sélection des participants.
-9. **SettingsScreen** : Préférences de thème, chat, diagnostic serveur et liens vers les modules.
-10. **ComplementaryScreens** :
-    - `MemoryScreen` : Explorateur des faits `MEMORY.md`.
-    - `RoutinesScreen` : Tâches automatisées programmées avec bouton de test.
-    - `ExtensionsScreen` : Catalogue des connecteurs MCP et outils système.
-    - `VoiceScreen` : Appel vocal mains-libres avec reconnaissance vocale Android.
-    - `RemoteScreenUnavailable` : État d'indisponibilité transparent expliquant les prérequis WebRTC/Wayland.
-11. **StateScreens** : Écrans d'état hors-ligne, permissions refusées et erreurs système.
-- **Navigation** : `NavRoutes.kt`, `SynapseNavHost.kt`, `MainActivity.kt` avec gestion des deep links d'appairage.
-
-### Phase 6 — Tests & CI GitHub Actions (Complétée)
-- Tests unitaires complets écrits avec JUnit 4, MockK et Kotlinx Coroutines Test :
-  - `RosterViewModelTest` : Validation du tri à 3 bandes (Lead bot en tête permanente, puis épinglés, puis récents) et du filtrage.
-  - `ChatViewModelTest` : Validation de l'envoi de messages, gestion des citations et réponse aux approbations.
-  - `ModelValidationTest` : Validation de la conversion bidirectionnelle Room Entity <-> Domain Model.
-- Workflow CI GitHub Actions `.github/workflows/build_apk.yml` :
-  - Exécuteur `ubuntu-latest` avec JDK 21 Temurin et Gradle 8.9.
-  - Exécution des tests unitaires (`testDebugUnitTest`).
-  - Compilation de l'APK debug (`assembleDebug`).
-  - Production du fichier `Synapse-v1.0.0-debug.apk` et de son empreinte `Synapse-v1.0.0-debug.apk.sha256`.
-  - Upload automatique comme artefact de build téléchargeable.
-
-### Phase 7 — Rétro-Ingénierie des Sources Android Codync & Parité UI/UX Totale (Complétée)
-- **Inspection Directe des Sources Android Officielles** (`/root/Codyn/apps/android/`) :
-  - Analyse approfondie des modules `design` (`Palette.kt`, `Type.kt`, `Motion.kt`, `Shape.kt`, `CharacterAvatar.kt`, `Controls.kt`, `Chrome.kt`), `app` (`RosterView.kt`, `ChatView.kt`, `PairingView.kt`, `TraceView.kt`) et `core` (`dev.codync.core.api`).
-- **Alignement Rigoureux du Design System** :
-  - Remplacement des dégradés saturés par la véritable palette monochrome d'Apple/Codync : fond noir profond `#0A0A0A` (mode sombre) / blanc pur `#FFFFFF` (mode clair), bulles de message grises neutres (`#1E1E1E` pour l'agent, `#262626` pour l'utilisateur), accent blanc contrasté, couleur isolée aux 11 teintes d'avatars et signaux d'état (ambre `#F59E0B` pour `warning`/`needsInput`, rouge `#EF4444` pour `danger`).
-  - Intégration de la police variable `Inter.ttf` (879 Ko) avec formule de crénage optique dynamique calquée sur SF Pro.
-  - Formes à courbure continue : `Capsule()` et `RoundedRectangle(radius)`.
-  - Intégration des 172 drawables vectoriels SF Symbols officiels (`sf_*.xml`), `apple_logo.xml` et `computer_linux.xml` dans `app/src/main/res/drawable/`.
-  - Modélisation vectorielle pure sur Canvas pour `Bubbles` et `CardStack` dans `DrawnSymbols.kt`.
-- **Implémentation des Composants Graphiques Avancés** :
-  - `CharacterAvatar.kt` : Reproduction fidèle des 8 formes géométriques (`blob`, `pebble`, `squircle`, `tablet`, `wedge`, `hex`, `cloud`, `teardrop`), rendu 3D sphérique par gradient radial avec reflet spéculaire en coin supérieur gauche, regard dynamique animé et clignement naturel périodique.
-  - `ThinkingOrb.kt` & `ThinkingOrbGeometry.kt` : Orbe géométrique 3D wireframe projeté sur Canvas avec rotation spatiale continue, estompage de profondeur et arêtes filaires.
-  - `ApprovalCard.kt` : Carte de demande d'approbation d'action (exécution bash, modification de fichier) avec visualiseur de diff colorisé (`#10B981` / `#EF4444`), boîte de code shell et trois boutons tactiles ("Autoriser une fois", "Toujours autoriser", "Refuser").
-  - `MessageComposer.kt` : Compositeur de message extensible, raccourci clavier `Ctrl/Meta+Enter`, aperçu des citations en réponse (`QuotedReply`), bouton en verre pour les pièces jointes et bouton d'action à morphing dynamique (Envoyer / Arrêter / Appel vocal).
-  - `Chrome.kt` & `Glass.kt` : `ScreenHeader`, `ModalHeader`, `BackButton`, conteneur immersif `GlassStage` et barre de navigation inférieure flottante `GlassTabBar`.
-- **Refonte et Alignement des 11 Écrans** :
-  - `RosterScreen.kt`, `ChatScreen.kt`, `PairingScreen.kt`, `ApprovalsScreen.kt`, `TraceScreen.kt`, `BotEditorScreen.kt`, `GroupEditorScreen.kt`, `SettingsScreen.kt`, `OnboardingScreen.kt`, `StateScreens.kt`.
-- **Connexion Réseau Android ⟷ Termux Loopback** :
-  - Vérification du daemon local `codync_host` (v2.28.0) écoutant sur `http://127.0.0.1:19222`.
-  - Implémentation des endpoints réels dans `SynapseApiService.kt` : `GET /health`, `POST /api/hello`, `POST /api/send`, `POST /api/stop`, `POST /api/respondPermission`, `GET /events?since=0`.
-  - Configuration de `ServerRepositoryImpl.kt` avec mesure de latence réelle en millisecondes et résolution du jeton d'accès `/root/.codync-dev/token`.
-  - Prise en charge des deep links d'appairage `synapse://pair?token=...&host=...`.
-- **Tests Unitaires & Assurance Qualité** :
-  - Création de `DesignTokensTest.kt` validant les valeurs hexadécimales de la palette monochrome, les 8 formes d'avatars et les constantes de motion.
-  - Création de `ServerConnectionTest.kt` validant la classification en loopback, l'interrogation du endpoint `/health` et la gestion des erreurs 401.
-  - Maintien et exécution sans régression de `ModelValidationTest.kt`, `RosterViewModelTest.kt` et `ChatViewModelTest.kt`.
-- **Documentation Dédiée Livrée** :
-  - `docs/CODYNC_UI_PARITY_AUDIT.md` : Audit exhaustif de parité visuelle et fonctionnelle.
-  - `docs/UI_COMPONENT_MAPPING.md` : Table de correspondance directe fichier par fichier.
-  - `docs/CONNECTION_TERMUX_DESIGN.md` : Architecture matérielle et logicielle de la connexion locale.
-  - `docs/UI_PARITY_TESTS.md` : Matrice de tests et plan de vérification.
+    User->>ChatUI: Saisie "Hi" et validation
+    ChatUI->>Room: Insertion message utilisateur (status: SENT)
+    ChatUI->>Host: POST /api/send {botId, text, clientNonce}
+    Host->>Host: Inscription dans SQLite codync.db (turn, kind: "user")
+    Host->>PRoot: Lancement de l'agent via wrapper run.sh
+    PRoot->>CLI: Exécution CLI (ex: opencode acp)
+    CLI->>CLI: Traitement LLM (GLM-5.3-Flash Free)
+    CLI-->>Host: Protocole ACP stdio (output agent, thought, tool)
+    Host->>Host: Inscription SQLite codync.db (kind: "agent", text: "Hi! 👋...")
+    Host-->>SSE: Événement SSE 'entry' {kind: "agent", data: {text: "Hi! 👋..."}}
+    Note over SSE: [POINT DE RUPTURE IDENTIFIÉ]
+    SSE-->>Room: Insertion dans messageDao
+    Room-->>ChatUI: Émission Flow<List<ChatMessage>>
+    ChatUI-->>User: Affichage du message dans la vue
+```
 
 ---
 
-## 3. Synthèse des Fichiers Modifiés & Créés
+## 2. Causes Démontrées des Dysfonctionnements
 
-* Racine `/root/synapse/docs/` :
-  - `CODYNC_UI_PARITY_AUDIT.md` (Créé)
-  - `UI_COMPONENT_MAPPING.md` (Créé)
-  - `CONNECTION_TERMUX_DESIGN.md` (Créé)
-  - `UI_PARITY_TESTS.md` (Créé)
-  - `REFERENCE_AUDIT.md`, `SCREEN_INVENTORY.md`, `REFERENCE_GAPS.md`, `DESIGN_SYSTEM.md`, `ARCHITECTURE.md`, `TEST_PLAN.md`, `KNOWN_LIMITATIONS.md`
-* Projet `/root/synapse/app/` :
-  - 172 drawables vectoriels officiels `res/drawable/sf_*.xml`, `apple_logo.xml`, `computer_linux.xml`
-  - Police variable `res/font/inter.ttf`
-  - Nouveaux composants : `CharacterAvatar.kt`, `ThinkingOrb.kt`, `ThinkingOrbGeometry.kt`, `Chrome.kt`, `Controls.kt`, `Glass.kt`, `DrawnSymbols.kt`, `Symbols.kt`, `Symbol.kt`
-  - Thème aligné : `Palette.kt`, `Motion.kt`, `Type.kt`, `Shape.kt`, `Theme.kt`
-  - Écrans alignés : `RosterScreen.kt`, `ChatScreen.kt`, `PairingScreen.kt`, `ApprovalsScreen.kt`, `TraceScreen.kt`, `BotEditorScreen.kt`, `GroupEditorScreen.kt`, `SettingsScreen.kt`, `OnboardingScreen.kt`, `StateScreens.kt`
-  - Nouveaux tests : `DesignTokensTest.kt`, `ServerConnectionTest.kt`
-
-### Phase 8 — Publication sur le Dépôt Officiel CodeStation & Validation CI/CD (Complétée avec Succès)
-- **Vérification Initiale du Dépôt Cible** :
-  - Dépôt distant : `https://github.com/Anisghd-lab/CodeStation`
-  - Inspection via `git ls-remote` et GitHub REST API : Dépôt distant vérifié vide (taille 0, aucun commit antérieur, branche `main` non initialisée).
-  - Validation de l'accès en écriture sans risque d'écrasement de données.
-- **Publication Git & Préservation d'Historique** :
-  - Remote `origin` configuré vers `https://github.com/Anisghd-lab/CodeStation.git`.
-  - Push de la branche locale `main` avec préservation stricte de l'arbre et du commit historique de référence `37d2052` (ainsi que `2171c13` et `0e591b1`).
-- **Audit Itératif des Exécutions CI GitHub Actions & Résolutions** :
-  1. **Run 1 (`40521897087`) sur commit `37d2052`** :
-     - Échec en compilation Kotlin (`compileDebugKotlin`).
-     - Corrections apportées : Suppression de l'argument `isPulsing` sur `ThinkingOrb`, exhaustivité du `when` sur `StepType.THINKING` et `PLANNING`, implémentation de `ChoicePicker` dans `Controls.kt`, ajout de `saveBot(bot)` dans `BotRepository`, correction d'alignement dans `ComplementaryScreens.kt`, annotation `@OptIn(ExperimentalTextApi::class)` dans `Type.kt`, découplage du `combine` à 7 flux dans `ChatViewModel.kt`. (Commit `06ff37b`).
-  2. **Run 2 (`40527115482`) sur commit `06ff37b`** :
-     - Échec en compilation Kotlin (`compileDebugKotlin`).
-     - Corrections apportées : Import manquant `androidx.compose.foundation.layout.width` dans `ChatMessageItem.kt`, réassignation de 11 drawables vectoriels SF Symbols manquants vers des substituts existants vérifiés dans `res/drawable/`, import de `Palette` dans `ComplementaryScreens.kt`. (Commit `76b855f`).
-  3. **Run 3 (`40528816910`) sur commit `76b855f`** :
-     - Compilation du code source principal validée avec succès (`compileDebugKotlin` passé). Échec sur `compileDebugUnitTestKotlin`.
-     - Corrections apportées : Alignement du constructeur `HelloResponse(name = "termux-dev", version = "2.28.0")` et gestion de la nullabilité de `latencyMs` dans `ServerConnectionTest.kt`, mise à jour de `DesignTokensTest.kt` pour tester `AvatarPalette`, `Motion.hover()` et les tokens `@ReadOnlyComposable`. (Commit `e3868a2`).
-  4. **Run 4 (`40529860314`) sur commit `e3868a2`** :
-     - Compilation complète validée. 10 tests unitaires sur 13 réussis, 3 échecs d'assertion dus à la stratégie `SharingStarted.WhileSubscribed(5000)` des `StateFlow` dans `RosterViewModel` et `ChatViewModel` (en l'absence de collecteur actif en test unitaire, le flux amont ne démarre pas).
-     - Corrections apportées : Démarrage d'un collecteur en arrière-plan via `backgroundScope.launch(testDispatcher) { viewModel.uiState.collect() }` dans `RosterViewModelTest` et `ChatViewModelTest`. (Commit `7c17dd8`).
-  5. **Run 5 (`40532712267`) sur commit `7c17dd8` & Run 6 (`40534471967`) sur commit `28c16d6` — SUCCÈS TOTAL** :
-     - **Tests unitaires (`testDebugUnitTest`)** : 13/13 tests exécutés et validés avec succès (100% de réussite).
-     - **Compilation Debug APK (`assembleDebug`)** : BUILD SUCCESSFUL (36 tâches Gradle exécutées/à jour).
-     - **Artefacts générés & Empreintes SHA-256** :
-       - Sur commit `7c17dd8` : `d320b6e03a24532a24e4c5485ce83ac492c051234f854c4091f1022346953916` (Artifact ID `12747057215`)
-       - Sur commit `28c16d6` : `c5fcb8ac0b3f61d112f158c01723bb35a1856bfce48ab2df89d1f4ef506d5846` (Artifact ID `12748485895`)
-
----
-
-## 4. Références & Liens Observables
-
-- **Dépôt GitHub Officiel** : [https://github.com/Anisghd-lab/CodeStation](https://github.com/Anisghd-lab/CodeStation)
-- **Branche Principale** : `main`
-- **Commit Historique de Référence** : [`37d2052`](https://github.com/Anisghd-lab/CodeStation/commit/37d2052)
-- **Commit de Validation du Code** : [`7c17dd8`](https://github.com/Anisghd-lab/CodeStation/commit/7c17dd8)
-- **Pipelines CI GitHub Actions (Succès)** :
-  - [Run #40532712267 (Validation code)](https://github.com/Anisghd-lab/CodeStation/actions/runs/40532712267) — Artefact ID [12747057215](https://github.com/Anisghd-lab/CodeStation/actions/runs/40532712267/artifacts/12747057215)
-  - [Run #40534471967 (Validation doc)](https://github.com/Anisghd-lab/CodeStation/actions/runs/40534471967) — Artefact ID [12748485895](https://github.com/Anisghd-lab/CodeStation/actions/runs/40534471967/artifacts/12748485895)
-- **Empreinte SHA-256 de l'APK (Dernière version)** :
-  ```text
-  c5fcb8ac0b3f61d112f158c01723bb35a1856bfce48ab2df89d1f4ef506d5846  Synapse-v1.0.0-debug.apk
+### Cause 1 : Filtrage erroné des messages dans l'écouteur SSE Android (`CodeStationEventStreamClient.kt:178`)
+- **Constat** : Dans le code existant de `CodeStationEventStreamClient.kt`, le filtre d'insertion Room était :
+  ```kotlin
+  if (text.isNotBlank() && (kind == "assistant" || kind == "notice" || kind == "user"))
   ```
+- **Fait démontré dans la base SQLite réelle (`codync.db`)** :
+  L'hôte CodeStation enregistre et diffuse les réponses des bots avec `kind = "agent"` (`EntryKind::Agent` dans `host/src/store/model.rs`).
+- **Conséquence directe** :
+  Lorsque OpenCode a répondu avec succès :
+  `"Hi! 👋 I'm OpenCode GLM, ready to help. What would you like to work on today?"` (kind: `"agent"`),
+  le client SSE Android a **ignoré et jeté** la réponse. Le message n'a jamais été inséré dans `messageDao`, et l'interface est restée bloquée indéfiniment sur « Réflexion en cours… ».
+
+### Cause 2 : Absence de réinitialisation de `_isBotWorking` et absence de timeout UI
+- `ChatViewModel` activait `_isBotWorking.value = true` lors de l'envoi, mais rien ne remettait cette valeur à `false` lorsqu'une réponse était reçue ou lorsque le bot revenait à l'état `IDLE`.
+- Aucun délai d'attente (timeout) n'était configuré : si le serveur ou le fournisseur tardait, le spinner tournait indéfiniment.
+
+### Cause 3 : Absence de déclenchement interactif d'une session Termux
+- Le serveur CodeStation exécute les agents en arrière-plan via des pipes stdio pour l'API ACP (`Acp::spawn`).
+- Aucune commande Intent Android vers Termux (`com.termux.RUN_COMMAND` ou intent d'activité) n'était exposée dans l'interface pour permettre à l'utilisateur d'ouvrir interactivement un terminal dans le conteneur du bot.
+
+### Cause 4 : Déclenchement abusif des notifications et divergence avec `StatusBarPreview`
+- Dans `CodeStationEventStreamClient.kt`, le statut `"idle"` du bot était automatiquement mappé à `TaskNotificationPhase.COMPLETED`, provoquant la publication répétée de la notification « Tâche exécutée avec succès » alors même qu'aucune tâche n'avait été exécutée.
+- La notification ne reflétait pas le design capsule/pill avec chronomètre visible dans `StatusBarPreview`.
+
+### Cause 5 : Encombrement de l'écran « Connexion Termux »
+- Les onglets « Réseau LAN » et « Passerelle » étaient mis en avant alors qu'ils ne sont pas encore opérationnels.
+- Les conteneurs de bots étaient relégués tout en bas d'une longue page déroulante, et le jeton d'authentification s'affichait sans masquage.
 
 ---
 
-### Phase 9 — Réplication Complète UI/UX Codync, Validation CI/CD et Déploiement Appareil Réel (Complétée avec Succès)
+## 3. Plan d'Implémentation des Correctifs
 
-- **Audit Comparatif des 6 Captures d'Écran Codync Officielles** :
-  1. `1_welcome.jpg` (Écran d'Accueil / Onboarding) : Équipage de 5 mascottes en grille de points animées (`bobbingCrew`), bulle d'échange d'invite ("Un script pour synchroniser..."), typographie française soignée ("Vos ordinateurs, au même endroit."), boutons d'action "Watch the demo" et "Commencer".
-  2. `2_bots_roster.jpg` (Écran Bots / Roster) : En-tête minimaliste (`👤 ˅` compte/paramètres, `Computers ˅` sélecteur d'agent local, `+` nouveau bot/groupe), état vide illustré par l'avatar nuage de points verts (`CodyncDotsCanvas`), boutons "New bot" / "New group", dock en verre flottant (`GlassTabBar` 54dp, pilule glissante 90dp : `Bots` 💬 + `État` 🗂️).
-  3. `3_state_widget.jpg` (Écran État — Onglet Widget) : Sélecteur de segments de modèle, carte de limites d'utilisation avec jauges de ticks dynamiques (`UsageTicks`) et ligne de progression, titre "Codync, at a glance.", checklist, sélecteur de style ("Personnage" vs "Icone originale"), carte de démonstration widget bureau 9:41, bouton "Ajouter à l'écran d'accueil".
-  4. `4_state_liveupdate.jpg` (Écran État — Onglet Live update) : Carte d'activation live update avec commutateur, sélecteur d'états ("Réflexion", "Au travail", "En attente", "Terminé"), carte de prévisualisation de notification à 4 segments avec jauges de progression réelles, actions de contrôle (arrêter / inspecter).
-  5. `5_state_statusbar.jpg` (Écran État — Onglet Status bar) : Carte de prévisualisation îlot dynamique / barre d'état noire (`9:41 [icon 2:37] wifi batterie`), options de configuration d'affichage.
-  6. `6_settings.jpg` (Ordinateurs et paramètres) : Feuille modale complète avec drag handle, sections Ordinateurs (appairage et gestion Termux local `127.0.0.1:19222`), Apparence (Système / Sombre / Clair), Langue (Français / Anglais), Discussion (commutateur Détails de réflexion), Notifications (tâches en cours, permissions), Informations (version v2.28.0, licence Apache-2.0, statut Open Source), bouton destructeur rouge "Recommencer" avec dialogue de confirmation.
-- **Résolutions de Compilation et Améliorations de Robustesse** :
-  - `ChatMessageItem.kt` : Sécurisation du `avatarGlyph` nullable via `message.author.avatarGlyph?.takeIf { it.isNotEmpty() } ?: "blob"`.
-  - `Controls.kt` : Définition de l'extension `Modifier.plainButton` pour les composants tactiles sans sur-effet ripple.
-  - `res/drawable/` : Réplication de l'icône de lancement officielle Codync et drawables vectoriels associés.
-  - Découplage strict des résidus cloud/distants au profit exclusif de la connexion locale Termux/PRoot (`127.0.0.1:19222`).
-- **Validation CI/CD GitHub Actions sur Commit `971d978`** :
-  - **Pipeline GitHub Actions** : [Run #40563757572](https://github.com/Anisghd-lab/CodeStation/actions/runs/40563757572)
-  - **Statut** : `success` (Compilation JDK 21, Kotlin 2.0, Gradle 8.9).
-  - **Tests unitaires (`testDebugUnitTest`)** : 13/13 tests validés (100%).
-  - **Artefact généré** : `Synapse-v1.0.0-debug-apk` (ID `12761633229`).
-  - **Empreinte SHA-256 de l'APK officiel** :
-    ```text
-    2c0ea8305116904adfc02dc4a9837625c1eb0e67184f9aa5da6c1eba9ff847bf  Synapse-v1.0.0-debug.apk
-    ```
-- **Déploiement et Preuve d'Exécution sur Appareil Réel** :
-  - Installation réussie via ADB (`Streamed Install` -> `Success`).
-  - Identifiant de package : `com.ghdinteractivestudio.synapse.debug`.
-  - Processus Android actif vérifié : PID `17855`.
-  - Dump UI et capture d'écran validés (`verify_1.png` et `ui_synapse.xml`) : Composants d'interface, typographie Inter, onglets `Widget` / `Live update` / `Status bar`, jauges de ticks et dock flottant `Bots` / `État` observables et interactifs.
-  - Backend local opérationnel : daemon `codync-host` actif sur `127.0.0.1:19222` (`/health` OK).
+1. **`CodeStationEventStreamClient.kt`** :
+   - Accepter `kind == "agent"` et `kind == "assistant"`.
+   - Ignorer les messages internes silencieux de passage `(pass)`.
+   - Mapper les pensées (`kind == "thought"`) et les exécutions d'outils (`kind == "tool"`).
+   - Corriger la détection des approvations (`kind == "permission"`).
+   - N'émettre la notification `COMPLETED` que si une transition réelle depuis l'état `WORKING` a eu lieu.
 
----
+2. **`ChatViewModel.kt`** :
+   - Réinitialiser `_isBotWorking` dès qu'un message du bot arrive ou que le bot passe à `IDLE`.
+   - Ajouter un timeout configurable (60 secondes) avec message d'avertissement et bouton Réessayer.
+   - Corriger `stopTurn()` pour forcer l'arrêt immédiat et insérer un avis d'annulation.
 
-### Phase 10 — Audit des Écarts, Renommage Global CodeStation & Validation E2E
+3. **Intégration Session Termux Interactive (`TermuxSessionLauncher.kt`)** :
+   - Créer un lanceur dédié capable d'envoyer l'intent Termux `com.termux.RUN_COMMAND` ou d'ouvrir l'application Termux avec la commande prête.
+   - Ajouter des boutons explicites « Ouvrir la session Termux » dans l'interface.
 
-- **Migration Complète de l'Identité Android** :
-  - **Identifiant de package (applicationId / namespace)** : Migré de `com.ghdinteractivestudio.synapse` vers `com.ghdinteractivestudio.codestation`.
-  - **Nom d'application (`strings.xml`)** : « CodeStation ».
-  - **Thème et styles** : `Theme.CodeStation` configuré dans `themes.xml` (avec alias rétrocompatible `Theme.Synapse`).
-  - **Schémas d'URI d'appairage (`AndroidManifest.xml`)** : `codestation://pair` et `codestation-dev://pair` (support rétrocompatible `synapse://pair` et `codync://pair`).
-  - **Base de données Room** : Renommée en `CodeStationDatabase` (`codestation.db`), intégrant une migration automatique des données depuis l'ancienne base `synapse.db` si présente.
-  - **Préférences DataStore** : `codestation_preferences` configuré dans `CodeStationPreferences.kt`.
-  - **Tokens de design & Composants** : Renommage complet de `SynapseDark*` / `SynapseLight*` vers `CodeStationDark*` / `CodeStationLight*`, `CodeStationShapes`, `CodeStationSpacing`.
+4. **Notifications & Barre d'État / Dynamic Island Pill (`CodeStationNotificationManager.kt` & Composant Compose)** :
+   - Nettoyer les fausses réussites.
+   - Créer le composant `DynamicIslandBar` reproduisant fidèlement `StatusBarPreview` en haut de l'écran.
 
-- **Réorganisation et Racine du Projet** :
-  - Répertoire racine officiel du projet : `/root/CodeStation` (arborescence Git active liée à `https://github.com/Anisghd-lab/CodeStation.git`).
-  - Préservation intégrale et non destructive de l'ancien répertoire `/root/synapse` et du dépôt de référence `/root/Codyn`.
-
-- **Backend Rust & Adaptateur CodeStation** :
-  - Inspection de `/root/Codyn/host` et validation de la toolchain Rust (`cargo 1.93.1`).
-  - Ajout du target binaire `[[bin]] name = "codestation-host"` dans `Cargo.toml`.
-  - Compilation native réussie du binaire `/usr/local/bin/codestation-host` (69 Mo).
-  - Création de l'adaptateur CLI officiel `/usr/local/bin/codestation` avec support des commandes :
-    - `codestation serve` (démarrage du daemon sur 127.0.0.1:19222 avec répertoire de données `~/.codestation`)
-    - `codestation pair [--json]` (génération d'URL d'appairage `codestation-dev://pair?...` / QR code)
-    - `codestation status` (vérification de santé HTTP 200)
-    - `codestation token` (résolution du jeton sans affichage non sollicité)
-    - `codestation stop` (arrêt propre du service)
-
-- **Gestion des Jetons et Sécurité Android** :
-  - Migration sécurisée du jeton et des configurations vers `~/.codestation/token`.
-  - Prise en compte explicite de l'isolation UID sous Android : l'application Android s'exécute dans un bac à sable Linux distinct et ne peut pas lire le système de fichiers privé de Termux. L'appairage s'effectue via deep-link `codestation://pair` ou par saisie du jeton.
-
-- **Tests de Bout en Bout Réels (`test_e2e_codestation.py`)** :
-  - **Étape 1 : Santé** : `GET /health` -> HTTP 200 (`version=2.28.0`, `hostId=61bfb07b-f953-4dbc-8a56-4f7516695cdf`).
-  - **Étape 2 : Authentification** : Chargement sécurisé du jeton 64 caractères depuis `~/.codestation/token`.
-  - **Étape 3 : Découverte des Agents** : `POST /api/hello` -> 46 backends détectés, dont Google Antigravity (`antigravity`), Codex (`codex`) et OpenCode (`opencode`) disponibles.
-  - **Étape 4 : Arrêt d'une Tâche** : `POST /api/stop` -> Endpoint actif et fonctionnel.
-  - **Étape 5 : Flux SSE** : `GET /events?since=0` -> Connexion établie HTTP 200 `text/event-stream`, trame événementielle initiale reçue (`data: {"type":"hello", ...}`).
-
-- **Pipeline CI/CD GitHub Actions (`.github/workflows/build_apk.yml`)** :
-  - Mise à jour du pipeline pour compiler et publier :
-    - `CodeStation-debug.apk`
-    - `CodeStation-v1.0.0-debug.apk`
-    - `CodeStation-debug.apk.sha256`
-  - Nom d'artefact : `CodeStation-v1.0.0-debug-apk`.
-
+5. **Restructuration de `PairingScreen.kt`** :
+   - Remplacer les onglets non fonctionnels LAN/Passerelle par des onglets clairs :
+     1. « Connexion & Diagnostic »
+     2. « Conteneurs Ubuntu PRoot »
+     3. « Commandes & Ressources »
+   - Masquer le jeton par défaut avec icône oeil pour révélation explicite.

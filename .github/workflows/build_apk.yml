@@ -2,7 +2,7 @@ name: Build CodeStation Android Native APK
 
 on:
   push:
-    branches: [ main, master, feature/** ]
+    branches: [ main, master, feature/**, fix/** ]
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:

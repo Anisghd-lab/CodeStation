@@ -35,14 +35,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ghdinteractivestudio.codestation.domain.model.BotEnvironment
 import com.ghdinteractivestudio.codestation.domain.model.EnvironmentStatus
 import com.ghdinteractivestudio.codestation.domain.model.ServerConnectionStatus
-import com.ghdinteractivestudio.codestation.domain.model.ServerMode
 import com.ghdinteractivestudio.codestation.ui.components.CardSection
-import com.ghdinteractivestudio.codestation.ui.components.CodeBox
 import com.ghdinteractivestudio.codestation.ui.components.IconButton
 import com.ghdinteractivestudio.codestation.ui.components.PageHeader
 import com.ghdinteractivestudio.codestation.ui.components.PrimaryButton
@@ -50,7 +50,6 @@ import com.ghdinteractivestudio.codestation.ui.components.SecondaryButton
 import com.ghdinteractivestudio.codestation.ui.components.SegmentedChoice
 import com.ghdinteractivestudio.codestation.ui.components.Spinner
 import com.ghdinteractivestudio.codestation.ui.components.Symbol
-import com.ghdinteractivestudio.codestation.ui.components.tr
 import com.ghdinteractivestudio.codestation.ui.theme.Capsule
 import com.ghdinteractivestudio.codestation.ui.theme.Palette
 import com.ghdinteractivestudio.codestation.ui.theme.RoundedRectangle
@@ -59,9 +58,16 @@ import com.ghdinteractivestudio.codestation.ui.theme.bold
 import com.ghdinteractivestudio.codestation.ui.theme.medium
 import com.ghdinteractivestudio.codestation.ui.theme.monospaced
 import com.ghdinteractivestudio.codestation.ui.theme.semibold
+import com.ghdinteractivestudio.codestation.util.TermuxSessionLauncher
 import com.ghdinteractivestudio.codestation.viewmodel.PairingViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+private enum class PairingTab(val label: String) {
+    CONNECTION("Connexion Locale"),
+    CONTAINERS("Conteneurs PRoot"),
+    COMMANDS("Commandes Termux")
+}
 
 @Composable
 fun PairingScreen(
@@ -71,9 +77,13 @@ fun PairingScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val isConnected = state.status == ServerConnectionStatus.CONNECTED
     val isConnecting = state.status == ServerConnectionStatus.CONNECTING
     val isError = state.status == ServerConnectionStatus.ERROR
+
+    var selectedTab by remember { mutableStateOf(PairingTab.CONNECTION) }
+    var isTokenVisible by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -91,129 +101,17 @@ fun PairingScreen(
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header explanation
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    "Connecter à Termux",
-                    style = Type.title2.bold,
-                    color = Palette.text
-                )
-                Text(
-                    "Vos agents s'exécutent dans l'environnement Termux / Ubuntu PRoot sur ce même téléphone.",
-                    style = Type.subheadline,
-                    color = Palette.secondary
-                )
-            }
-
-            // Connection Mode Selector
-            SegmentedChoice(
-                selection = state.serverMode,
-                options = listOf(
-                    ServerMode.LOCAL_LOOPBACK to "Local (127.0.0.1)",
-                    ServerMode.LAN_HOST to "Réseau LAN",
-                    ServerMode.REMOTE_GATEWAY to "Passerelle"
-                ),
-                select = { viewModel.setServerMode(it) }
-            )
-
-            // Step 1: Commands to run in Termux
+            // 1. CARTE DE STATUT ET ACTIONS PRIORITAIRES (PLACÉE TOUT EN HAUT)
             CardSection(
-                title = "Commandes du serveur local"
-            ) {
-                row {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            "1. Démarrer le serveur CodeStation",
-                            style = Type.footnote.semibold,
-                            color = Palette.secondary
-                        )
-                        CommandBlockRow("/root/CodeStation/start_code_station.sh start")
-                    }
-                }
-                row {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            "2. Générer le lien d'appairage local",
-                            style = Type.footnote.semibold,
-                            color = Palette.secondary
-                        )
-                        CommandBlockRow("/root/CodeStation/start_code_station.sh pair")
-                    }
-                }
-                row {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            "3. Afficher le jeton d'authentification",
-                            style = Type.footnote.semibold,
-                            color = Palette.secondary
-                        )
-                        CommandBlockRow("/root/CodeStation/start_code_station.sh token")
-                    }
-                }
-            }
-
-            // Step 2: Server URL & Token configuration
-            CardSection(
-                title = "Paramètres de connexion"
-            ) {
-                row {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Adresse du serveur hôte", style = Type.caption, color = Palette.secondary)
-                        BasicTextField(
-                            value = state.serverUrl,
-                            onValueChange = { viewModel.onServerUrlChanged(it) },
-                            textStyle = Type.body.monospaced.copy(color = Palette.text),
-                            cursorBrush = SolidColor(Palette.accent),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            decorationBox = { inner ->
-                                Box {
-                                    if (state.serverUrl.isEmpty()) {
-                                        Text("http://127.0.0.1:19222", style = Type.body, color = Palette.tertiary)
-                                    }
-                                    inner()
-                                }
-                            }
-                        )
-                    }
-                }
-
-                row {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Jeton d'authentification (Bearer Token)", style = Type.caption, color = Palette.secondary)
-                        BasicTextField(
-                            value = state.pairingToken ?: "",
-                            onValueChange = { viewModel.onPairingTokenChanged(it) },
-                            textStyle = Type.body.monospaced.copy(color = Palette.text),
-                            cursorBrush = SolidColor(Palette.accent),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            decorationBox = { inner ->
-                                Box {
-                                    if (state.pairingToken.isNullOrEmpty()) {
-                                        Text("Jeton local (dans ~/.codestation/token)", style = Type.body, color = Palette.tertiary)
-                                    }
-                                    inner()
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-
-            // Connection status and diagnostics card
-            CardSection(
-                title = "État du diagnostic"
+                title = "État du serveur local"
             ) {
                 row {
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Symbol(
                             when {
@@ -222,10 +120,11 @@ fun PairingScreen(
                                 isConnecting -> "arrow.clockwise"
                                 else -> "circle.dotted"
                             },
-                            size = 20.dp,
+                            size = 24.dp,
                             tint = when {
                                 isConnected -> Palette.added
                                 isError -> Palette.danger
+                                isConnecting -> Palette.accent
                                 else -> Palette.secondary
                             }
                         )
@@ -243,9 +142,9 @@ fun PairingScreen(
                             )
                             if (isConnected && state.serverVersion != null) {
                                 Text(
-                                    "Version ${state.serverVersion} · Latence: ${state.latencyMs ?: 4}ms",
+                                    "Version ${state.serverVersion} · Latence : ${state.latencyMs ?: 27} ms",
                                     style = Type.caption,
-                                    color = Palette.secondary
+                                    color = Palette.emeraldAccent
                                 )
                             } else if (isError && state.errorMessage != null) {
                                 Text(
@@ -255,124 +154,276 @@ fun PairingScreen(
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
+                            } else {
+                                Text(
+                                    "127.0.0.1:19222",
+                                    style = Type.caption,
+                                    color = Palette.secondary
+                                )
                             }
                         }
 
                         if (isConnecting) {
-                            Spinner(16.dp)
+                            Spinner(18.dp)
                         }
+                    }
+                }
+
+                // Boutons d'action rapides directement dans la carte d'état
+                row {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        PrimaryButton(
+                            title = if (isConnecting) "Test…" else "Tester la Connexion",
+                            enabled = !isConnecting,
+                            action = { viewModel.testConnection() },
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        if (isConnected) {
+                            SecondaryButton(
+                                title = "Accéder aux Bots",
+                                action = onPairingSuccess
+                            )
+                        }
+
+                        SecondaryButton(
+                            title = "Ouvrir Termux",
+                            action = { TermuxSessionLauncher.openTermux(context) }
+                        )
                     }
                 }
             }
 
-            // Multi-Environment Control Center (Section 6)
-            if (isConnected) {
-                CardSection(
-                    title = "Ressources du smartphone"
-                ) {
-                    row {
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Text("Mémoire RAM", style = Type.caption, color = Palette.secondary)
-                                Text(
-                                    "${state.resources.ramAvailableMb} Mo dispo / ${state.resources.ramTotalMb} Mo",
-                                    style = Type.footnote.bold,
-                                    color = Palette.text
+            // 2. SÉLECTEUR D'ONGLETS REMPLAÇANT "RÉSEAU LAN" ET "PASSERELLE" INUTILISABLES
+            SegmentedChoice(
+                selection = selectedTab,
+                options = listOf(
+                    PairingTab.CONNECTION to "Connexion",
+                    PairingTab.CONTAINERS to "Conteneurs PRoot",
+                    PairingTab.COMMANDS to "Commandes"
+                ),
+                select = { selectedTab = it }
+            )
+
+            // 3. CONTENU DES ONGLETS
+            when (selectedTab) {
+                PairingTab.CONNECTION -> {
+                    // Onglet Paramètres de connexion locale
+                    CardSection(
+                        title = "Paramètres de connexion"
+                    ) {
+                        row {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("Adresse de l'hôte CodeStation", style = Type.caption, color = Palette.secondary)
+                                BasicTextField(
+                                    value = state.serverUrl,
+                                    onValueChange = { viewModel.onServerUrlChanged(it) },
+                                    textStyle = Type.body.monospaced.copy(color = Palette.text),
+                                    cursorBrush = SolidColor(Palette.accent),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    decorationBox = { inner ->
+                                        Box {
+                                            if (state.serverUrl.isEmpty()) {
+                                                Text("http://127.0.0.1:19222", style = Type.body, color = Palette.tertiary)
+                                            }
+                                            inner()
+                                        }
+                                    }
                                 )
                             }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text("Stockage Disque", style = Type.caption, color = Palette.secondary)
-                                Text(
-                                    "${state.resources.diskAvailableGb} Go dispo / ${state.resources.diskTotalGb} Go",
-                                    style = Type.footnote.bold,
-                                    color = Palette.text
+                        }
+
+                        row {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Jeton d'authentification (Bearer Token)", style = Type.caption, color = Palette.secondary)
+                                    IconButton(
+                                        title = if (isTokenVisible) "Masquer" else "Révéler",
+                                        systemImage = if (isTokenVisible) "eye.slash" else "eye",
+                                        action = { isTokenVisible = !isTokenVisible }
+                                    )
+                                }
+                                BasicTextField(
+                                    value = state.pairingToken ?: "",
+                                    onValueChange = { viewModel.onPairingTokenChanged(it) },
+                                    textStyle = Type.body.monospaced.copy(color = Palette.text),
+                                    cursorBrush = SolidColor(Palette.accent),
+                                    visualTransformation = if (isTokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    decorationBox = { inner ->
+                                        Box {
+                                            if (state.pairingToken.isNullOrEmpty()) {
+                                                Text("Jeton local (automatiquement chargé de ~/.codestation/token)", style = Type.caption, color = Palette.tertiary)
+                                            }
+                                            inner()
+                                        }
+                                    }
                                 )
                             }
                         }
                     }
-                }
 
-                CardSection(
-                    title = "Conteneurs Ubuntu PRoot (1 Bot = 1 Rootfs)"
-                ) {
-                    row {
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "Orchestrateur Multi-Bots",
-                                style = Type.footnote.bold,
-                                color = Palette.text
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                SecondaryButton(
-                                    title = if (state.isLoadingEnvironments) "…" else "Actualiser",
-                                    enabled = !state.isLoadingEnvironments,
-                                    action = { viewModel.refreshEnvironments() }
-                                )
-                                PrimaryButton(
-                                    title = "Démarrer Tout",
-                                    enabled = !state.isLoadingEnvironments,
-                                    action = { viewModel.startAllEnvironments() }
-                                )
-                            }
-                        }
-                    }
-
-                    if (state.environmentMessage != null) {
+                    CardSection(
+                        title = "À propos de la connexion"
+                    ) {
                         row {
                             Text(
-                                state.environmentMessage!!,
-                                style = Type.caption,
-                                color = Palette.emeraldAccent
-                            )
-                        }
-                    }
-
-                    if (state.environments.isEmpty()) {
-                        row {
-                            Text(
-                                if (state.isLoadingEnvironments) "Chargement des conteneurs..." else "Aucun conteneur configuré.",
+                                "Le serveur CodeStation Host s'exécute localement dans Termux sur le port 19222. La communication s'effectue via l'interface réseau de boucle locale (127.0.0.1) sans passer par internet ni nécessiter de passerelle externe.",
                                 style = Type.footnote,
                                 color = Palette.secondary
                             )
                         }
-                    } else {
-                        state.environments.forEach { env ->
-                            row {
-                                BotEnvironmentRow(
-                                    env = env,
-                                    onStart = { viewModel.startEnvironment(env.botId) },
-                                    onStop = { viewModel.stopEnvironment(env.botId) }
+                    }
+                }
+
+                PairingTab.CONTAINERS -> {
+                    // Onglet Conteneurs PRoot Multi-Bots
+                    CardSection(
+                        title = "Ressources du smartphone"
+                    ) {
+                        row {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text("Mémoire RAM", style = Type.caption, color = Palette.secondary)
+                                    Text(
+                                        "${state.resources.ramAvailableMb} Mo dispo / ${state.resources.ramTotalMb} Mo",
+                                        style = Type.footnote.bold,
+                                        color = Palette.text
+                                    )
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text("Stockage Disque", style = Type.caption, color = Palette.secondary)
+                                    Text(
+                                        "${state.resources.diskAvailableGb} Go dispo / ${state.resources.diskTotalGb} Go",
+                                        style = Type.footnote.bold,
+                                        color = Palette.text
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    CardSection(
+                        title = "Conteneurs Ubuntu PRoot (1 Bot = 1 Rootfs)"
+                    ) {
+                        row {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Orchestrateur Multi-Bots",
+                                    style = Type.footnote.bold,
+                                    color = Palette.text
                                 )
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    SecondaryButton(
+                                        title = if (state.isLoadingEnvironments) "…" else "Actualiser",
+                                        enabled = !state.isLoadingEnvironments,
+                                        action = { viewModel.refreshEnvironments() }
+                                    )
+                                    PrimaryButton(
+                                        title = "Démarrer Tout",
+                                        enabled = !state.isLoadingEnvironments,
+                                        action = { viewModel.startAllEnvironments() }
+                                    )
+                                }
+                            }
+                        }
+
+                        if (state.environmentMessage != null) {
+                            row {
+                                Text(
+                                    state.environmentMessage!!,
+                                    style = Type.caption,
+                                    color = Palette.emeraldAccent
+                                )
+                            }
+                        }
+
+                        if (state.environments.isEmpty()) {
+                            row {
+                                Text(
+                                    if (state.isLoadingEnvironments) "Chargement des conteneurs..." else "Aucun conteneur configuré.",
+                                    style = Type.footnote,
+                                    color = Palette.secondary
+                                )
+                            }
+                        } else {
+                            state.environments.forEach { env ->
+                                row {
+                                    BotEnvironmentRow(
+                                        env = env,
+                                        onStart = { viewModel.startEnvironment(env.botId) },
+                                        onStop = { viewModel.stopEnvironment(env.botId) }
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            // Action Buttons
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                PrimaryButton(
-                    title = if (isConnecting) "Test en cours…" else "Tester la Connexion",
-                    enabled = !isConnecting,
-                    action = { viewModel.testConnection() },
-                    modifier = Modifier.weight(1f)
-                )
-
-                if (isConnected) {
-                    SecondaryButton(
-                        title = "Accéder aux Bots",
-                        action = onPairingSuccess
-                    )
+                PairingTab.COMMANDS -> {
+                    // Onglet Commandes Termux
+                    CardSection(
+                        title = "Commandes utiles Termux"
+                    ) {
+                        row {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    "1. Démarrer le serveur CodeStation",
+                                    style = Type.footnote.semibold,
+                                    color = Palette.secondary
+                                )
+                                CommandBlockRow("/root/CodeStation/start_code_station.sh start")
+                            }
+                        }
+                        row {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    "2. Vérifier l'état et les conteneurs",
+                                    style = Type.footnote.semibold,
+                                    color = Palette.secondary
+                                )
+                                CommandBlockRow("/root/CodeStation/start_code_station.sh status")
+                            }
+                        }
+                        row {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    "3. Générer le lien d'appairage",
+                                    style = Type.footnote.semibold,
+                                    color = Palette.secondary
+                                )
+                                CommandBlockRow("/root/CodeStation/start_code_station.sh pair")
+                            }
+                        }
+                        row {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    "4. Afficher le jeton d'authentification",
+                                    style = Type.footnote.semibold,
+                                    color = Palette.secondary
+                                )
+                                CommandBlockRow("/root/CodeStation/start_code_station.sh token")
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -385,6 +436,7 @@ private fun BotEnvironmentRow(
     onStart: () -> Unit,
     onStop: () -> Unit
 ) {
+    val context = LocalContext.current
     val statusColor = when (env.status) {
         EnvironmentStatus.READY -> Palette.added
         EnvironmentStatus.STOPPED -> Palette.secondary
@@ -430,7 +482,7 @@ private fun BotEnvironmentRow(
                     }
                 }
                 Text(
-                    "Moteur: ${env.engine}${env.model?.let { " · $it" } ?: ""} · Disque: ${env.diskMb} Mo",
+                    "Moteur : ${env.engine}${env.model?.let { " · $it" } ?: ""} · Disque : ${env.diskMb} Mo",
                     style = Type.caption,
                     color = Palette.secondary
                 )
@@ -466,6 +518,18 @@ private fun BotEnvironmentRow(
                         action = onStop
                     )
                 }
+                // Bouton pour ouvrir la session interactive dans Termux
+                IconButton(
+                    title = "Ouvrir dans Termux",
+                    systemImage = "terminal",
+                    action = {
+                        TermuxSessionLauncher.openBotTerminalSession(
+                            context = context,
+                            botId = env.botId,
+                            engine = env.engine
+                        )
+                    }
+                )
             }
         }
     }

@@ -3,7 +3,10 @@ package com.ghdinteractivestudio.codestation.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -65,9 +69,11 @@ import com.ghdinteractivestudio.codestation.ui.components.pressScale
 import com.ghdinteractivestudio.codestation.ui.components.tr
 import com.ghdinteractivestudio.codestation.ui.theme.Capsule
 import com.ghdinteractivestudio.codestation.ui.theme.Palette
+import com.ghdinteractivestudio.codestation.ui.theme.RoundedRectangle
 import com.ghdinteractivestudio.codestation.ui.theme.Type
 import com.ghdinteractivestudio.codestation.ui.theme.medium
 import com.ghdinteractivestudio.codestation.ui.theme.semibold
+import com.ghdinteractivestudio.codestation.util.TermuxSessionLauncher
 import com.ghdinteractivestudio.codestation.viewmodel.ChatViewModel
 
 @Composable
@@ -81,6 +87,7 @@ fun ChatScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
+    val context = LocalContext.current
     var isMenuOpen by remember { mutableStateOf(false) }
     var activeQuotedReply by remember { mutableStateOf<QuotedReply?>(null) }
 
@@ -170,8 +177,25 @@ fun ChatScreen(
                         onDismissRequest = { isMenuOpen = false }
                     ) {
                         DropdownMenuItem(
+                            text = { Text("Ouvrir la session Termux", style = Type.body) },
+                            leadingIcon = { Symbol("terminal", size = 18.dp, tint = Palette.accent) },
+                            onClick = {
+                                isMenuOpen = false
+                                val targetBot = bot
+                                if (targetBot != null) {
+                                    TermuxSessionLauncher.openBotTerminalSession(
+                                        context = context,
+                                        botId = targetBot.id,
+                                        engine = targetBot.backend
+                                    )
+                                } else {
+                                    TermuxSessionLauncher.openTermux(context)
+                                }
+                            }
+                        )
+                        DropdownMenuItem(
                             text = { Text("Traces d'exécution", style = Type.body) },
-                            leadingIcon = { Symbol("terminal", size = 18.dp, tint = Palette.text) },
+                            leadingIcon = { Symbol("doc.text", size = 18.dp, tint = Palette.text) },
                             onClick = {
                                 isMenuOpen = false
                                 onViewTrace()
@@ -205,6 +229,45 @@ fun ChatScreen(
                     .imePadding()
                     .navigationBarsPadding()
             ) {
+                // Banner d'erreur / expiration de délai avec bouton Réessayer
+                AnimatedVisibility(
+                    visible = state.errorMessage != null,
+                    enter = fadeIn() + slideInVertically { it / 2 },
+                    exit = fadeOut() + slideOutVertically { it / 2 }
+                ) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                            .clip(RoundedRectangle(14.dp))
+                            .background(Palette.danger.copy(alpha = 0.12f))
+                            .border(1.dp, Palette.danger.copy(alpha = 0.3f), RoundedRectangle(14.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Symbol("exclamationmark.triangle.fill", size = 16.dp, tint = Palette.danger)
+                        Text(
+                            state.errorMessage ?: "Erreur",
+                            style = Type.caption,
+                            color = Palette.danger,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Box(
+                            Modifier
+                                .clip(Capsule())
+                                .background(Palette.accent)
+                                .clickable { viewModel.retryLastMessage() }
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Text("Réessayer", style = Type.caption.semibold, color = Palette.onAccent)
+                        }
+                        IconButton("Fermer", "xmark", action = { viewModel.dismissError() }, size = 20.dp)
+                    }
+                }
+
                 MessageComposer(
                     botName = bot?.name ?: "Agent",
                     isWorking = state.isBotWorking,

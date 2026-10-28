@@ -111,13 +111,13 @@ object CodeStationNotificationManager {
         }
 
         val title = when (phase) {
-            TaskNotificationPhase.QUEUED -> "$botName · En file d'attente"
+            TaskNotificationPhase.QUEUED -> "$botName · En attente"
             TaskNotificationPhase.WORKING -> "$botName · Au travail"
-            TaskNotificationPhase.NEEDS_APPROVAL -> "$botName · Autorisation requise"
-            TaskNotificationPhase.COMPLETED -> "$botName · Tâche terminée"
-            TaskNotificationPhase.FAILED -> "$botName · Erreur"
+            TaskNotificationPhase.NEEDS_APPROVAL -> "$botName · Needs you"
+            TaskNotificationPhase.COMPLETED -> "$botName · Done"
+            TaskNotificationPhase.FAILED -> "$botName · Failed"
             TaskNotificationPhase.STOPPED -> "$botName · Arrêté"
-            TaskNotificationPhase.DISCONNECTED -> "CodeStation · Connexion perdue"
+            TaskNotificationPhase.DISCONNECTED -> "CodeStation · Déconnecté"
         }
 
         val ongoing = phase == TaskNotificationPhase.WORKING ||
@@ -139,7 +139,7 @@ object CodeStationNotificationManager {
         )
 
         val builder = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.drawable.sf_point_3_connected_trianglepath_dotted)
+            .setSmallIcon(R.drawable.sf_star_fill)
             .setContentTitle(title)
             .setContentText(summary)
             .setStyle(NotificationCompat.BigTextStyle().bigText("$summary\nAgent : $agentBackend"))

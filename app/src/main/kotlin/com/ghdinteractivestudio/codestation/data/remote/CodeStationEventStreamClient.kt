@@ -29,6 +29,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import java.io.BufferedReader
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 class CodeStationEventStreamClient(
@@ -42,6 +43,7 @@ class CodeStationEventStreamClient(
     private val json = Json { ignoreUnknownKeys = true }
     private var streamJob: Job? = null
     private var lastRev: Long = 0
+    private val botPreviousStatus = ConcurrentHashMap<String, String>()
 
     private val client = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS) // SSE stream illimité
@@ -130,6 +132,9 @@ class CodeStationEventStreamClient(
                     val activity = botObj["activity"]?.jsonPrimitive?.content ?: ""
                     val startedAt = botObj["startedAt"]?.jsonPrimitive?.longOrNull
 
+                    val prevStatus = botPreviousStatus[botId] ?: "idle"
+                    botPreviousStatus[botId] = rawStatus
+
                     val mappedStatus = when (rawStatus) {
                         "working" -> BotStatus.WORKING
                         "needs_input" -> BotStatus.WORKING
@@ -139,31 +144,56 @@ class CodeStationEventStreamClient(
 
                     botDao.updateStatus(botId, mappedStatus.name)
 
-                    val notificationPhase = when (rawStatus) {
-                        "working" -> TaskNotificationPhase.WORKING
-                        "needs_input" -> TaskNotificationPhase.NEEDS_APPROVAL
-                        "error" -> TaskNotificationPhase.FAILED
-                        "idle" -> TaskNotificationPhase.COMPLETED
-                        else -> TaskNotificationPhase.QUEUED
+                    // Gestion rigoureuse des notifications : uniquement sur changement d'état réel
+                    when (rawStatus) {
+                        "working" -> {
+                            val summary = if (activity.isNotBlank()) activity else "Exécution d'instructions en cours..."
+                            CodeStationNotificationManager.updateTaskNotification(
+                                context = context,
+                                botId = botId,
+                                botName = name,
+                                agentBackend = backend,
+                                phase = TaskNotificationPhase.WORKING,
+                                summary = summary,
+                                startedAtMs = startedAt ?: System.currentTimeMillis()
+                            )
+                        }
+                        "needs_input" -> {
+                            CodeStationNotificationManager.updateTaskNotification(
+                                context = context,
+                                botId = botId,
+                                botName = name,
+                                agentBackend = backend,
+                                phase = TaskNotificationPhase.NEEDS_APPROVAL,
+                                summary = if (activity.isNotBlank()) activity else "Autorisation requise pour continuer"
+                            )
+                        }
+                        "error" -> {
+                            CodeStationNotificationManager.updateTaskNotification(
+                                context = context,
+                                botId = botId,
+                                botName = name,
+                                agentBackend = backend,
+                                phase = TaskNotificationPhase.FAILED,
+                                summary = if (activity.isNotBlank()) activity else "Erreur de processus agent"
+                            )
+                        }
+                        "idle" -> {
+                            if (prevStatus == "working") {
+                                CodeStationNotificationManager.updateTaskNotification(
+                                    context = context,
+                                    botId = botId,
+                                    botName = name,
+                                    agentBackend = backend,
+                                    phase = TaskNotificationPhase.COMPLETED,
+                                    summary = "Réponse terminée avec succès"
+                                )
+                            } else {
+                                // Déjà au repos : ne pas spammer de notification de succès fantôme
+                                CodeStationNotificationManager.clearTaskNotification(context, botId)
+                            }
+                        }
                     }
-
-                    val summary = if (activity.isNotBlank()) activity else when (notificationPhase) {
-                        TaskNotificationPhase.WORKING -> "Exécution d'instructions en cours..."
-                        TaskNotificationPhase.NEEDS_APPROVAL -> "Une approbation est requise pour continuer"
-                        TaskNotificationPhase.COMPLETED -> "Tâche exécutée avec succès"
-                        TaskNotificationPhase.FAILED -> "Échec du processus"
-                        else -> "Prêt"
-                    }
-
-                    CodeStationNotificationManager.updateTaskNotification(
-                        context = context,
-                        botId = botId,
-                        botName = name,
-                        agentBackend = backend,
-                        phase = notificationPhase,
-                        summary = summary,
-                        startedAtMs = startedAt
-                    )
                 }
 
                 "entry" -> {
@@ -173,33 +203,46 @@ class CodeStationEventStreamClient(
                     val kind = entryObj["kind"]?.jsonPrimitive?.content ?: return
                     val dataObj = entryObj["data"]?.jsonObject ?: return
                     val text = dataObj["text"]?.jsonPrimitive?.content ?: ""
+                    val isFinal = dataObj["final"]?.jsonPrimitive?.booleanOrNull ?: false
 
-                    // Mise à jour de l'historique dans Room
-                    if (text.isNotBlank() && (kind == "assistant" || kind == "notice" || kind == "user")) {
-                        val authorType = if (kind == "user") MessageAuthorType.USER else MessageAuthorType.BOT
-                        val displayText = if (kind == "notice" && (text.contains("Couldn't select model", ignoreCase = true) || text.contains("Insufficient credits", ignoreCase = true))) {
+                    val isAgent = (kind == "agent" || kind == "assistant")
+                    val isUser = (kind == "user")
+                    val isNotice = (kind == "notice")
+
+                    // Mise à jour de l'historique dans Room (inclut "agent", "assistant", "notice", "user")
+                    // On filtre les messages de complétion silencieuse interne comme "(pass)"
+                    if (text.isNotBlank() && text.trim() != "(pass)" && (isAgent || isNotice || isUser)) {
+                        val authorType = if (isUser) MessageAuthorType.USER else MessageAuthorType.BOT
+                        val displayText = if (isNotice && (text.contains("Couldn't select model", ignoreCase = true) || text.contains("Insufficient credits", ignoreCase = true))) {
                             "$text\n\n💡 Modèles gratuits OpenCode disponibles sans crédit :\n• opencode/glm-5.3-flash-free (GLM-5.3-Flash Free)\n• opencode/deepseek-v4.1-flash-free\n• opencode/beam-free"
                         } else text
+
+                        val botName = botDao.getBotById(botId)?.name ?: if (isUser) "Moi" else "CodeStation Agent"
 
                         val entity = ChatMessageEntity(
                             id = entryId,
                             botId = botId,
                             authorType = authorType.name,
-                            authorId = botId,
-                            authorName = if (authorType == MessageAuthorType.USER) "Moi" else "CodeStation Agent",
+                            authorId = if (isUser) "user" else botId,
+                            authorName = if (isUser) "Moi" else botName,
                             text = displayText,
                             timestamp = System.currentTimeMillis(),
-                            isFinal = true,
+                            isFinal = isFinal || isNotice || isUser,
                             replyToMessageId = null,
                             replyToAuthor = null,
                             replyToText = null
                         )
                         messageDao.insertMessage(entity)
                         botDao.updateLastMessage(botId, displayText, entity.timestamp)
+
+                        if (isAgent && isFinal) {
+                            botDao.updateStatus(botId, BotStatus.IDLE.name)
+                            botPreviousStatus[botId] = "idle"
+                        }
                     }
 
                     // Détection des demandes d'approbation (cartes de permission)
-                    val isApproval = dataObj["approval"]?.jsonPrimitive?.booleanOrNull ?: (kind == "approval")
+                    val isApproval = dataObj["approval"]?.jsonPrimitive?.booleanOrNull ?: (kind == "approval" || kind == "permission")
                     val command = dataObj["command"]?.jsonPrimitive?.content
                     if (isApproval || command != null) {
                         val approvalEntity = ApprovalEntity(
@@ -208,6 +251,24 @@ class CodeStationEventStreamClient(
                             botName = "CodeStation Agent",
                             actionType = ApprovalActionType.SHELL_COMMAND.name,
                             commandOrPath = command ?: text,
+                            diffPreview = dataObj["diff"]?.jsonPrimitive?.content,
+                            timestamp = System.currentTimeMillis(),
+                            status = ApprovalStatus.PENDING.name,
+                            isAlwaysApproved = false
+                        )
+                        approvalDao.insertApproval(approvalEntity)
+
+                        CodeStationNotificationManager.updateTaskNotification(
+                            context = context,
+                            botId = botId,
+                            botName = "CodeStation",
+                            agentBackend = "acp",
+                            phase = TaskNotificationPhase.NEEDS_APPROVAL,
+                            summary = "Autorisation requise : ${command ?: text}",
+                            approvalId = entryId
+                        )
+                    }
+                }
                             diffPreview = dataObj["diff"]?.jsonPrimitive?.content,
                             timestamp = System.currentTimeMillis(),
                             status = ApprovalStatus.PENDING.name,

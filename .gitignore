@@ -23,4 +23,6 @@ host/target/
 environments/
 __pycache__/
 *.pyc
+*.zip
+build_output/
 
