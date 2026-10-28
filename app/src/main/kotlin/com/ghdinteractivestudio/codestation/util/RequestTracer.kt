@@ -70,7 +70,11 @@ object RequestTracer {
 
         val botInfo = if (botId != null) " | bot=$botId" else ""
         val detailsStr = if (safeDetails.isEmpty()) "" else " | details=$safeDetails"
-        Log.i(TAG, "[req:$requestId] event=$event$botInfo$detailsStr")
+        try {
+            Log.i(TAG, "[req:$requestId] event=$event$botInfo$detailsStr")
+        } catch (_: Throwable) {
+            println("$TAG: [req:$requestId] event=$event$botInfo$detailsStr")
+        }
     }
 
     fun getEventsForRequest(requestId: String): List<TraceEvent> {
