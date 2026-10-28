@@ -269,24 +269,6 @@ class CodeStationEventStreamClient(
                         )
                     }
                 }
-                            diffPreview = dataObj["diff"]?.jsonPrimitive?.content,
-                            timestamp = System.currentTimeMillis(),
-                            status = ApprovalStatus.PENDING.name,
-                            isAlwaysApproved = false
-                        )
-                        approvalDao.insertApproval(approvalEntity)
-
-                        CodeStationNotificationManager.updateTaskNotification(
-                            context = context,
-                            botId = botId,
-                            botName = "CodeStation",
-                            agentBackend = "acp",
-                            phase = TaskNotificationPhase.NEEDS_APPROVAL,
-                            summary = "Autorisation requise : ${command ?: text}",
-                            approvalId = entryId
-                        )
-                    }
-                }
             }
         } catch (_: Exception) {
             // Ignorer les fragments malformés sans casser le flux
