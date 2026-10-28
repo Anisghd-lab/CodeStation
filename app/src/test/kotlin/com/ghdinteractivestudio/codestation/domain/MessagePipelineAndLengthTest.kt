@@ -91,7 +91,7 @@ class MessagePipelineAndLengthTest {
 
         // Verify preservation without truncation
         val originalLength = longText.length
-        val retrievedText = longText.trim()
+        val retrievedText = longText
         assertEquals(originalLength, retrievedText.length)
         assertTrue(retrievedText.contains("Ligne 200"))
         assertTrue(retrievedText.contains("🚀 🤖 📱"))

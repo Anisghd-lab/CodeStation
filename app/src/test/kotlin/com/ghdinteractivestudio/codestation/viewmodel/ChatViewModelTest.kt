@@ -49,8 +49,12 @@ class ChatViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         every { botRepository.getBotByIdStream("bot-1") } returns flowOf(testBot)
+        coEvery { botRepository.getBotById("bot-1") } returns testBot
+        coEvery { botRepository.updateBotStatus(any(), any()) } returns Result.success(Unit)
         every { chatRepository.getMessagesStream("bot-1") } returns flowOf(testMessages)
         every { chatRepository.getPendingApprovalsStream("bot-1") } returns flowOf(emptyList())
+        coEvery { chatRepository.sendMessage(any(), any(), any(), any()) } returns Result.success(testMessages.first())
+        coEvery { chatRepository.respondApproval(any(), any(), any()) } returns Result.success(Unit)
     }
 
     @After
@@ -80,7 +84,7 @@ class ChatViewModelTest {
         viewModel.sendMessage()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        coVerify { chatRepository.sendMessage("bot-1", "Nouvelle tâche", null) }
+        coVerify { chatRepository.sendMessage("bot-1", "Nouvelle tâche", null, any()) }
         assertEquals("", viewModel.uiState.value.inputDraft)
     }
 

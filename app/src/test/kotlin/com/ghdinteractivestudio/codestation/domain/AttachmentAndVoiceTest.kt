@@ -3,6 +3,7 @@ package com.ghdinteractivestudio.codestation.domain
 import android.net.Uri
 import com.ghdinteractivestudio.codestation.domain.model.PendingAttachment
 import com.ghdinteractivestudio.codestation.util.TranscriptionResult
+import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -12,7 +13,7 @@ class AttachmentAndVoiceTest {
 
     @Test
     fun `test PendingAttachment image classification and formatted size`() {
-        val testUri = Uri.parse("content://media/external/images/media/1")
+        val testUri = mockk<Uri>(relaxed = true)
         val imageAttachment = PendingAttachment(
             id = "att-1",
             uri = testUri,
@@ -28,7 +29,7 @@ class AttachmentAndVoiceTest {
 
     @Test
     fun `test PendingAttachment video warning flag`() {
-        val testUri = Uri.parse("content://media/external/video/media/2")
+        val testUri = mockk<Uri>(relaxed = true)
         val videoAttachment = PendingAttachment(
             id = "att-2",
             uri = testUri,
@@ -44,7 +45,7 @@ class AttachmentAndVoiceTest {
 
     @Test
     fun `test PendingAttachment document file handling`() {
-        val testUri = Uri.parse("content://com.android.providers.downloads/document/3")
+        val testUri = mockk<Uri>(relaxed = true)
         val docAttachment = PendingAttachment(
             id = "att-3",
             uri = testUri,
