@@ -62,6 +62,43 @@ data class GenericApiResponse(
     val error: String? = null
 )
 
+@Serializable
+data class EnvironmentDto(
+    @SerialName("bot_id") val botId: String = "",
+    @SerialName("engine") val engine: String = "opencode",
+    @SerialName("model") val model: String? = null,
+    @SerialName("status") val status: String? = "READY",
+    @SerialName("rootfs") val rootfs: String? = null,
+    @SerialName("disk_mb") val diskMb: Int = 0,
+    @SerialName("last_error") val lastError: String? = null
+)
+
+@Serializable
+data class SystemResourcesDto(
+    @SerialName("ram_total_mb") val ramTotalMb: Long = 0,
+    @SerialName("ram_available_mb") val ramAvailableMb: Long = 0,
+    @SerialName("disk_total_gb") val diskTotalGb: Long = 0,
+    @SerialName("disk_available_gb") val diskAvailableGb: Long = 0
+)
+
+@Serializable
+data class EnvironmentsResponse(
+    @SerialName("environments") val environments: List<EnvironmentDto> = emptyList(),
+    @SerialName("resources") val resources: SystemResourcesDto = SystemResourcesDto()
+)
+
+@Serializable
+data class EnvironmentActionRequest(
+    @SerialName("botId") val botId: String
+)
+
+@Serializable
+data class EnvironmentCreateRequest(
+    @SerialName("botId") val botId: String,
+    @SerialName("engine") val engine: String,
+    @SerialName("model") val model: String? = null
+)
+
 interface CodeStationApiService {
     /** `GET /health`, open on loopback without token. */
     @GET("health")
@@ -91,6 +128,34 @@ interface CodeStationApiService {
     @POST("api/respondPermission")
     suspend fun respondPermission(
         @Body request: RespondPermissionRequest,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<GenericApiResponse>
+
+    /** `POST /api/environments`, list all isolated PRoot environments. */
+    @POST("api/environments")
+    suspend fun getEnvironments(
+        @Body empty: Map<String, String> = emptyMap(),
+        @Header("Authorization") authHeader: String? = null
+    ): Response<EnvironmentsResponse>
+
+    /** `POST /api/environmentStart`, start a bot's PRoot environment. */
+    @POST("api/environmentStart")
+    suspend fun startEnvironment(
+        @Body request: EnvironmentActionRequest,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<GenericApiResponse>
+
+    /** `POST /api/environmentStop`, stop a bot's PRoot environment. */
+    @POST("api/environmentStop")
+    suspend fun stopEnvironment(
+        @Body request: EnvironmentActionRequest,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<GenericApiResponse>
+
+    /** `POST /api/environmentCreate`, create a bot's PRoot environment. */
+    @POST("api/environmentCreate")
+    suspend fun createEnvironment(
+        @Body request: EnvironmentCreateRequest,
         @Header("Authorization") authHeader: String? = null
     ): Response<GenericApiResponse>
 }

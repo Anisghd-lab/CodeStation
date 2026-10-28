@@ -20,3 +20,7 @@ app/build/
 target/
 host/target/
 .cargo/
+environments/
+__pycache__/
+*.pyc
+

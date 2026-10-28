@@ -91,7 +91,7 @@ check_agents() {
 
     if command -v opencode >/dev/null 2>&1; then
         echo "  [✓] OpenCode (opencode)     : $(which opencode) ($(opencode --version 2>/dev/null | head -n 1 || echo 'ok'))"
-        if opencode models 2>/dev/null | grep -q "opencode/glm-5.3-flash-free"; then
+        if timeout 2 opencode models 2>/dev/null | grep -q "opencode/glm-5.3-flash-free"; then
             echo "      -> Modèle gratuit GLM-5.3-Flash Free : DISPONIBLE (opencode/glm-5.3-flash-free)"
         fi
     else

@@ -40,10 +40,29 @@ fn claude_options(cfg: &BotConfig) -> Value {
 
 /// Ways to start the bot's agent over ACP, best first: its own command, else its backend's.
 pub(crate) fn launch_commands(cfg: &BotConfig) -> Result<Vec<Candidate>> {
-    Ok(match cfg.command.as_deref().map(str::trim) {
+    let mut candidates = match cfg.command.as_deref().map(str::trim) {
         Some(c) if !c.is_empty() => vec![Candidate::Ready(Cmd { program: c.to_owned(), args: String::new() })],
         _ => crate::agent::backends::launch_candidates(&cfg.backend)?,
-    })
+    };
+
+    // Multi-bot PRoot isolation: if an independent rootfs environment exists for this bot,
+    // wrap the candidate command with the bot's dedicated PRoot runner.
+    let run_script = format!("/root/CodeStation/environments/{}/run.sh", cfg.id);
+    if std::path::Path::new(&run_script).exists() {
+        for cand in &mut candidates {
+            if let Candidate::Ready(cmd) = cand {
+                let full = if cmd.args.is_empty() {
+                    cmd.program.clone()
+                } else {
+                    format!("{} {}", cmd.program, cmd.args)
+                };
+                cmd.program = run_script.clone();
+                cmd.args = full;
+            }
+        }
+    }
+
+    Ok(candidates)
 }
 
 /// Switches a session (`session/new` or `session/load` answered `res`) to the bot's

@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -35,6 +37,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.ghdinteractivestudio.codestation.domain.model.BotEnvironment
+import com.ghdinteractivestudio.codestation.domain.model.EnvironmentStatus
 import com.ghdinteractivestudio.codestation.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.codestation.domain.model.ServerMode
 import com.ghdinteractivestudio.codestation.ui.components.CardSection
@@ -52,6 +56,7 @@ import com.ghdinteractivestudio.codestation.ui.theme.Palette
 import com.ghdinteractivestudio.codestation.ui.theme.RoundedRectangle
 import com.ghdinteractivestudio.codestation.ui.theme.Type
 import com.ghdinteractivestudio.codestation.ui.theme.bold
+import com.ghdinteractivestudio.codestation.ui.theme.caption2
 import com.ghdinteractivestudio.codestation.ui.theme.medium
 import com.ghdinteractivestudio.codestation.ui.theme.monospaced
 import com.ghdinteractivestudio.codestation.ui.theme.semibold
@@ -261,6 +266,97 @@ fun PairingScreen(
                 }
             }
 
+            // Multi-Environment Control Center (Section 6)
+            if (isConnected) {
+                CardSection(
+                    title = "Ressources du smartphone"
+                ) {
+                    row {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text("Mémoire RAM", style = Type.caption, color = Palette.secondary)
+                                Text(
+                                    "${state.resources.ramAvailableMb} Mo dispo / ${state.resources.ramTotalMb} Mo",
+                                    style = Type.footnote.bold,
+                                    color = Palette.text
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("Stockage Disque", style = Type.caption, color = Palette.secondary)
+                                Text(
+                                    "${state.resources.diskAvailableGb} Go dispo / ${state.resources.diskTotalGb} Go",
+                                    style = Type.footnote.bold,
+                                    color = Palette.text
+                                )
+                            }
+                        }
+                    }
+                }
+
+                CardSection(
+                    title = "Conteneurs Ubuntu PRoot (1 Bot = 1 Rootfs)"
+                ) {
+                    row {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Orchestrateur Multi-Bots",
+                                style = Type.footnote.bold,
+                                color = Palette.text
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                SecondaryButton(
+                                    title = if (state.isLoadingEnvironments) "…" else "Actualiser",
+                                    enabled = !state.isLoadingEnvironments,
+                                    action = { viewModel.refreshEnvironments() }
+                                )
+                                PrimaryButton(
+                                    title = "Démarrer Tout",
+                                    enabled = !state.isLoadingEnvironments,
+                                    action = { viewModel.startAllEnvironments() }
+                                )
+                            }
+                        }
+                    }
+
+                    if (state.environmentMessage != null) {
+                        row {
+                            Text(
+                                state.environmentMessage!!,
+                                style = Type.caption,
+                                color = Palette.emeraldAccent
+                            )
+                        }
+                    }
+
+                    if (state.environments.isEmpty()) {
+                        row {
+                            Text(
+                                if (state.isLoadingEnvironments) "Chargement des conteneurs..." else "Aucun conteneur configuré.",
+                                style = Type.footnote,
+                                color = Palette.secondary
+                            )
+                        }
+                    } else {
+                        state.environments.forEach { env ->
+                            row {
+                                BotEnvironmentRow(
+                                    env = env,
+                                    onStart = { viewModel.startEnvironment(env.botId) },
+                                    onStop = { viewModel.stopEnvironment(env.botId) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Action Buttons
             Row(
                 Modifier.fillMaxWidth(),
@@ -277,6 +373,98 @@ fun PairingScreen(
                     SecondaryButton(
                         title = "Accéder aux Bots",
                         action = onPairingSuccess
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BotEnvironmentRow(
+    env: BotEnvironment,
+    onStart: () -> Unit,
+    onStop: () -> Unit
+) {
+    val statusColor = when (env.status) {
+        EnvironmentStatus.READY -> Palette.added
+        EnvironmentStatus.STOPPED -> Palette.secondary
+        EnvironmentStatus.STARTING -> Palette.warning
+        EnvironmentStatus.CREATING, EnvironmentStatus.INSTALLING -> Palette.accent
+        EnvironmentStatus.ERROR -> Palette.danger
+        EnvironmentStatus.BUSY -> Palette.warning
+        EnvironmentStatus.STOPPING -> Palette.secondary
+        EnvironmentStatus.NOT_INSTALLED -> Palette.tertiary
+    }
+
+    Column(
+        Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        env.botId,
+                        style = Type.body.bold,
+                        color = Palette.text
+                    )
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(statusColor.copy(alpha = 0.15f))
+                            .border(1.dp, statusColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            env.status.label,
+                            style = Type.caption2.semibold,
+                            color = statusColor
+                        )
+                    }
+                }
+                Text(
+                    "Moteur: ${env.engine}${env.model?.let { " · $it" } ?: ""} · Disque: ${env.diskMb} Mo",
+                    style = Type.caption,
+                    color = Palette.secondary
+                )
+                if (env.rootfsPath != null) {
+                    Text(
+                        env.rootfsPath,
+                        style = Type.caption2.monospaced,
+                        color = Palette.tertiary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (env.lastError != null) {
+                    Text(
+                        env.lastError,
+                        style = Type.caption2,
+                        color = Palette.danger,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (env.status == EnvironmentStatus.STOPPED || env.status == EnvironmentStatus.ERROR || env.status == EnvironmentStatus.NOT_INSTALLED) {
+                    SecondaryButton(
+                        title = "Démarrer",
+                        action = onStart
+                    )
+                } else if (env.status == EnvironmentStatus.READY) {
+                    SecondaryButton(
+                        title = "Arrêter",
+                        action = onStop
                     )
                 }
             }

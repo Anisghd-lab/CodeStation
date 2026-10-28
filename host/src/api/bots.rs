@@ -98,6 +98,55 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
             hub.mark_read(str_arg(&b, "botId")?)?;
             json!({})
         }
+        "environments" => {
+            let output = tokio::process::Command::new("/root/CodeStation/scripts/bot_env_manager.py")
+                .arg("list")
+                .output()
+                .await?;
+            let val: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|_| json!({"environments": []}));
+            val
+        }
+        "environmentStart" => {
+            let bot_id = str_arg(&b, "botId")?;
+            let output = tokio::process::Command::new("/root/CodeStation/scripts/bot_env_manager.py")
+                .args(["start", bot_id])
+                .output()
+                .await?;
+            let val: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|_| json!({"ok": true}));
+            val
+        }
+        "environmentStop" => {
+            let bot_id = str_arg(&b, "botId")?;
+            let output = tokio::process::Command::new("/root/CodeStation/scripts/bot_env_manager.py")
+                .args(["stop", bot_id])
+                .output()
+                .await?;
+            let val: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|_| json!({"ok": true}));
+            val
+        }
+        "environmentCreate" => {
+            let bot_id = str_arg(&b, "botId")?;
+            let engine = b["engine"].as_str().unwrap_or("opencode");
+            let mut args = vec!["create", bot_id, engine];
+            if let Some(m) = b["model"].as_str() {
+                args.push(m);
+            }
+            let output = tokio::process::Command::new("/root/CodeStation/scripts/bot_env_manager.py")
+                .args(&args)
+                .output()
+                .await?;
+            let val: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|_| json!({"ok": true}));
+            val
+        }
+        "environmentCheck" => {
+            let bot_id = str_arg(&b, "botId")?;
+            let output = tokio::process::Command::new("/root/CodeStation/scripts/bot_env_manager.py")
+                .args(["status", bot_id])
+                .output()
+                .await?;
+            let val: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|_| json!({"ok": true}));
+            val
+        }
         // One chunk of a file for a later `send` (`attachments`); base64 `data` at `offset`.
         "upload" => {
             use base64::Engine as _;

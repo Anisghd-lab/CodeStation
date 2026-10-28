@@ -4,9 +4,14 @@ import java.net.URI
 import java.net.URLDecoder
 import com.ghdinteractivestudio.codestation.data.preferences.PreferencesRepositoryImpl
 import com.ghdinteractivestudio.codestation.data.remote.CodeStationApiService
+import com.ghdinteractivestudio.codestation.data.remote.EnvironmentActionRequest
+import com.ghdinteractivestudio.codestation.data.remote.EnvironmentCreateRequest
+import com.ghdinteractivestudio.codestation.domain.model.BotEnvironment
+import com.ghdinteractivestudio.codestation.domain.model.EnvironmentStatus
 import com.ghdinteractivestudio.codestation.domain.model.ServerConfig
 import com.ghdinteractivestudio.codestation.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.codestation.domain.model.ServerMode
+import com.ghdinteractivestudio.codestation.domain.model.SystemResources
 import com.ghdinteractivestudio.codestation.domain.repository.ServerRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -185,6 +190,77 @@ class ServerRepositoryImpl(
             }
 
             testConnection().getOrThrow()
+        }
+    }
+
+    override suspend fun getEnvironments(): Result<Pair<List<BotEnvironment>, SystemResources>> {
+        return runCatching {
+            val current = getServerConfig()
+            val api = apiServiceProvider(current.url)
+                ?: error("Client HTTP non initialisable pour l'URL: ${current.url}")
+            val authHeader = current.token?.let { "Bearer $it" }
+            val response = api.getEnvironments(emptyMap(), authHeader)
+            if (!response.isSuccessful || response.body() == null) {
+                error("Erreur HTTP ${response.code()}: ${response.message()}")
+            }
+            val body = response.body()!!
+            val envs = body.environments.map { dto ->
+                BotEnvironment(
+                    botId = dto.botId,
+                    engine = dto.engine,
+                    model = dto.model,
+                    status = EnvironmentStatus.fromString(dto.status),
+                    rootfsPath = dto.rootfs,
+                    diskMb = dto.diskMb,
+                    lastError = dto.lastError
+                )
+            }
+            val res = SystemResources(
+                ramTotalMb = body.resources.ramTotalMb,
+                ramAvailableMb = body.resources.ramAvailableMb,
+                diskTotalGb = body.resources.diskTotalGb,
+                diskAvailableGb = body.resources.diskAvailableGb
+            )
+            Pair(envs, res)
+        }
+    }
+
+    override suspend fun startEnvironment(botId: String): Result<Unit> {
+        return runCatching {
+            val current = getServerConfig()
+            val api = apiServiceProvider(current.url)
+                ?: error("Client HTTP non initialisable")
+            val authHeader = current.token?.let { "Bearer $it" }
+            val response = api.startEnvironment(EnvironmentActionRequest(botId), authHeader)
+            if (!response.isSuccessful || response.body()?.ok != true) {
+                error(response.body()?.error ?: "Erreur HTTP ${response.code()}")
+            }
+        }
+    }
+
+    override suspend fun stopEnvironment(botId: String): Result<Unit> {
+        return runCatching {
+            val current = getServerConfig()
+            val api = apiServiceProvider(current.url)
+                ?: error("Client HTTP non initialisable")
+            val authHeader = current.token?.let { "Bearer $it" }
+            val response = api.stopEnvironment(EnvironmentActionRequest(botId), authHeader)
+            if (!response.isSuccessful || response.body()?.ok != true) {
+                error(response.body()?.error ?: "Erreur HTTP ${response.code()}")
+            }
+        }
+    }
+
+    override suspend fun createEnvironment(botId: String, engine: String, model: String?): Result<Unit> {
+        return runCatching {
+            val current = getServerConfig()
+            val api = apiServiceProvider(current.url)
+                ?: error("Client HTTP non initialisable")
+            val authHeader = current.token?.let { "Bearer $it" }
+            val response = api.createEnvironment(EnvironmentCreateRequest(botId, engine, model), authHeader)
+            if (!response.isSuccessful || response.body()?.ok != true) {
+                error(response.body()?.error ?: "Erreur HTTP ${response.code()}")
+            }
         }
     }
 }
