@@ -16,3 +16,7 @@ local.properties
 app/build/
 *.apk
 *.aab
+**/target/
+target/
+host/target/
+.cargo/

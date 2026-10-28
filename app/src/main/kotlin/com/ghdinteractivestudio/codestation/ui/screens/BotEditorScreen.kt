@@ -254,13 +254,83 @@ fun BotEditorScreen(
                 row {
                     Column(
                         Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "Modèle (${state.provider.displayName})",
-                            style = Type.caption,
-                            color = Palette.secondary
-                        )
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Modèle (${state.provider.displayName})",
+                                style = Type.caption,
+                                color = Palette.secondary
+                            )
+                            if (state.provider == ProviderType.OPENCODE) {
+                                Text(
+                                    text = "Gratuit · OpenCode CLI",
+                                    style = Type.caption.semibold,
+                                    color = Palette.emeraldAccent
+                                )
+                            }
+                        }
+
+                        // Model selection chips
+                        val availableModels = state.provider.getAvailableModels()
+                        if (availableModels.isNotEmpty()) {
+                            Column(
+                                Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                availableModels.forEach { modelInfo ->
+                                    val isModelSelected = state.model == modelInfo.id
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedRectangle(8.dp))
+                                            .background(if (isModelSelected) Palette.emeraldAccent.copy(alpha = 0.15f) else Palette.glass)
+                                            .border(
+                                                width = if (isModelSelected) 1.dp else 0.5.dp,
+                                                color = if (isModelSelected) Palette.emeraldAccent else Palette.glassBorder,
+                                                shape = RoundedRectangle(8.dp)
+                                            )
+                                            .clickable { viewModel.onModelChanged(modelInfo.id) }
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Text(
+                                                    text = modelInfo.displayName,
+                                                    style = Type.caption.semibold,
+                                                    color = if (isModelSelected) Palette.text else Palette.secondary
+                                                )
+                                                if (modelInfo.isFree) {
+                                                    Text(
+                                                        text = "Gratuit",
+                                                        style = Type.system(9f).semibold,
+                                                        color = Palette.emeraldAccent
+                                                    )
+                                                }
+                                            }
+                                            Text(
+                                                text = modelInfo.id,
+                                                style = Type.system(10f).monospaced,
+                                                color = Palette.tertiary
+                                            )
+                                        }
+                                        if (isModelSelected) {
+                                            Symbol("checkmark", size = 14.dp, tint = Palette.emeraldAccent)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         BasicTextField(
                             value = state.model,
                             onValueChange = { viewModel.onModelChanged(it) },

@@ -177,13 +177,17 @@ class CodeStationEventStreamClient(
                     // Mise à jour de l'historique dans Room
                     if (text.isNotBlank() && (kind == "assistant" || kind == "notice" || kind == "user")) {
                         val authorType = if (kind == "user") MessageAuthorType.USER else MessageAuthorType.BOT
+                        val displayText = if (kind == "notice" && (text.contains("Couldn't select model", ignoreCase = true) || text.contains("Insufficient credits", ignoreCase = true))) {
+                            "$text\n\n💡 Modèles gratuits OpenCode disponibles sans crédit :\n• opencode/glm-5.3-flash-free (GLM-5.3-Flash Free)\n• opencode/deepseek-v4.1-flash-free\n• opencode/beam-free"
+                        } else text
+
                         val entity = ChatMessageEntity(
                             id = entryId,
                             botId = botId,
                             authorType = authorType.name,
                             authorId = botId,
                             authorName = if (authorType == MessageAuthorType.USER) "Moi" else "CodeStation Agent",
-                            text = text,
+                            text = displayText,
                             timestamp = System.currentTimeMillis(),
                             isFinal = true,
                             replyToMessageId = null,
@@ -191,7 +195,7 @@ class CodeStationEventStreamClient(
                             replyToText = null
                         )
                         messageDao.insertMessage(entity)
-                        botDao.updateLastMessage(botId, text, entity.timestamp)
+                        botDao.updateLastMessage(botId, displayText, entity.timestamp)
                     }
 
                     // Détection des demandes d'approbation (cartes de permission)

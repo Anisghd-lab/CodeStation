@@ -117,79 +117,27 @@ class ChatViewModel(
         val reply = _quotedReply.value
         _inputDraft.value = ""
         _quotedReply.value = null
+        _errorMessage.value = null
 
-        viewModelScope.launch {
-            chatRepository.sendMessage(botId, text, reply)
-            simulateAutonomousTurn(text)
-        }
-    }
-
-    private fun simulateAutonomousTurn(prompt: String) {
         viewModelScope.launch {
             _isBotWorking.value = true
             botRepository.updateBotStatus(botId, BotStatus.WORKING)
-
-            _workingSteps.value = listOf(
-                ExecutionStep(
-                    id = "step-1",
-                    type = StepType.THOUGHT,
-                    title = "Analyse du contexte & instructions",
-                    content = "Prise en compte de la demande de l'utilisateur."
-                )
-            )
-
-            delay(1000)
-
-            // Si la requête contient "bash" ou "script" ou "fichier", créer une demande d'approbation
-            if (prompt.contains("bash", ignoreCase = true) || prompt.contains("run", ignoreCase = true) || prompt.contains("exec", ignoreCase = true)) {
-                val currentBot = botRepository.getBotById(botId)
-                val botName = currentBot?.name ?: "Agent"
-                (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.createApprovalRequest(
+            val result = chatRepository.sendMessage(botId, text, reply)
+            result.onFailure { error ->
+                _isBotWorking.value = false
+                botRepository.updateBotStatus(botId, BotStatus.IDLE)
+                _errorMessage.value = error.message ?: "Échec de l'envoi au serveur"
+                (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.insertNotice(
                     botId = botId,
-                    botName = botName,
-                    command = "pytest tests/ --verbose"
-                )
-            } else {
-                _workingSteps.value = _workingSteps.value + ExecutionStep(
-                    id = "step-2",
-                    type = StepType.TOOL_CALL,
-                    title = "Lecture des sources locales",
-                    content = "Inspecte les fichiers du projet."
-                )
-                delay(1200)
-
-                val bot = botRepository.getBotById(botId)
-                val botName = bot?.name ?: "CodeStation Assistant"
-                val replyText = "J'ai traité votre consigne avec succès. Tout est synchronisé et conforme à l'architecture."
-
-                (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.insertAgentReply(
-                    botId = botId,
-                    botName = botName,
-                    text = replyText,
-                    traceSteps = _workingSteps.value
+                    text = "Erreur de transmission : ${error.localizedMessage}"
                 )
             }
-
-            _isBotWorking.value = false
-            botRepository.updateBotStatus(botId, BotStatus.IDLE)
         }
     }
 
     fun respondApproval(approvalId: String, status: ApprovalStatus, alwaysApprove: Boolean = false) {
         viewModelScope.launch {
             chatRepository.respondApproval(approvalId, status, alwaysApprove)
-            if (status == ApprovalStatus.APPROVED) {
-                // Débloque et poursuit le tour
-                delay(500)
-                val bot = botRepository.getBotById(botId)
-                val botName = bot?.name ?: "Agent"
-                (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.insertAgentReply(
-                    botId = botId,
-                    botName = botName,
-                    text = "Commande shell exécutée avec succès (Code 0)."
-                )
-                botRepository.updateBotStatus(botId, BotStatus.IDLE)
-            }
         }
     }
 

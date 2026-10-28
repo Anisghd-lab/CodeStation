@@ -143,6 +143,21 @@ class BotRepositoryImpl(
                 lastMessage = "Tests unitaires passés avec succès (100% couverture).",
                 permissionPolicy = PermissionPolicy.ASK_SHELL,
                 instructions = "Assistant de commandes bash et d'exécution d'outils système sécurisés."
+            ),
+            Bot(
+                id = "bot-opencode-glm",
+                name = "OpenCode GLM",
+                description = "Agent OpenCode propulsé par GLM-5.3-Flash Free",
+                avatarGlyph = "hexagon",
+                avatarColorHex = "#A855F7",
+                provider = ProviderType.OPENCODE,
+                model = "opencode/glm-5.3-flash-free",
+                isFastMode = true,
+                isLead = false,
+                isPinned = false,
+                status = BotStatus.IDLE,
+                lastMessage = "Prêt. Modèle gratuit GLM-5.3-Flash actif via OpenCode CLI.",
+                instructions = "Tu es un agent de codage propulsé par OpenCode et le modèle gratuit GLM-5.3-Flash."
             )
         )
         botDao.insertAll(initialBots.map { BotEntity.fromDomain(it) })

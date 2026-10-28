@@ -37,10 +37,12 @@ export CODESTATION_EXTERNAL_URL="http://${BIND}:${PORT}"
 
 # Détection explicite du binaire hôte
 detect_host_binary() {
-    if [ -x "$SCRIPT_DIR/host/target/release/codync-host" ]; then
-        echo "$SCRIPT_DIR/host/target/release/codync-host"
-    elif [ -x "$SCRIPT_DIR/host/target/debug/codync-host" ]; then
-        echo "$SCRIPT_DIR/host/target/debug/codync-host"
+    if command -v codestation >/dev/null 2>&1; then
+        command -v codestation
+    elif [ -x "$SCRIPT_DIR/host/target/debug/codestation" ]; then
+        echo "$SCRIPT_DIR/host/target/debug/codestation"
+    elif [ -x "/usr/local/bin/codestation" ]; then
+        echo "/usr/local/bin/codestation"
     elif command -v codestation-host >/dev/null 2>&1; then
         command -v codestation-host
     elif command -v codync-host >/dev/null 2>&1; then
@@ -89,6 +91,9 @@ check_agents() {
 
     if command -v opencode >/dev/null 2>&1; then
         echo "  [✓] OpenCode (opencode)     : $(which opencode) ($(opencode --version 2>/dev/null | head -n 1 || echo 'ok'))"
+        if opencode models 2>/dev/null | grep -q "opencode/glm-5.3-flash-free"; then
+            echo "      -> Modèle gratuit GLM-5.3-Flash Free : DISPONIBLE (opencode/glm-5.3-flash-free)"
+        fi
     else
         echo "  [-] OpenCode (opencode)     : Non trouvé"
     fi

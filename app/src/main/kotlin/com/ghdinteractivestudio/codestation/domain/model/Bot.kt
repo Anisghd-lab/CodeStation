@@ -7,14 +7,60 @@ enum class BotStatus {
     OFFLINE
 }
 
-enum class ProviderType(val displayName: String, val defaultModel: String) {
-    CLAUDE_CODE("Claude Code", "claude-3-7-sonnet"),
-    OPENAI_CODEX("OpenAI Codex", "gpt-4o"),
-    GEMINI_CLI("Google Gemini CLI", "gemini-2.0-flash"),
-    OPENCODE("OpenCode", "deepseek-coder-v2"),
-    ACP_LOCAL("ACP Local Agent", "local-qwen-2.5"),
-    CUSTOM("Custom Agent", "default")
+enum class ProviderType(val displayName: String, val defaultModel: String, val backendId: String) {
+    CLAUDE_CODE("Claude Code", "claude-3-7-sonnet", "claude"),
+    OPENAI_CODEX("OpenAI Codex", "gpt-4o", "codex"),
+    GEMINI_CLI("Google Gemini CLI", "gemini-2.0-flash", "gemini"),
+    ANTIGRAVITY("Google Antigravity", "gemini-2.5-pro", "antigravity"),
+    OPENCODE("OpenCode", "opencode/glm-5.3-flash-free", "opencode"),
+    ACP_LOCAL("ACP Local Agent", "local-qwen-2.5", "acp"),
+    CUSTOM("Custom Agent", "default", "custom");
+
+    fun getAvailableModels(): List<ModelInfo> {
+        return when (this) {
+            OPENCODE -> listOf(
+                ModelInfo("opencode/glm-5.3-flash-free", "GLM-5.3-Flash Free", isFree = true, isDefault = true),
+                ModelInfo("opencode/deepseek-v4.1-flash-free", "DeepSeek V4.1 Flash Free", isFree = true),
+                ModelInfo("opencode/beam-free", "Beam Free", isFree = true),
+                ModelInfo("opencode/flint-40b-free", "Flint 40B Free", isFree = true),
+                ModelInfo("opencode/mimo-v2.6-flash-free", "MiMo V2.6 Flash Free", isFree = true),
+                ModelInfo("opencode/nemotron-3-ultra-free", "Nemotron 3 Ultra Free", isFree = true),
+                ModelInfo("deepseek/deepseek-v4-pro", "DeepSeek V4 Pro", isFree = false)
+            )
+            CLAUDE_CODE -> listOf(
+                ModelInfo("claude-3-7-sonnet", "Claude 3.7 Sonnet", isFree = false, isDefault = true),
+                ModelInfo("claude-3-5-sonnet", "Claude 3.5 Sonnet", isFree = false),
+                ModelInfo("claude-3-5-haiku", "Claude 3.5 Haiku", isFree = false)
+            )
+            OPENAI_CODEX -> listOf(
+                ModelInfo("gpt-4o", "GPT-4o", isFree = false, isDefault = true),
+                ModelInfo("gpt-4o-mini", "GPT-4o Mini", isFree = false),
+                ModelInfo("o3-mini", "o3-mini", isFree = false)
+            )
+            GEMINI_CLI -> listOf(
+                ModelInfo("gemini-2.0-flash", "Gemini 2.0 Flash", isFree = false, isDefault = true),
+                ModelInfo("gemini-2.5-pro", "Gemini 2.5 Pro", isFree = false)
+            )
+            ANTIGRAVITY -> listOf(
+                ModelInfo("gemini-2.5-pro", "Gemini 2.5 Pro (AGY)", isFree = true, isDefault = true),
+                ModelInfo("gemini-2.0-flash", "Gemini 2.0 Flash (AGY)", isFree = true)
+            )
+            ACP_LOCAL -> listOf(
+                ModelInfo("local-qwen-2.5", "Qwen 2.5 (Local)", isFree = true, isDefault = true)
+            )
+            CUSTOM -> listOf(
+                ModelInfo("default", "Modèle Personnalisé", isFree = true, isDefault = true)
+            )
+        }
+    }
 }
+
+data class ModelInfo(
+    val id: String,
+    val displayName: String,
+    val isFree: Boolean = false,
+    val isDefault: Boolean = false
+)
 
 enum class WorkspaceMode(val displayName: String) {
     PERSONAL("Bac à sable personnel"),

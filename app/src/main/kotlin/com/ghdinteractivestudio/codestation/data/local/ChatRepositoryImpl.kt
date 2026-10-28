@@ -57,25 +57,26 @@ class ChatRepositoryImpl(
             messageDao.insertMessage(ChatMessageEntity.fromDomain(userMsg))
             botDao.updateLastMessage(botId, text, userMsg.timestamp)
 
-            // Tentative d'envoi réseau vers apiService si connecté
+            // Envoi réseau vers apiService si connecté
             if (apiServiceProvider != null && serverRepository != null) {
-                try {
-                    val config = serverRepository.getServerConfig()
-                    val api = apiServiceProvider.invoke()
-                    if (api != null && !config.token.isNullOrBlank()) {
-                        val auth = "Bearer ${config.token}"
-                        api.sendMessage(
-                            SendMessageRequest(
-                                botId = botId,
-                                text = text,
-                                clientNonce = userMsg.id,
-                                replyTo = replyTo?.messageId
-                            ),
-                            authHeader = auth
-                        )
-                    }
-                } catch (_: Exception) {
-                    // Fallback silencieux en local
+                val config = serverRepository.getServerConfig()
+                val api = apiServiceProvider.invoke()
+                if (api == null || config.token.isNullOrBlank()) {
+                    throw IllegalStateException("Serveur CodeStation non connecté ou jeton d'authentification manquant.")
+                }
+                val auth = "Bearer ${config.token}"
+                val response = api.sendMessage(
+                    SendMessageRequest(
+                        botId = botId,
+                        text = text,
+                        clientNonce = userMsg.id,
+                        replyTo = replyTo?.messageId
+                    ),
+                    authHeader = auth
+                )
+                if (!response.isSuccessful) {
+                    val err = response.errorBody()?.string() ?: "Erreur HTTP ${response.code()}"
+                    throw IllegalStateException("Le serveur a refusé le message ($err)")
                 }
             }
 
@@ -91,25 +92,44 @@ class ChatRepositoryImpl(
         return runCatching {
             approvalDao.updateStatus(approvalId, status.name, alwaysApprove)
             if (apiServiceProvider != null && serverRepository != null) {
-                try {
-                    val config = serverRepository.getServerConfig()
-                    val api = apiServiceProvider.invoke()
-                    if (api != null && !config.token.isNullOrBlank()) {
-                        val auth = "Bearer ${config.token}"
-                        val optionId = when (status) {
-                            ApprovalStatus.APPROVED -> if (alwaysApprove) "allow_always" else "allow_once"
-                            ApprovalStatus.REJECTED -> if (alwaysApprove) "reject_always" else "reject_once"
-                            else -> "allow_once"
-                        }
-                        api.respondPermission(
-                            RespondPermissionRequest(entryId = approvalId, optionId = optionId),
-                            authHeader = auth
-                        )
+                val config = serverRepository.getServerConfig()
+                val api = apiServiceProvider.invoke()
+                if (api != null && !config.token.isNullOrBlank()) {
+                    val auth = "Bearer ${config.token}"
+                    val optionId = when (status) {
+                        ApprovalStatus.APPROVED -> if (alwaysApprove) "allow_always" else "allow_once"
+                        ApprovalStatus.REJECTED -> if (alwaysApprove) "reject_always" else "reject_once"
+                        else -> "allow_once"
                     }
-                } catch (_: Exception) {
-                    // Fallback
+                    val resp = api.respondPermission(
+                        RespondPermissionRequest(entryId = approvalId, optionId = optionId),
+                        authHeader = auth
+                    )
+                    if (!resp.isSuccessful) {
+                        val err = resp.errorBody()?.string() ?: "Erreur HTTP ${resp.code()}"
+                        throw IllegalStateException("Échec de transmission de l'approbation ($err)")
+                    }
                 }
             }
+        }
+    }
+
+    suspend fun insertNotice(
+        botId: String,
+        text: String
+    ): Result<ChatMessage> {
+        return runCatching {
+            val noticeMsg = ChatMessage(
+                id = UUID.randomUUID().toString(),
+                botId = botId,
+                author = MessageAuthor(MessageAuthorType.SYSTEM, "system", "Système"),
+                text = text,
+                timestamp = System.currentTimeMillis(),
+                isFinal = true
+            )
+            messageDao.insertMessage(ChatMessageEntity.fromDomain(noticeMsg))
+            botDao.updateLastMessage(botId, text, noticeMsg.timestamp)
+            noticeMsg
         }
     }
 
