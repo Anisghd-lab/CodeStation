@@ -60,15 +60,12 @@ class AttachmentAndVoiceTest {
 
     @Test
     fun `test voice transcription result sealed class states`() {
-        val success = TranscriptionResult.Success("Bonjour CodeStation", isFinal = true)
+        val success = TranscriptionResult.Success("Bonjour CodeStation")
         val partial = TranscriptionResult.Partial("Bonjour")
         val error = TranscriptionResult.Error("Microphone occupé")
 
         assertEquals("Bonjour CodeStation", success.text)
-        assertTrue(success.isFinal)
-
         assertEquals("Bonjour", partial.text)
-
         assertEquals("Microphone occupé", error.message)
     }
 }
