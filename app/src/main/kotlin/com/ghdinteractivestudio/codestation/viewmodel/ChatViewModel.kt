@@ -48,7 +48,8 @@ class ChatViewModel(
         val draft: String,
         val reply: QuotedReply?,
         val working: Boolean,
-        val steps: List<ExecutionStep>
+        val steps: List<ExecutionStep>,
+        val error: String?
     )
 
     private val _botDataFlow = combine(
@@ -63,9 +64,10 @@ class ChatViewModel(
         _inputDraft,
         _quotedReply,
         _isBotWorking,
-        _workingSteps
-    ) { draft, reply, working, steps ->
-        InputState(draft, reply, working, steps)
+        _workingSteps,
+        _errorMessage
+    ) { draft, reply, working, steps, error ->
+        InputState(draft, reply, working, steps, error)
     }
 
     val uiState: StateFlow<ChatUiState> = combine(
@@ -80,7 +82,7 @@ class ChatViewModel(
             currentWorkingSteps = input.steps,
             inputDraft = input.draft,
             quotedReply = input.reply,
-            errorMessage = _errorMessage.value
+            errorMessage = input.error
         )
     }.stateIn(
         scope = viewModelScope,
