@@ -13,9 +13,9 @@ class NotificationArchitectureTest {
 
     @Test
     fun testNotificationChannelsDefinitions() {
-        assertEquals("codestation_live_tasks", CodeStationNotificationManager.CHANNEL_LIVE_TASKS)
-        assertEquals("codestation_approvals", CodeStationNotificationManager.CHANNEL_APPROVALS)
-        assertEquals("codestation_completed", CodeStationNotificationManager.CHANNEL_COMPLETED)
+        assertEquals("codestation_live_tasks_v2", CodeStationNotificationManager.CHANNEL_LIVE_TASKS)
+        assertEquals("codestation_approvals_v2", CodeStationNotificationManager.CHANNEL_APPROVALS)
+        assertEquals("codestation_completed_v2", CodeStationNotificationManager.CHANNEL_COMPLETED)
     }
 
     @Test
@@ -33,13 +33,16 @@ class NotificationArchitectureTest {
     fun testTaskNotificationPhasesCompleteness() {
         val phases = TaskNotificationPhase.values().map { it.name }
         assertTrue(phases.contains("QUEUED"))
+        assertTrue(phases.contains("STARTING"))
         assertTrue(phases.contains("WORKING"))
+        assertTrue(phases.contains("RESPONSE_RECEIVED"))
         assertTrue(phases.contains("NEEDS_APPROVAL"))
         assertTrue(phases.contains("COMPLETED"))
         assertTrue(phases.contains("FAILED"))
         assertTrue(phases.contains("STOPPED"))
+        assertTrue(phases.contains("CANCELLED"))
         assertTrue(phases.contains("DISCONNECTED"))
-        assertEquals(7, TaskNotificationPhase.values().size)
+        assertEquals(10, TaskNotificationPhase.values().size)
     }
 
     @Test

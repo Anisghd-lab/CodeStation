@@ -144,6 +144,9 @@ class CodeStationEventStreamClient(
 
                     botDao.updateStatus(botId, mappedStatus.name)
 
+                    val formattedBotName = CodeStationNotificationManager.formatAgentDisplayName(botId, name)
+                    val formattedBackend = CodeStationNotificationManager.formatBackendDisplayName(backend)
+
                     // Gestion rigoureuse des notifications et traçage : uniquement sur changement d'état réel
                     when (rawStatus) {
                         "working" -> {
@@ -156,8 +159,8 @@ class CodeStationEventStreamClient(
                             CodeStationNotificationManager.updateTaskNotification(
                                 context = context,
                                 botId = botId,
-                                botName = name,
-                                agentBackend = backend,
+                                botName = formattedBotName,
+                                agentBackend = formattedBackend,
                                 phase = TaskNotificationPhase.WORKING,
                                 summary = summary,
                                 startedAtMs = startedAt ?: System.currentTimeMillis()
@@ -167,8 +170,8 @@ class CodeStationEventStreamClient(
                             CodeStationNotificationManager.updateTaskNotification(
                                 context = context,
                                 botId = botId,
-                                botName = name,
-                                agentBackend = backend,
+                                botName = formattedBotName,
+                                agentBackend = formattedBackend,
                                 phase = TaskNotificationPhase.NEEDS_APPROVAL,
                                 summary = if (activity.isNotBlank()) activity else "Autorisation requise pour continuer"
                             )
@@ -182,14 +185,14 @@ class CodeStationEventStreamClient(
                             CodeStationNotificationManager.updateTaskNotification(
                                 context = context,
                                 botId = botId,
-                                botName = name,
-                                agentBackend = backend,
+                                botName = formattedBotName,
+                                agentBackend = formattedBackend,
                                 phase = TaskNotificationPhase.FAILED,
                                 summary = if (activity.isNotBlank()) activity else "Erreur de processus agent"
                             )
                         }
                         "idle" -> {
-                            if (prevStatus == "working") {
+                            if (prevStatus == "working" || prevStatus == "needs_input") {
                                 com.ghdinteractivestudio.codestation.util.RequestTracer.logEvent(
                                     requestId = "status-$botId",
                                     event = com.ghdinteractivestudio.codestation.util.RequestTracer.EVENT_RESPONSE_COMPLETED,
@@ -198,8 +201,8 @@ class CodeStationEventStreamClient(
                                 CodeStationNotificationManager.updateTaskNotification(
                                     context = context,
                                     botId = botId,
-                                    botName = name,
-                                    agentBackend = backend,
+                                    botName = formattedBotName,
+                                    agentBackend = formattedBackend,
                                     phase = TaskNotificationPhase.COMPLETED,
                                     summary = "Réponse terminée avec succès"
                                 )
@@ -250,6 +253,8 @@ class CodeStationEventStreamClient(
                         messageDao.insertMessage(entity)
                         botDao.updateLastMessage(botId, displayText, entity.timestamp)
 
+                        val formattedBotName = CodeStationNotificationManager.formatAgentDisplayName(botId, botName)
+
                         if (isAgent && isFinal) {
                             com.ghdinteractivestudio.codestation.util.RequestTracer.logEvent(
                                 requestId = entryId,
@@ -261,7 +266,7 @@ class CodeStationEventStreamClient(
                             CodeStationNotificationManager.updateTaskNotification(
                                 context = context,
                                 botId = botId,
-                                botName = botName,
+                                botName = formattedBotName,
                                 agentBackend = "agent",
                                 phase = TaskNotificationPhase.COMPLETED,
                                 summary = "Réponse terminée avec succès"
@@ -272,6 +277,15 @@ class CodeStationEventStreamClient(
                                 event = com.ghdinteractivestudio.codestation.util.RequestTracer.EVENT_FIRST_OUTPUT_RECEIVED,
                                 details = mapOf("botId" to botId, "chunkLength" to text.length)
                             )
+                            // Mise à jour de la notification persistante avec l'extrait de streaming
+                            CodeStationNotificationManager.updateTaskNotification(
+                                context = context,
+                                botId = botId,
+                                botName = formattedBotName,
+                                agentBackend = "agent",
+                                phase = TaskNotificationPhase.RESPONSE_RECEIVED,
+                                summary = text.trim().takeLast(90).ifBlank { "Réception de la réponse..." }
+                            )
                         }
                     }
 
@@ -279,10 +293,11 @@ class CodeStationEventStreamClient(
                     val isApproval = dataObj["approval"]?.jsonPrimitive?.booleanOrNull ?: (kind == "approval" || kind == "permission")
                     val command = dataObj["command"]?.jsonPrimitive?.content
                     if (isApproval || command != null) {
+                        val formattedBotName = CodeStationNotificationManager.formatAgentDisplayName(botId, null)
                         val approvalEntity = ApprovalEntity(
                             id = entryId,
                             botId = botId,
-                            botName = "CodeStation Agent",
+                            botName = formattedBotName,
                             actionType = ApprovalActionType.SHELL_COMMAND.name,
                             commandOrPath = command ?: text,
                             diffPreview = dataObj["diff"]?.jsonPrimitive?.content,
@@ -295,7 +310,7 @@ class CodeStationEventStreamClient(
                         CodeStationNotificationManager.updateTaskNotification(
                             context = context,
                             botId = botId,
-                            botName = "CodeStation",
+                            botName = formattedBotName,
                             agentBackend = "acp",
                             phase = TaskNotificationPhase.NEEDS_APPROVAL,
                             summary = "Autorisation requise : ${command ?: text}",

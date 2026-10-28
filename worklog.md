@@ -215,11 +215,33 @@ sequenceDiagram
 - Nettoyage automatique des fichiers audio temporaires après transcription.
 
 ### F. Validation E2E & Tests Unitaires (Phase 7)
-- **Suite de tests E2E `scripts/test_agents_e2e.py`** : **10/10 tests réussis**.
+- **Suite de tests E2E `scripts/test_agents_e2e.py`** : **11/11 tests réussis**.
 - **Tests unitaires dédiés** :
   - `CliDetectionTest.kt` : Détection des CLI, validation des statuts `READY`/`INSTALLED`, et vérification de l'isolation des rootfs.
   - `MessagePipelineAndLengthTest.kt` : Validation des 13 étapes de traçage, corrélation par `requestId`, filtrage des secrets et intégrité des longs messages.
   - `AttachmentAndVoiceTest.kt` : Classification des pièces jointes et cycle de vie audio.
   - `AntigravityDynamicModelTest.kt` : Découverte dynamique des modèles `agy` et rétention de cache.
   - `BotNotificationAndTraceTest.kt` : Notifications persistantes d'exécution des agents.
+  - `NotificationArchitectureTest.kt` : Canaux v2 et complétude des phases de notification.
+
+---
+
+## 7. Notifications Persistantes dans la Barre d'État Android (Android 14/15/16)
+
+**Date :** 28 Octobre 2026  
+**Branche :** `fix/bot-launch-and-persistent-notifications`
+
+### Objectif et Problématiques Résolues
+1. **Disparition ou rejet par balayage (Swipe dismiss)** : Sous Android 14+ (`API 34/35/36`), les notifications persistantes `setOngoing(true)` peuvent être écartées par l'utilisateur sauf si les drapeaux système `FLAG_ONGOING_EVENT` et `FLAG_NO_CLEAR` sont activement combinés et que le canal est en `IMPORTANCE_DEFAULT` ou `IMPORTANCE_HIGH`.
+2. **Icône dans la barre d'état invisible ou tronquée** : Utilisation du drawable vectoriel monochrome optimisé `ic_launcher_monochrome.xml` (avec teinte Indigo `#6366F1`) garantissant un rendu net et visible dans la barre d'état Android sans effet de bloc blanc opaque.
+3. **Absence de notification immédiate lors de l'envoi** : `ChatViewModel.sendMessage()` déclenche désormais instantanément la notification persistante de travail avec chronomètre de progression avant même la réception du flux SSE, évitant tout délai d'affichage si l'utilisateur quitte l'application.
+4. **Service au premier plan de synchronisation locale (`CodeStationTaskSyncService`)** :
+   - Démarré de façon conforme dans `MainActivity.onStart()` avec type `FOREGROUND_SERVICE_TYPE_DATA_SYNC`.
+   - Maintient la connexion SSE locale avec CodeStation Host (`127.0.0.1:19222`) active en arrière-plan lorsque l'utilisateur bascule sur Termux ou verrouille l'écran.
+5. **Actions contextuelles enrichies** :
+   - `Ouvrir` : Redirection immédiate par deep link vers le chat de l'agent concerné.
+   - `Arrêter` : Interruption propre et immédiate de l'agent via `NotificationActionReceiver.ACTION_STOP_BOT`.
+   - `Autoriser` / `Refuser` : Prise de décision directe pour les commandes shell et modifications depuis la notification d'approbation (`ACTION_APPROVE` / `ACTION_REJECT`).
+6. **Mise à niveau des canaux (Migration v2)** : Canaux créés avec IDs mis à jour (`codestation_live_tasks_v2`, `codestation_approvals_v2`, `codestation_completed_v2`) avec suppression des versions obsolètes pour forcer la prise en compte sur les appareils ayant déjà exécuté une version antérieure.
+
 

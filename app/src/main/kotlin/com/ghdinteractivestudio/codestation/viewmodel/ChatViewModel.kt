@@ -1,5 +1,6 @@
 package com.ghdinteractivestudio.codestation.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -15,6 +16,8 @@ import com.ghdinteractivestudio.codestation.domain.model.QuotedReply
 import com.ghdinteractivestudio.codestation.domain.model.StepType
 import com.ghdinteractivestudio.codestation.domain.repository.BotRepository
 import com.ghdinteractivestudio.codestation.domain.repository.ChatRepository
+import com.ghdinteractivestudio.codestation.notification.CodeStationNotificationManager
+import com.ghdinteractivestudio.codestation.notification.TaskNotificationPhase
 import com.ghdinteractivestudio.codestation.util.RequestTracer
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -43,7 +46,8 @@ data class ChatUiState(
 class ChatViewModel(
     private val botId: String,
     private val botRepository: BotRepository,
-    private val chatRepository: ChatRepository
+    private val chatRepository: ChatRepository,
+    private val context: Context? = null
 ) : ViewModel() {
 
     private val _inputDraft = MutableStateFlow("")
@@ -252,7 +256,22 @@ class ChatViewModel(
                 botId = botId
             )
             val bot = botRepository.getBotById(botId)
+            val displayName = CodeStationNotificationManager.formatAgentDisplayName(botId, bot?.name)
             val engine = bot?.provider?.backendId ?: "opencode"
+
+            // Déclenchement immédiat de la notification persistante dans la barre d'état
+            context?.let { ctx ->
+                CodeStationNotificationManager.updateTaskNotification(
+                    context = ctx,
+                    botId = botId,
+                    botName = displayName,
+                    agentBackend = engine,
+                    phase = TaskNotificationPhase.WORKING,
+                    summary = "Envoi et réflexion en cours...",
+                    startedAtMs = System.currentTimeMillis()
+                )
+            }
+
             RequestTracer.logEvent(
                 requestId = reqId,
                 event = RequestTracer.EVENT_CLI_RESOLVED,
@@ -285,6 +304,16 @@ class ChatViewModel(
                         botId = botId,
                         details = mapOf("reason" to "turn_timeout_60s")
                     )
+                    context?.let { ctx ->
+                        CodeStationNotificationManager.updateTaskNotification(
+                            context = ctx,
+                            botId = botId,
+                            botName = displayName,
+                            agentBackend = engine,
+                            phase = TaskNotificationPhase.FAILED,
+                            summary = "Délai d'attente dépassé (60s). L'agent n'a pas répondu à temps."
+                        )
+                    }
                     (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.insertNotice(
                         botId = botId,
                         text = "⏱️ Délai de réponse dépassé (60s). Vérifiez que Termux et le CLI du bot sont actifs, puis appuyez sur Réessayer."
@@ -321,6 +350,16 @@ class ChatViewModel(
                     botId = botId,
                     details = mapOf("error" to error.localizedMessage)
                 )
+                context?.let { ctx ->
+                    CodeStationNotificationManager.updateTaskNotification(
+                        context = ctx,
+                        botId = botId,
+                        botName = displayName,
+                        agentBackend = engine,
+                        phase = TaskNotificationPhase.FAILED,
+                        summary = "Erreur de transmission : ${error.localizedMessage}"
+                    )
+                }
                 (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.insertNotice(
                     botId = botId,
                     text = "Erreur de transmission : ${error.localizedMessage}"
@@ -355,6 +394,18 @@ class ChatViewModel(
             details = mapOf("botId" to botId)
         )
         viewModelScope.launch {
+            val bot = botRepository.getBotById(botId)
+            val displayName = CodeStationNotificationManager.formatAgentDisplayName(botId, bot?.name)
+            context?.let { ctx ->
+                CodeStationNotificationManager.updateTaskNotification(
+                    context = ctx,
+                    botId = botId,
+                    botName = displayName,
+                    agentBackend = bot?.provider?.backendId ?: "agent",
+                    phase = TaskNotificationPhase.STOPPED,
+                    summary = "Tâche interrompue par l'utilisateur."
+                )
+            }
             botRepository.updateBotStatus(botId, BotStatus.IDLE)
             botRepository.stopBotTurn(botId)
             (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.insertNotice(
@@ -374,11 +425,12 @@ class ChatViewModel(
         fun provideFactory(
             botId: String,
             botRepository: BotRepository,
-            chatRepository: ChatRepository
+            chatRepository: ChatRepository,
+            context: Context? = null
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return ChatViewModel(botId, botRepository, chatRepository) as T
+                return ChatViewModel(botId, botRepository, chatRepository, context) as T
             }
         }
     }

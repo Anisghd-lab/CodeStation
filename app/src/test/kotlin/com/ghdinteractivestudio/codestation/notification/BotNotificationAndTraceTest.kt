@@ -31,6 +31,7 @@ class BotNotificationAndTraceTest {
     fun `test notification phase ongoing behavior`() {
         // Phases nécessitant une notification persistante dans la barre d'état
         val ongoingPhases = listOf(
+            TaskNotificationPhase.QUEUED,
             TaskNotificationPhase.STARTING,
             TaskNotificationPhase.WORKING,
             TaskNotificationPhase.RESPONSE_RECEIVED,
@@ -49,6 +50,7 @@ class BotNotificationAndTraceTest {
         for (phase in ongoingPhases) {
             val isOngoing = phase == TaskNotificationPhase.WORKING ||
                     phase == TaskNotificationPhase.STARTING ||
+                    phase == TaskNotificationPhase.QUEUED ||
                     phase == TaskNotificationPhase.RESPONSE_RECEIVED ||
                     phase == TaskNotificationPhase.NEEDS_APPROVAL
             assertTrue("Phase $phase doit être persistante (ongoing = true)", isOngoing)
@@ -57,6 +59,7 @@ class BotNotificationAndTraceTest {
         for (phase in completedPhases) {
             val isOngoing = phase == TaskNotificationPhase.WORKING ||
                     phase == TaskNotificationPhase.STARTING ||
+                    phase == TaskNotificationPhase.QUEUED ||
                     phase == TaskNotificationPhase.RESPONSE_RECEIVED ||
                     phase == TaskNotificationPhase.NEEDS_APPROVAL
             assertFalse("Phase $phase ne doit PAS être persistante (ongoing = false)", isOngoing)
@@ -112,5 +115,19 @@ class BotNotificationAndTraceTest {
         assertFalse("Le token ne doit jamais apparaître", safeKeys.contains("token"))
         assertFalse("L'api_key ne doit jamais apparaître", safeKeys.contains("api_key"))
         assertFalse("L'authHeader ne doit jamais apparaître", safeKeys.contains("authHeader"))
+    }
+
+    @Test
+    fun `test agent and backend display name formatting`() {
+        assertEquals("OpenCode GLM", CodeStationNotificationManager.formatAgentDisplayName("bot-opencode-glm"))
+        assertEquals("Google Antigravity", CodeStationNotificationManager.formatAgentDisplayName("bot-antigravity"))
+        assertEquals("Codex Terminal", CodeStationNotificationManager.formatAgentDisplayName("bot-codex-terminal"))
+        assertEquals("Custom Bot", CodeStationNotificationManager.formatAgentDisplayName("custom-1", "Custom Bot"))
+
+        assertEquals("Google Antigravity CLI", CodeStationNotificationManager.formatBackendDisplayName("agy"))
+        assertEquals("Google Antigravity CLI", CodeStationNotificationManager.formatBackendDisplayName("antigravity"))
+        assertEquals("OpenCode CLI", CodeStationNotificationManager.formatBackendDisplayName("opencode"))
+        assertEquals("Codex Termux", CodeStationNotificationManager.formatBackendDisplayName("codex"))
+        assertEquals("Protocole ACP", CodeStationNotificationManager.formatBackendDisplayName("acp"))
     }
 }

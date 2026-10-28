@@ -131,6 +131,27 @@ def test_long_message_piping_preservation():
     assert "Fin du message sans troncature." in long_msg
     assert "🚀" in long_msg
 
+def test_persistent_notification_configuration():
+    manifest_path = "/root/CodeStation/app/src/main/AndroidManifest.xml"
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    assert "android.permission.POST_NOTIFICATIONS" in content, "Permission POST_NOTIFICATIONS requise"
+    assert "android.permission.FOREGROUND_SERVICE" in content, "Permission FOREGROUND_SERVICE requise"
+    assert "android.permission.FOREGROUND_SERVICE_DATA_SYNC" in content, "Permission FOREGROUND_SERVICE_DATA_SYNC requise"
+    assert "CodeStationTaskSyncService" in content, "Service CodeStationTaskSyncService requis dans manifest"
+    assert "NotificationActionReceiver" in content, "Receiver NotificationActionReceiver requis"
+    assert "ACTION_STOP_BOT" in content, "Action ACTION_STOP_BOT manquante"
+    assert "ACTION_APPROVE" in content, "Action ACTION_APPROVE manquante"
+    assert "ACTION_REJECT" in content, "Action ACTION_REJECT manquante"
+
+    manager_path = "/root/CodeStation/app/src/main/kotlin/com/ghdinteractivestudio/codestation/notification/CodeStationNotificationManager.kt"
+    with open(manager_path, "r", encoding="utf-8") as f:
+        mgr = f.read()
+    assert "CHANNEL_LIVE_TASKS" in mgr, "Canal LIVE_TASKS manquant"
+    assert "FLAG_ONGOING_EVENT" in mgr, "Drapeau FLAG_ONGOING_EVENT manquant"
+    assert "FLAG_NO_CLEAR" in mgr, "Drapeau FLAG_NO_CLEAR manquant"
+    assert "ic_launcher_monochrome" in mgr, "Icône monochrome requise pour barre d'état"
+
 def main():
     print("=" * 60)
     print("CodeStation E2E Agents & Environments Test Suite")
@@ -146,6 +167,7 @@ def main():
         ("Préservation des messages longs et sans troncature", test_long_message_piping_preservation),
         ("Bridge ACP Handshake (bot-antigravity)", test_antigravity_acp_bridge_initialize),
         ("Arrêt propre 'stop' (bot-opencode-glm)", test_cancellation_and_stop),
+        ("Configuration notifications persistantes Android 16", test_persistent_notification_configuration),
         ("Réponse réelle OpenCode GLM-5.3-Flash Free", test_opencode_real_glm_query),
     ]
 

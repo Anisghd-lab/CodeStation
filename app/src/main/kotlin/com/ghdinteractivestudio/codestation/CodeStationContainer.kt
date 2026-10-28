@@ -21,6 +21,7 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
 
 interface AppContainer {
+    val context: Context
     val botRepository: BotRepository
     val chatRepository: ChatRepository
     val serverRepository: ServerRepository
@@ -29,7 +30,7 @@ interface AppContainer {
     val eventStreamClient: com.ghdinteractivestudio.codestation.data.remote.CodeStationEventStreamClient
 }
 
-class CodeStationContainer(private val context: Context) : AppContainer {
+class CodeStationContainer(override val context: Context) : AppContainer {
 
     private val database: CodeStationDatabase by lazy {
         CodeStationDatabase.getDatabase(context)

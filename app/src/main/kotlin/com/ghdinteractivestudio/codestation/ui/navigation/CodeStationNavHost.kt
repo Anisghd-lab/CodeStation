@@ -92,7 +92,7 @@ fun CodeStationNavHost(
             val botId = backStackEntry.arguments?.getString("botId") ?: return@composable
             val chatViewModel: ChatViewModel = viewModel(
                 key = botId,
-                factory = ChatViewModel.provideFactory(botId, container.botRepository, container.chatRepository)
+                factory = ChatViewModel.provideFactory(botId, container.botRepository, container.chatRepository, container.context)
             )
             ChatScreen(
                 viewModel = chatViewModel,
@@ -156,7 +156,7 @@ fun CodeStationNavHost(
             val botId = backStackEntry.arguments?.getString("botId") ?: return@composable
             val chatViewModel: ChatViewModel = viewModel(
                 key = botId,
-                factory = ChatViewModel.provideFactory(botId, container.botRepository, container.chatRepository)
+                factory = ChatViewModel.provideFactory(botId, container.botRepository, container.chatRepository, container.context)
             )
             val chatState by chatViewModel.uiState.collectAsState()
             TraceScreen(
@@ -168,7 +168,7 @@ fun CodeStationNavHost(
         // 8. Approbations
         composable(Screen.Approvals.route) {
             val chatViewModel: ChatViewModel = viewModel(
-                factory = ChatViewModel.provideFactory("lead", container.botRepository, container.chatRepository)
+                factory = ChatViewModel.provideFactory("lead", container.botRepository, container.chatRepository, container.context)
             )
             val chatState by chatViewModel.uiState.collectAsState()
             ApprovalsScreen(

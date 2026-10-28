@@ -69,6 +69,8 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.ghdinteractivestudio.codestation.ACTION_STOP_BOT" />
+                <action android:name="com.ghdinteractivestudio.codestation.ACTION_APPROVE" />
+                <action android:name="com.ghdinteractivestudio.codestation.ACTION_REJECT" />
             </intent-filter>
         </receiver>
     </application>
