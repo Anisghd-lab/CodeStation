@@ -112,7 +112,7 @@ fun AttachmentChip(
             modifier = Modifier
                 .size(18.dp)
                 .clip(Capsule())
-                .background(Palette.surfaceElevated)
+                .background(Palette.surface)
                 .clickable(onClick = onRemove),
             contentAlignment = Alignment.Center
         ) {

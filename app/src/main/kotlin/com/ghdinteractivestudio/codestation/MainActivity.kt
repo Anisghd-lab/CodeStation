@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
         val container = app.container
         CoroutineScope(Dispatchers.IO).launch {
             container.botRepository.refreshBots()
-            container.serverRepository.checkHealth()
+            container.serverRepository.testConnection()
         }
     }
 
