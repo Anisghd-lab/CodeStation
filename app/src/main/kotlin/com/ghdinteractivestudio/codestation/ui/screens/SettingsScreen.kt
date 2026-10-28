@@ -2,9 +2,7 @@ package com.ghdinteractivestudio.codestation.ui.screens
 
 import android.Manifest
 import android.content.Context
-import android.content.Intent
 import android.os.Build
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -20,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -44,7 +41,6 @@ import com.ghdinteractivestudio.codestation.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.codestation.ui.components.CardForm
 import com.ghdinteractivestudio.codestation.ui.components.CardSection
 import com.ghdinteractivestudio.codestation.ui.components.CodyncSwitch
-import com.ghdinteractivestudio.codestation.ui.components.IconButton
 import com.ghdinteractivestudio.codestation.ui.components.LinkButton
 import com.ghdinteractivestudio.codestation.ui.components.PageHeader
 import com.ghdinteractivestudio.codestation.ui.components.SecondaryButton
@@ -82,7 +78,6 @@ fun SettingsScreen(
     }
     val notificationsAllowed = rememberOnResume { notificationsAllowed(context) } || (askedNotifications && notificationsAllowed(context))
 
-    var showThinkingDetails by rememberSaveable { mutableStateOf(true) }
     var shareAnalytics by rememberSaveable { mutableStateOf(false) }
     var appLanguage by rememberSaveable { mutableStateOf("system") }
     var confirmStartOver by remember { mutableStateOf(false) }
@@ -103,7 +98,7 @@ fun SettingsScreen(
             // Section 1: Ordinateurs
             CardSection(
                 title = "Ordinateurs",
-                footer = "Chaque bot fonctionne sur son propre ordinateur. Connectez-vous pour voir les ordinateurs de votre compte."
+                footer = "Chaque bot dispose de son propre conteneur Ubuntu PRoot indépendant sur Termux."
             ) {
                 if (isConnected) {
                     row {
@@ -114,8 +109,8 @@ fun SettingsScreen(
                         ) {
                             Symbol("desktopcomputer", size = 20.dp, tint = Palette.added)
                             Column(Modifier.weight(1f)) {
-                                Text("Termux PRoot", style = Type.body.semibold, color = Palette.text)
-                                Text("127.0.0.1:19222 · En ligne", style = Type.footnote, color = Palette.secondary)
+                                Text("Termux PRoot Local", style = Type.body.semibold, color = Palette.text)
+                                Text("127.0.0.1:19222 · Serveur opérationnel", style = Type.footnote, color = Palette.emeraldAccent)
                             }
                             Symbol("checkmark.circle.fill", size = 18.dp, tint = Palette.added)
                         }
@@ -135,18 +130,18 @@ fun SettingsScreen(
                 }
             }
 
-            // Section 2: Apparence
+            // Section 2: Préférences & Discussion (Regroupées pour éliminer le vide artificiel)
             CardSection(
-                title = "Apparence",
-                footer = "Modifie uniquement l’apparence sur cet appareil."
+                title = "Préférences générales"
             ) {
+                // Thème
                 row {
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Thème", style = Type.body, color = Palette.text)
+                        Text("Thème de l'interface", style = Type.body, color = Palette.text)
                         CompactDropdownMenu(
                             selection = state.themeMode,
                             options = listOf(
@@ -158,20 +153,15 @@ fun SettingsScreen(
                         )
                     }
                 }
-            }
 
-            // Section 3: Langue
-            CardSection(
-                title = "Langue",
-                footer = "Choisissez la langue de cet appareil. Les langues système non prises en charge utilisent l’anglais."
-            ) {
+                // Langue
                 row {
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Langue de l'app", style = Type.body, color = Palette.text)
+                        Text("Langue de l'application", style = Type.body, color = Palette.text)
                         CompactDropdownMenu(
                             selection = appLanguage,
                             options = listOf(
@@ -183,55 +173,44 @@ fun SettingsScreen(
                         )
                     }
                 }
-            }
 
-            // Section 4: Discussion
-            CardSection(
-                title = "Discussion",
-                footer = "Permet de déplier la réflexion et les étapes d’un bot au travail depuis son statut dans la discussion. Ne change que cet appareil."
-            ) {
+                // Discussion : Détails de la réflexion avec interrupteur accolé au texte
                 row {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    CodyncSwitch(
+                        checked = state.showThinkingDetails,
+                        onChange = { viewModel.setShowThinkingDetails(it) },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            "Afficher les détails de la réflexion",
-                            style = Type.body,
-                            color = Palette.text,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        CodyncSwitch(
-                            checked = state.showThinkingDetails,
-                            onChange = { viewModel.setShowThinkingDetails(it) }
-                        ) {}
+                        Column(Modifier.weight(1f)) {
+                            Text("Détails de la réflexion", style = Type.body, color = Palette.text)
+                            Text("Déplie les étapes et raisonnements dans la discussion", style = Type.caption, color = Palette.secondary)
+                        }
                     }
                 }
             }
 
-            // Section 5: Notifications
+            // Section 3: Notifications & Analyses
             CardSection(
-                title = "Notifications",
-                footer = "Get a result summary, a request for input, or a failure notice. Notification previews follow your Android settings."
+                title = "Notifications & Diagnostics"
             ) {
-                row {
-                    Text(
-                        "Push isn't set up in this build. Bots and chats still update while CodeStation is open.",
-                        style = Type.subheadline,
-                        color = Palette.secondary
-                    )
-                }
+                // Notifications locales Android (état clair sans faux push)
                 row {
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Notifications", style = Type.body, color = Palette.text)
+                        Column(Modifier.weight(1f)) {
+                            Text("Notifications Android", style = Type.body, color = Palette.text)
+                            Text(
+                                if (notificationsAllowed) "Live Updates et alertes d'action actives"
+                                else "Autorisation système requise pour les alertes",
+                                style = Type.caption,
+                                color = Palette.secondary
+                            )
+                        }
                         SecondaryButton(
-                            title = if (notificationsAllowed) "Activé" else "Activer",
+                            title = if (notificationsAllowed) "Actif" else "Activer",
                             action = {
                                 if (!notificationsAllowed && Build.VERSION.SDK_INT >= 33 && !askedNotifications) {
                                     notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -242,11 +221,25 @@ fun SettingsScreen(
                         )
                     }
                 }
+
+                // Analyses d'utilisation
+                row {
+                    CodyncSwitch(
+                        checked = shareAnalytics,
+                        onChange = { shareAnalytics = it },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Partager les diagnostics anonymes", style = Type.body, color = Palette.text)
+                            Text("Aide à repérer les plantages sans transmettre vos données", style = Type.caption, color = Palette.secondary)
+                        }
+                    }
+                }
             }
 
-            // Section 6: Analytics
+            // Section 4: Informations de version et Réinitialisation (Compact et directement visible)
             CardSection(
-                footer = "Les fonctionnalités que vous utilisez, jamais vos messages, votre code ni vos fichiers. Cela nous aide à repérer les bugs et à améliorer CodeStation."
+                title = "À propos de CodeStation"
             ) {
                 row {
                     Row(
@@ -254,42 +247,22 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            "Partager des analyses d'utilisation",
-                            style = Type.body,
-                            color = Palette.text,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        CodyncSwitch(
-                            checked = shareAnalytics,
-                            onChange = { shareAnalytics = it }
-                        ) {}
+                        Text("Version de l'application", style = Type.body, color = Palette.text)
+                        Text("1.0.3 (Build 4)", style = Type.body.semibold, color = Palette.secondary)
                     }
                 }
-            }
-
-            // Section 7: Informations
-            CardSection {
                 row {
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Version de l'application", style = Type.body, color = Palette.text)
-                        Text("2.28.0", style = Type.body, color = Palette.secondary)
+                        Text("Dépôt GitHub", style = Type.body, color = Palette.text)
+                        LinkButton("Code source", color = Palette.accent) {
+                            uri.openUri("https://github.com/Anisghd-lab/CodeStation")
+                        }
                     }
                 }
-                row {
-                    LinkButton("Code source", color = Palette.accent) {
-                        uri.openUri("https://github.com/Anisghd-lab/CodeStation")
-                    }
-                }
-            }
-
-            // Section 8: Start over / Recommencer
-            CardSection {
                 row {
                     Row(
                         Modifier
@@ -298,8 +271,8 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Symbol("arrow.counterclockwise", size = 20.dp, tint = Palette.danger)
-                        Text("Recommencer", style = Type.body, color = Palette.danger)
+                        Symbol("arrow.counterclockwise", size = 18.dp, tint = Palette.danger)
+                        Text("Réinitialiser les sessions locales", style = Type.body.semibold, color = Palette.danger)
                     }
                 }
             }
@@ -309,10 +282,10 @@ fun SettingsScreen(
     if (confirmStartOver) {
         AlertDialog(
             onDismissRequest = { confirmStartOver = false },
-            title = { Text("Recommencer ?", style = Type.title3.bold, color = Palette.text) },
+            title = { Text("Réinitialiser les sessions ?", style = Type.title3.bold, color = Palette.text) },
             text = {
                 Text(
-                    "Réinitialise les paramètres locaux et déconnecte les sessions sur cet appareil. Vos ordinateurs et agents Termux conservent leurs données.",
+                    "Réinitialise les préférences locales de l'application sur cet appareil. Vos environnements et agents Ubuntu PRoot dans Termux sont entièrement préservés.",
                     style = Type.body,
                     color = Palette.secondary
                 )
@@ -324,7 +297,7 @@ fun SettingsScreen(
                         viewModel.resetPreferences()
                     }
                 ) {
-                    Text("Recommencer", color = Palette.danger, style = Type.body.semibold)
+                    Text("Réinitialiser", color = Palette.danger, style = Type.body.semibold)
                 }
             },
             dismissButton = {

@@ -344,7 +344,8 @@ fun <T> TabChoice(
 @Composable
 fun CardForm(
     modifier: Modifier = Modifier,
-    padding: PaddingValues = PaddingValues(20.dp),
+    padding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+    verticalSpacing: Dp = 14.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(
@@ -353,7 +354,7 @@ fun CardForm(
             .background(Palette.background)
             .verticalScroll(rememberScrollState())
             .padding(padding),
-        verticalArrangement = Arrangement.spacedBy(28.dp)
+        verticalArrangement = Arrangement.spacedBy(verticalSpacing)
     ) {
         CompositionLocalProvider(LocalTextStyle provides Type.body, LocalContentColor provides Palette.text) {
             content()
@@ -375,7 +376,7 @@ fun CardSection(
     rows: CardRows.() -> Unit
 ) {
     val list = CardRows().apply(rows).rows
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (title != null) {
             Row(
                 Modifier.padding(start = 4.dp),
@@ -402,7 +403,7 @@ fun CardSection(
                             .background(Palette.glassDivider)
                     )
                 }
-                Box(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 11.dp)) {
                     item()
                 }
             }

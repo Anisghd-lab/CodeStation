@@ -97,3 +97,37 @@ sequenceDiagram
      2. « Conteneurs Ubuntu PRoot »
      3. « Commandes & Ressources »
    - Masquer le jeton par défaut avec icône oeil pour révélation explicite.
+
+---
+
+## 3. Audit et Correction des Espaces Vides Excessifs dans l'Interface Android
+
+**Branche dédiée :** `fix/layout-compactness-and-form-spacing`  
+**Date :** 28 Octobre 2026
+
+### A. Diagnostic Technique des Espacements
+1. **`Controls.kt` (`CardForm`)** :
+   - Hardcoding d'un espacement vertical démesuré de `28.dp` (`Arrangement.spacedBy(28.dp)`) entre chaque section, créant un sentiment de vide immense.
+   - Padding interne de ligne de `14.dp` qui cumulait de la hauteur inutilement.
+   - **Correction** : Paramètre `verticalSpacing: Dp = 14.dp` et `padding: PaddingValues(horizontal = 16.dp, vertical = 12.dp)`, avec interlignes de `11.dp`.
+
+2. **`SettingsScreen.kt` (« Ordinateurs et paramètres »)** :
+   - **Fragmentation excessive** : Huit cartes séparées pour des éléments isolés (une carte pour Thème, une pour Langue, une pour Discussion, une pour Analytics...).
+   - **Conflit de disposition des interrupteurs** : `CodyncSwitch` intègre déjà son propre `Spacer(Modifier.weight(1f))`. L'envelopper dans un `Row` externe avec un `Text` portant également `weight(1f)` coupait l'espace 50/50, isolant les interrupteurs dans un vide flottant décalé.
+   - **Section Notifications** : Mention de messages push en anglais non configurés qui semaient la confusion.
+   - **Version repoussée** : Les informations de build et le bouton de réinitialisation étaient éjectés tout en bas hors de vue.
+   - **Correction** :
+     - Regroupement en 4 cartes naturelles et compactes (Ordinateurs, Préférences générales, Notifications & Diagnostics, À propos).
+     - Interrupteurs `CodyncSwitch` directement associés à leur texte sans conflit de `weight(1f)`.
+     - Suppression des avertissements push confus et valorisation des notifications locales / Live Updates réelles d'Android.
+     - Version 1.0.3 et lien GitHub immédiatement visibles.
+
+3. **`BotEditorScreen.kt` (« Nouvel Agent »)** :
+   - **Empilement démesuré** : 4 cartes moteurs verticales géantes (240dp) + 7 cartes modèles (350dp) occupant 600dp à elles seules, suivies d'un immense vide artificiel lorsque des moteurs plus courts étaient sélectionnés.
+   - **Avatar et formulaire séparés** : L'avatar occupait un bloc gigantesque au-dessus des champs d'identité.
+   - **Boutons d'action non ancrés** : Le bouton « Créer l'Agent » était abandonné au fond du défilement, invisible sur petit écran ou avec clavier virtuel.
+   - **Correction** :
+     - Disposition compacte : Avatar (54dp) intégré à gauche du champ « Nom de l'Agent ».
+     - Moteurs compacts avec badges d'état et modèles compatibles avec sélecteur clair (badge « Gratuit » pour `GLM-5.3-Flash Free`).
+     - Interrupteurs Fast Mode et Pinned directement accolés à leurs descriptions.
+     - Barre d'actions inférieure fixe (`Surface` avec `imePadding()` et `navigationBarsPadding()`) garantissant la présence permanente des boutons « Annuler » et « Créer l'Agent ».
