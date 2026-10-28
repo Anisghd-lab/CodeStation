@@ -21,7 +21,6 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.ghdinteractivestudio.codestation.notification.CodeStationNotificationManager
 import com.ghdinteractivestudio.codestation.service.CodeStationTaskSyncService
-import com.ghdinteractivestudio.codestation.ui.components.DynamicIslandBar
 import com.ghdinteractivestudio.codestation.ui.navigation.Screen
 import com.ghdinteractivestudio.codestation.ui.navigation.CodeStationNavHost
 import com.ghdinteractivestudio.codestation.ui.theme.CodeStationTheme
@@ -73,15 +72,7 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val navController = rememberNavController()
                     currentNavController = navController
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        CodeStationNavHost(navController = navController)
-                        DynamicIslandBar(
-                            botRepository = container.botRepository,
-                            onNavigateToBot = { botId ->
-                                navController.navigate(Screen.Chat.createRoute(botId))
-                            }
-                        )
-                    }
+                    CodeStationNavHost(navController = navController)
                 }
             }
         }

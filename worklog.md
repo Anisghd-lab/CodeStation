@@ -272,5 +272,62 @@ sequenceDiagram
   - `minSdk` : `26`, `targetSdk` : `35`
 - **Lancement effectif :** App lancée avec succès (`PID 27016`), activité `com.ghdinteractivestudio.codestation.MainActivity` active.
 
+---
+
+## 9. Mission de Correction Globale et d'Audit E2E (v1.0.4)
+
+**Date :** 28 Octobre 2026  
+**Branche :** `fix/global-mission-and-real-e2e`  
+**Version :** `1.0.4` (`versionCode: 5`)
+
+### 9.1 Causes Racines Démontrées et Résolues
+1. **OpenCode CLI — Erreur "-m" non reconnue (`ERROR Unrecognized flag: -m in command opencode`)** :
+   - *Cause* : `environments/bot-opencode-glm/run.sh` invoquait `opencode -m "opencode/glm-5.3-flash-free"` au niveau racine en mode `cli`/`interactive`. La sous-commande racine `opencode` n'accepte pas `-m` (seul `opencode run` prend `--model, -m`).
+   - *Correction* : Invocations interactives corrigées avec `exec "$OPENCODE_BIN" "$@"`.
+   - *Preuve E2E réelle* : Requête `session/prompt` via `opencode acp` avec le modèle `opencode/glm-5.3-flash-free` exécutée avec succès, retournant `OPENCODE_OK` avec pensée (`agent_thought_chunk`) et texte (`agent_message_chunk`).
+
+2. **Google Antigravity — Réponses non reçues dans l'application (`agy`)** :
+   - *Cause 1* : `environments/bot-antigravity/run.sh` et `agy_acp_bridge.py` appelaient `agy -p -`. Le CLI `agy` traite littéralement `"-"` comme la chaîne de prompt au lieu de lire depuis `stdin`.
+   - *Cause 2* : `agy_acp_bridge.py` émettait les notifications avec `sessionUpdate: "agentMessageChunk"` (camelCase). CodeStation Host (`host/src/agent/bot/updates.rs:62`) filtre strictement sur `"agent_message_chunk"` (snake_case). Tout le flux était ignoré silencieusement.
+   - *Correction* : Passage direct du prompt `exec "$AGY_BIN" -p "$PROMPT"` et alignement de la passerelle JSON-RPC sur le format standard `agent_message_chunk`.
+   - *Preuve E2E réelle* : Requête réelle `agy -p "Réponds uniquement : AGY_OK"` testée et validée avec succès (`AGY_OK`, code de sortie 0).
+
+3. **Reconnaissance Vocale — Erreur « Reconnaissance vocale non disponible sur cet appareil »** :
+   - *Cause* : Sous Android 11+ (API 30+), `SpeechRecognizer.isRecognitionAvailable()` échouait car `AndroidManifest.xml` ne déclarait pas l'action `android.speech.RecognitionService` dans `<queries>`. Le journal système Android (logcat) affichait : `AppsFilter: interaction: PackageSetting{...codestation.debug} -> PackageSetting{...com.google.android.tts} BLOCKED`.
+   - *Correction* : Déclaration de l'intent `android.speech.RecognitionService` et des packages `com.google.android.tts` / `com.google.android.googlequicksearchbox` dans `<queries>`.
+   - *Secours vocal robuste* : En cas d'indisponibilité ou d'échec de reconnaissance, l'enregistrement audio (`.m4a`) n'est plus supprimé ; il est automatiquement converti et conservé comme pièce jointe vocale `PendingAttachment(type = AUDIO)` dans le compositeur.
+
+4. **Suppression du Faux Notch In-App (Respect strict de la zone système Android)** :
+   - *Constat* : `MainActivity.kt` superposait le composant Compose `DynamicIslandBar` au-dessus de l'écran, créant un faux notch local.
+   - *Correction* : Suppression intégrale de `DynamicIslandBar` dans `MainActivity.kt`. Seule la véritable notification système persistante dans la barre d'état Android (canaux v2, importance par défaut, icône monochrome Indigo) est conservée.
+
+5. **Transport et Gestion Fine des Erreurs Réseau/Authentification** :
+   - *Correction dans `ChatRepositoryImpl.kt`* : Remplacement de l'erreur générique par des diagnostics précis :
+     - Serveur non appairé / jeton absent (invitation explicite à lancer `./start_code_station.sh pair`).
+     - Serveur inaccessible (machine locale / Termux arrêté).
+     - Délai de connexion dépassé (timeout socket).
+     - Authentification refusée (HTTP 401/403).
+     - Route ou bot inconnu (HTTP 404).
+     - Fournisseur indisponible (HTTP 502/503).
+
+6. **Mise en Avant Prioritaire des Agents Antigravity et OpenCode GLM** :
+   - `BotRepositoryImpl.kt` garantit l'initialisation et la persistance en tête de liste de `bot-antigravity` (Google Antigravity) et `bot-opencode-glm` (OpenCode GLM) avec épinglage `isPinned = true`.
+
+### 9.2 Validation de la Suite E2E
+- Exécution de `scripts/test_agents_e2e.py` : **14/14 tests réussis**.
+  - Syntaxe bash `run.sh` (OpenCode & Antigravity) : `PASS`
+  - Commande `status` : `PASS`
+  - Détection automatique des CLI Ubuntu PRoot : `PASS`
+  - Découverte des modèles `agy` : `PASS`
+  - Préservation des messages longs et caractères accentués : `PASS`
+  - Bridge ACP Handshake : `PASS`
+  - Arrêt propre `stop` : `PASS`
+  - Notifications persistantes Android 16 : `PASS`
+  - Absence de faux notch in-app : `PASS`
+  - Déclaration `RecognitionService` & `TTS` : `PASS`
+  - Réponse réelle Antigravity (`AGY_OK`) : `PASS`
+  - Réponse réelle OpenCode GLM : `PASS`
+
+
 
 

@@ -86,11 +86,52 @@ class BotRepositoryImpl(
 
     override suspend fun refreshBots(): Result<List<Bot>> {
         return runCatching {
-            // Initial seed if empty
+            // S'assurer que les agents prioritaires Antigravity et OpenCode GLM sont toujours enregistrés
+            if (botDao.getBotById("bot-antigravity") == null) {
+                botDao.insertBot(
+                    BotEntity.fromDomain(
+                        Bot(
+                            id = "bot-antigravity",
+                            name = "Google Antigravity",
+                            description = "Agent Google Antigravity propulsé par le CLI agy officiel",
+                            avatarGlyph = "diamond",
+                            avatarColorHex = "#6366F1",
+                            provider = ProviderType.ANTIGRAVITY,
+                            model = "gemini-4-argon-medium",
+                            isFastMode = true,
+                            isLead = true,
+                            isPinned = true,
+                            status = BotStatus.IDLE,
+                            lastMessage = "Prêt. Google Antigravity CLI (agy) opérationnel.",
+                            instructions = "Tu es un agent de codage Google Antigravity expert."
+                        )
+                    )
+                )
+            }
+            if (botDao.getBotById("bot-opencode-glm") == null) {
+                botDao.insertBot(
+                    BotEntity.fromDomain(
+                        Bot(
+                            id = "bot-opencode-glm",
+                            name = "OpenCode GLM",
+                            description = "Agent OpenCode propulsé par GLM-5.3-Flash Free",
+                            avatarGlyph = "hexagon",
+                            avatarColorHex = "#A855F7",
+                            provider = ProviderType.OPENCODE,
+                            model = "opencode/glm-5.3-flash-free",
+                            isFastMode = true,
+                            isLead = false,
+                            isPinned = true,
+                            status = BotStatus.IDLE,
+                            lastMessage = "Prêt. Modèle gratuit GLM-5.3-Flash actif via OpenCode CLI.",
+                            instructions = "Tu es un agent de codage propulsé par OpenCode et le modèle gratuit GLM-5.3-Flash."
+                        )
+                    )
+                )
+            }
             if (botDao.getBotCount() == 0) {
                 seedInitialBots()
             }
-            val entities = botDao.getAllBotsStream()
             emptyList()
         }
     }
@@ -115,50 +156,19 @@ class BotRepositoryImpl(
     suspend fun seedInitialBots() {
         val initialBots = listOf(
             Bot(
-                id = "bot-lead-codestation",
-                name = "CodeStation Core",
-                description = "Agent principal autonome — Check-ins proactifs & coordination",
+                id = "bot-antigravity",
+                name = "Google Antigravity",
+                description = "Agent Google Antigravity propulsé par le CLI agy officiel",
                 avatarGlyph = "diamond",
-                avatarColorHex = "#FFB703", // Gold Star
-                provider = ProviderType.ACP_LOCAL,
-                model = "codestation-neural-core",
+                avatarColorHex = "#6366F1", // Indigo
+                provider = ProviderType.ANTIGRAVITY,
+                model = "gemini-4-argon-medium",
                 isFastMode = true,
                 isLead = true,
                 isPinned = true,
                 status = BotStatus.IDLE,
-                lastMessage = "Système opérationnel. Tout est prêt pour orchestrer vos tâches.",
-                instructions = "Tu es l'agent principal CodeStation. Tu accueilles l'utilisateur, vérifies l'état des projets et coordonnes les autres agents."
-            ),
-            Bot(
-                id = "bot-claude-architect",
-                name = "Claude Architect",
-                description = "Spécialiste conception système & refactoring Kotlin/Rust",
-                avatarGlyph = "polygon",
-                avatarColorHex = "#00D2FF",
-                provider = ProviderType.CLAUDE_CODE,
-                model = "claude-3-7-sonnet",
-                isFastMode = true,
-                isLead = false,
-                isPinned = true,
-                status = BotStatus.IDLE,
-                lastMessage = "Architecture MVVM validée. Aucune fuite de mémoire détectée.",
-                instructions = "Expert senior en architecture logicielle Android Jetpack Compose et protocoles distribués."
-            ),
-            Bot(
-                id = "bot-codex-terminal",
-                name = "Codex Terminal",
-                description = "Exécution de scripts, diagnostics bash et git",
-                avatarGlyph = "square",
-                avatarColorHex = "#00E676",
-                provider = ProviderType.OPENAI_CODEX,
-                model = "gpt-4o",
-                isFastMode = false,
-                isLead = false,
-                isPinned = false,
-                status = BotStatus.IDLE,
-                lastMessage = "Tests unitaires passés avec succès (100% couverture).",
-                permissionPolicy = PermissionPolicy.ASK_SHELL,
-                instructions = "Assistant de commandes bash et d'exécution d'outils système sécurisés."
+                lastMessage = "Prêt. Google Antigravity CLI (agy) opérationnel.",
+                instructions = "Tu es un agent de codage Google Antigravity expert."
             ),
             Bot(
                 id = "bot-opencode-glm",
@@ -170,10 +180,26 @@ class BotRepositoryImpl(
                 model = "opencode/glm-5.3-flash-free",
                 isFastMode = true,
                 isLead = false,
-                isPinned = false,
+                isPinned = true,
                 status = BotStatus.IDLE,
                 lastMessage = "Prêt. Modèle gratuit GLM-5.3-Flash actif via OpenCode CLI.",
                 instructions = "Tu es un agent de codage propulsé par OpenCode et le modèle gratuit GLM-5.3-Flash."
+            ),
+            Bot(
+                id = "bot-codex-terminal",
+                name = "OpenAI Codex",
+                description = "Exécution de scripts, diagnostics bash et git (Termux)",
+                avatarGlyph = "square",
+                avatarColorHex = "#00E676",
+                provider = ProviderType.OPENAI_CODEX,
+                model = "gpt-4o",
+                isFastMode = false,
+                isLead = false,
+                isPinned = false,
+                status = BotStatus.IDLE,
+                lastMessage = "Disponible dans Termux.",
+                permissionPolicy = PermissionPolicy.ASK_SHELL,
+                instructions = "Assistant de commandes bash et d'exécution d'outils système sécurisés."
             )
         )
         botDao.insertAll(initialBots.map { BotEntity.fromDomain(it) })

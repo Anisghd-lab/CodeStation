@@ -92,7 +92,7 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
         env = os.environ.copy()
         env["PATH"] = "/root/.gemini/antigravity-cli/bin:/root/.local/bin:/usr/local/bin:/usr/bin:/bin:" + env.get("PATH", "")
         
-        cmd = ["agy", "-p", "-", "--dangerously-skip-permissions"]
+        cmd = ["agy", "-p", prompt_text, "--dangerously-skip-permissions"]
         if model_id:
             cmd.extend(["--model", model_id])
 
@@ -100,26 +100,22 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
             active_proc = subprocess.Popen(
                 cmd,
                 cwd=cwd if os.path.isdir(cwd) else "/root/workspace",
-                stdin=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 env=env,
                 bufsize=1
             )
-            try:
-                active_proc.stdin.write(prompt_text)
-                active_proc.stdin.close()
-            except Exception as e:
-                log(f"Error delivering prompt to stdin: {e}")
         
         output_chunks = []
         for line in active_proc.stdout:
             output_chunks.append(line)
+            # Use ACP standard snake_case "agent_message_chunk"
             send_notification("session/update", {
                 "sessionId": session_id,
                 "update": {
-                    "sessionUpdate": "agentMessageChunk",
+                    "sessionUpdate": "agent_message_chunk",
                     "content": {"type": "text", "text": line}
                 }
             })
@@ -214,6 +210,7 @@ def main():
                 log(f"Model set to: {current_selected_model}")
             send_response(req_id, {})
         elif method == "session/prompt":
+            session_id = params.get("sessionId", session_id)
             prompt_list = params.get("prompt", [])
             prompt_text = ""
             for item in prompt_list:

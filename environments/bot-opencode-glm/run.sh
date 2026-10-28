@@ -67,7 +67,7 @@ case "$ACTION" in
         fi
         echo -e "\n=== Lancement de la session interactive OpenCode GLM ==="
         echo "Workspace : $WORKSPACE"
-        exec "$OPENCODE_BIN" -m "opencode/glm-5.3-flash-free" "$@"
+        exec "$OPENCODE_BIN" "$@"
         ;;
 
     shell|bash)
