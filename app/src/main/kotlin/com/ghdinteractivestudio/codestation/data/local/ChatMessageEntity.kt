@@ -7,10 +7,14 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import com.ghdinteractivestudio.codestation.domain.model.ChatMessage
+import com.ghdinteractivestudio.codestation.domain.model.FileAttachment
 import com.ghdinteractivestudio.codestation.domain.model.MessageAuthor
 import com.ghdinteractivestudio.codestation.domain.model.MessageAuthorType
 import com.ghdinteractivestudio.codestation.domain.model.QuotedReply
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 @Entity(tableName = "chat_messages")
 data class ChatMessageEntity(
@@ -24,7 +28,8 @@ data class ChatMessageEntity(
     val isFinal: Boolean,
     val replyToMessageId: String?,
     val replyToAuthor: String?,
-    val replyToText: String?
+    val replyToText: String?,
+    val attachmentsJson: String? = null
 ) {
     fun toDomain(): ChatMessage {
         val author = MessageAuthor(
@@ -40,6 +45,16 @@ data class ChatMessageEntity(
             )
         } else null
 
+        val parsedAttachments: List<FileAttachment> = if (!attachmentsJson.isNullOrBlank()) {
+            try {
+                Json.decodeFromString<List<FileAttachmentDto>>(attachmentsJson).map {
+                    FileAttachment(it.id, it.name, it.sizeBytes, it.mimeType, it.localUri)
+                }
+            } catch (_: Exception) {
+                emptyList()
+            }
+        } else emptyList()
+
         return ChatMessage(
             id = id,
             botId = botId,
@@ -47,12 +62,22 @@ data class ChatMessageEntity(
             text = text,
             timestamp = timestamp,
             isFinal = isFinal,
-            replyTo = replyTo
+            replyTo = replyTo,
+            attachments = parsedAttachments
         )
     }
 
     companion object {
         fun fromDomain(msg: ChatMessage): ChatMessageEntity {
+            val jsonStr = if (msg.attachments.isNotEmpty()) {
+                try {
+                    val dtos = msg.attachments.map {
+                        FileAttachmentDto(it.id, it.name, it.sizeBytes, it.mimeType, it.localUri)
+                    }
+                    Json.encodeToString(dtos)
+                } catch (_: Exception) { null }
+            } else null
+
             return ChatMessageEntity(
                 id = msg.id,
                 botId = msg.botId,
@@ -64,11 +89,21 @@ data class ChatMessageEntity(
                 isFinal = msg.isFinal,
                 replyToMessageId = msg.replyTo?.messageId,
                 replyToAuthor = msg.replyTo?.authorName,
-                replyToText = msg.replyTo?.textExcerpt
+                replyToText = msg.replyTo?.textExcerpt,
+                attachmentsJson = jsonStr
             )
         }
     }
 }
+
+@kotlinx.serialization.Serializable
+data class FileAttachmentDto(
+    val id: String,
+    val name: String,
+    val sizeBytes: Long,
+    val mimeType: String,
+    val localUri: String? = null
+)
 
 @Dao
 interface MessageDao {

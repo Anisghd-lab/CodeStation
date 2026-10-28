@@ -97,6 +97,14 @@ check_agents() {
     else
         echo "  [-] OpenCode (opencode)     : Non trouvé"
     fi
+
+    echo -e "\n[+] Environnements de Bots dédiés (CodeStation) :"
+    for bot_dir in "$SCRIPT_DIR"/environments/bot-*; do
+        if [ -d "$bot_dir" ] && [ -x "$bot_dir/run.sh" ]; then
+            bot_name="$(basename "$bot_dir")"
+            echo "  [✓] $bot_name : $bot_dir/run.sh (actions: server, cli, shell, run, stop, status)"
+        fi
+    done
 }
 
 is_running() {

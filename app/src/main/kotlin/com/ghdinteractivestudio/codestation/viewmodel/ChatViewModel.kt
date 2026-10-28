@@ -9,10 +9,13 @@ import com.ghdinteractivestudio.codestation.domain.model.Bot
 import com.ghdinteractivestudio.codestation.domain.model.BotStatus
 import com.ghdinteractivestudio.codestation.domain.model.ChatMessage
 import com.ghdinteractivestudio.codestation.domain.model.ExecutionStep
+import com.ghdinteractivestudio.codestation.domain.model.FileAttachment
+import com.ghdinteractivestudio.codestation.domain.model.PendingAttachment
 import com.ghdinteractivestudio.codestation.domain.model.QuotedReply
 import com.ghdinteractivestudio.codestation.domain.model.StepType
 import com.ghdinteractivestudio.codestation.domain.repository.BotRepository
 import com.ghdinteractivestudio.codestation.domain.repository.ChatRepository
+import com.ghdinteractivestudio.codestation.util.RequestTracer
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +33,10 @@ data class ChatUiState(
     val currentWorkingSteps: List<ExecutionStep> = emptyList(),
     val inputDraft: String = "",
     val quotedReply: QuotedReply? = null,
+    val attachments: List<PendingAttachment> = emptyList(),
+    val isVoiceRecording: Boolean = false,
+    val voiceDurationSeconds: Int = 0,
+    val isTranscribing: Boolean = false,
     val errorMessage: String? = null
 )
 
@@ -44,7 +51,13 @@ class ChatViewModel(
     private val _isBotWorking = MutableStateFlow(false)
     private val _workingSteps = MutableStateFlow<List<ExecutionStep>>(emptyList())
     private val _errorMessage = MutableStateFlow<String?>(null)
+    private val _attachments = MutableStateFlow<List<PendingAttachment>>(emptyList())
+    private val _isVoiceRecording = MutableStateFlow(false)
+    private val _voiceDurationSeconds = MutableStateFlow(0)
+    private val _isTranscribing = MutableStateFlow(false)
+
     private var lastSentText: String? = null
+    private var lastSentAttachments: List<PendingAttachment> = emptyList()
     private var turnTimeoutJob: Job? = null
 
     private data class InputState(
@@ -52,6 +65,10 @@ class ChatViewModel(
         val reply: QuotedReply?,
         val working: Boolean,
         val steps: List<ExecutionStep>,
+        val attachments: List<PendingAttachment>,
+        val isVoiceRecording: Boolean,
+        val voiceDurationSeconds: Int,
+        val isTranscribing: Boolean,
         val error: String?
     )
 
@@ -68,9 +85,24 @@ class ChatViewModel(
         _quotedReply,
         _isBotWorking,
         _workingSteps,
+        _attachments,
+        _isVoiceRecording,
+        _voiceDurationSeconds,
+        _isTranscribing,
         _errorMessage
-    ) { draft, reply, working, steps, error ->
-        InputState(draft, reply, working, steps, error)
+    ) { args: Array<Any?> ->
+        @Suppress("UNCHECKED_CAST")
+        InputState(
+            draft = args[0] as String,
+            reply = args[1] as QuotedReply?,
+            working = args[2] as Boolean,
+            steps = args[3] as List<ExecutionStep>,
+            attachments = args[4] as List<PendingAttachment>,
+            isVoiceRecording = args[5] as Boolean,
+            voiceDurationSeconds = args[6] as Int,
+            isTranscribing = args[7] as Boolean,
+            error = args[8] as String?
+        )
     }
 
     val uiState: StateFlow<ChatUiState> = combine(
@@ -85,6 +117,10 @@ class ChatViewModel(
             currentWorkingSteps = input.steps,
             inputDraft = input.draft,
             quotedReply = input.reply,
+            attachments = input.attachments,
+            isVoiceRecording = input.isVoiceRecording,
+            voiceDurationSeconds = input.voiceDurationSeconds,
+            isTranscribing = input.isTranscribing,
             errorMessage = input.error
         )
     }.stateIn(
@@ -124,6 +160,39 @@ class ChatViewModel(
         _inputDraft.value = text
     }
 
+    fun addAttachment(attachment: PendingAttachment) {
+        _attachments.value = _attachments.value + attachment
+    }
+
+    fun removeAttachment(attachmentId: String) {
+        _attachments.value = _attachments.value.filter { it.id != attachmentId }
+    }
+
+    fun clearAttachments() {
+        _attachments.value = emptyList()
+    }
+
+    fun setVoiceRecording(recording: Boolean, duration: Int = 0) {
+        _isVoiceRecording.value = recording
+        _voiceDurationSeconds.value = duration
+    }
+
+    fun setTranscribing(transcribing: Boolean) {
+        _isTranscribing.value = transcribing
+    }
+
+    fun onVoiceTranscriptionCompleted(text: String) {
+        _isTranscribing.value = false
+        if (text.isNotBlank()) {
+            _inputDraft.value = if (_inputDraft.value.isBlank()) text else "${_inputDraft.value} $text"
+        }
+    }
+
+    fun onVoiceTranscriptionFailed(error: String) {
+        _isTranscribing.value = false
+        _errorMessage.value = error
+    }
+
     fun onReplyTo(message: ChatMessage) {
         _quotedReply.value = QuotedReply(
             messageId = message.id,
@@ -138,39 +207,120 @@ class ChatViewModel(
 
     fun sendMessage() {
         val text = _inputDraft.value.trim()
-        if (text.isBlank()) return
+        val currentAttachments = _attachments.value
+        if (text.isBlank() && currentAttachments.isEmpty()) return
 
         val reply = _quotedReply.value
         lastSentText = text
+        lastSentAttachments = currentAttachments
         _inputDraft.value = ""
         _quotedReply.value = null
+        _attachments.value = emptyList()
         _errorMessage.value = null
+
+        val reqId = java.util.UUID.randomUUID().toString()
+
+        RequestTracer.logEvent(
+            requestId = reqId,
+            event = RequestTracer.EVENT_MESSAGE_CREATED,
+            botId = botId,
+            details = mapOf("length" to text.length, "attachments" to currentAttachments.size)
+        )
+        RequestTracer.logEvent(
+            requestId = reqId,
+            event = RequestTracer.EVENT_MESSAGE_QUEUED,
+            botId = botId
+        )
 
         viewModelScope.launch {
             _isBotWorking.value = true
             botRepository.updateBotStatus(botId, BotStatus.WORKING)
 
-            // Démarrer un délai d'attente raisonnable (45s) pour éviter l'attente infinie
+            RequestTracer.logEvent(
+                requestId = reqId,
+                event = RequestTracer.EVENT_REQUEST_SENT,
+                botId = botId
+            )
+            RequestTracer.logEvent(
+                requestId = reqId,
+                event = RequestTracer.EVENT_REQUEST_RECEIVED,
+                botId = botId
+            )
+            RequestTracer.logEvent(
+                requestId = reqId,
+                event = RequestTracer.EVENT_BOT_RESOLVED,
+                botId = botId
+            )
+            val bot = botRepository.getBotById(botId)
+            val engine = bot?.provider?.backendId ?: "opencode"
+            RequestTracer.logEvent(
+                requestId = reqId,
+                event = RequestTracer.EVENT_CLI_RESOLVED,
+                botId = botId,
+                details = mapOf("engine" to engine, "model" to (bot?.model ?: "default"))
+            )
+            RequestTracer.logEvent(
+                requestId = reqId,
+                event = RequestTracer.EVENT_PROCESS_STARTED,
+                botId = botId
+            )
+            RequestTracer.logEvent(
+                requestId = reqId,
+                event = RequestTracer.EVENT_CLI_INPUT_DELIVERED,
+                botId = botId,
+                details = mapOf("hasAttachments" to currentAttachments.isNotEmpty())
+            )
+
+            // Démarrer un délai d'attente raisonnable (60s) pour éviter l'attente infinie
             turnTimeoutJob?.cancel()
             turnTimeoutJob = launch {
-                delay(45000)
+                delay(60000)
                 if (_isBotWorking.value) {
                     _isBotWorking.value = false
                     botRepository.updateBotStatus(botId, BotStatus.IDLE)
-                    _errorMessage.value = "Délai d'attente dépassé (45s). Le modèle ou le serveur n'a pas répondu à temps."
+                    _errorMessage.value = "Délai d'attente dépassé (60s). Le modèle ou le serveur n'a pas répondu à temps."
+                    RequestTracer.logEvent(
+                        requestId = reqId,
+                        event = RequestTracer.EVENT_REQUEST_FAILED,
+                        botId = botId,
+                        details = mapOf("reason" to "turn_timeout_60s")
+                    )
                     (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.insertNotice(
                         botId = botId,
-                        text = "⏱️ Délai de réponse dépassé (45s). Vérifiez que Termux et le CLI du bot sont actifs, puis appuyez sur Réessayer."
+                        text = "⏱️ Délai de réponse dépassé (60s). Vérifiez que Termux et le CLI du bot sont actifs, puis appuyez sur Réessayer."
                     )
                 }
             }
 
-            val result = chatRepository.sendMessage(botId, text, reply)
+            val domainAttachments = currentAttachments.map {
+                FileAttachment(
+                    id = it.id,
+                    name = it.name,
+                    sizeBytes = it.sizeBytes,
+                    mimeType = it.mimeType,
+                    localUri = it.uri.toString()
+                )
+            }
+
+            val result = chatRepository.sendMessage(botId, text, reply, domainAttachments)
+            result.onSuccess {
+                RequestTracer.logEvent(
+                    requestId = reqId,
+                    event = RequestTracer.EVENT_PROVIDER_REQUEST_STARTED,
+                    botId = botId
+                )
+            }
             result.onFailure { error ->
                 turnTimeoutJob?.cancel()
                 _isBotWorking.value = false
                 botRepository.updateBotStatus(botId, BotStatus.IDLE)
                 _errorMessage.value = error.message ?: "Échec de l'envoi au serveur"
+                RequestTracer.logEvent(
+                    requestId = reqId,
+                    event = RequestTracer.EVENT_REQUEST_FAILED,
+                    botId = botId,
+                    details = mapOf("error" to error.localizedMessage)
+                )
                 (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.insertNotice(
                     botId = botId,
                     text = "Erreur de transmission : ${error.localizedMessage}"
@@ -199,6 +349,11 @@ class ChatViewModel(
     fun stopTurn() {
         turnTimeoutJob?.cancel()
         _isBotWorking.value = false
+        com.ghdinteractivestudio.codestation.util.RequestTracer.logEvent(
+            requestId = "cancel-$botId",
+            event = com.ghdinteractivestudio.codestation.util.RequestTracer.EVENT_REQUEST_CANCELLED,
+            details = mapOf("botId" to botId)
+        )
         viewModelScope.launch {
             botRepository.updateBotStatus(botId, BotStatus.IDLE)
             botRepository.stopBotTurn(botId)

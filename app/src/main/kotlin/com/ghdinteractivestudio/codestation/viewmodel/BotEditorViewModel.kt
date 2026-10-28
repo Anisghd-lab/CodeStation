@@ -7,8 +7,11 @@ import com.ghdinteractivestudio.codestation.domain.model.Bot
 import com.ghdinteractivestudio.codestation.domain.model.PermissionPolicy
 import com.ghdinteractivestudio.codestation.domain.model.ProviderType
 import com.ghdinteractivestudio.codestation.domain.model.WorkspaceMode
+import com.ghdinteractivestudio.codestation.domain.repository.AntigravityCatalogState
+import com.ghdinteractivestudio.codestation.domain.repository.AntigravityModelRepository
 import com.ghdinteractivestudio.codestation.domain.repository.BotRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -37,11 +40,15 @@ data class BotEditorUiState(
 
 class BotEditorViewModel(
     private val existingBotId: String?,
-    private val botRepository: BotRepository
+    private val botRepository: BotRepository,
+    private val antigravityModelRepository: AntigravityModelRepository? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BotEditorUiState(isNewBot = existingBotId.isNullOrBlank()))
     val uiState = _uiState.asStateFlow()
+
+    val antigravityCatalogState: StateFlow<AntigravityCatalogState>? =
+        antigravityModelRepository?.catalogState
 
     init {
         if (!existingBotId.isNullOrBlank()) {
@@ -65,9 +72,24 @@ class BotEditorViewModel(
                         isPinned = bot.isPinned,
                         isNewBot = false
                     )
+                    if (bot.provider == ProviderType.ANTIGRAVITY) {
+                        refreshAntigravityModels(force = false)
+                    }
                 }
             }
         }
+    }
+
+    fun refreshAntigravityModels(force: Boolean = true) {
+        viewModelScope.launch {
+            antigravityModelRepository?.refreshModels(force)
+        }
+    }
+
+    fun isCurrentModelVerified(): Boolean {
+        if (_uiState.value.provider != ProviderType.ANTIGRAVITY) return true
+        val repo = antigravityModelRepository ?: return true
+        return repo.isModelVerified(_uiState.value.model)
     }
 
     fun onNameChanged(name: String) { _uiState.value = _uiState.value.copy(name = name) }
@@ -76,7 +98,17 @@ class BotEditorViewModel(
     fun onAvatarColorHexChanged(hex: String) { onAvatarColorChanged(hex) }
     fun onAvatarGlyphChanged(glyph: String) { _uiState.value = _uiState.value.copy(avatarGlyph = glyph) }
     fun onProviderChanged(provider: ProviderType) {
-        _uiState.value = _uiState.value.copy(provider = provider, model = provider.defaultModel)
+        val newModel = if (provider == ProviderType.ANTIGRAVITY) {
+            val current = _uiState.value.model
+            val isVerified = antigravityModelRepository?.isModelVerified(current) ?: false
+            if (isVerified) current else provider.defaultModel
+        } else {
+            provider.defaultModel
+        }
+        _uiState.value = _uiState.value.copy(provider = provider, model = newModel)
+        if (provider == ProviderType.ANTIGRAVITY) {
+            refreshAntigravityModels(force = false)
+        }
     }
     fun onModelChanged(model: String) { _uiState.value = _uiState.value.copy(model = model) }
     fun onFastModeChanged(fast: Boolean) { _uiState.value = _uiState.value.copy(isFastMode = fast) }
@@ -143,11 +175,12 @@ class BotEditorViewModel(
     companion object {
         fun provideFactory(
             botId: String?,
-            botRepository: BotRepository
+            botRepository: BotRepository,
+            antigravityModelRepository: AntigravityModelRepository? = null
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return BotEditorViewModel(botId, botRepository) as T
+                return BotEditorViewModel(botId, botRepository, antigravityModelRepository) as T
             }
         }
     }

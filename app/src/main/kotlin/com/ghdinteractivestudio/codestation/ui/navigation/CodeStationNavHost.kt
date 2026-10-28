@@ -115,7 +115,7 @@ fun CodeStationNavHost(
             val botId = backStackEntry.arguments?.getString("botId")
             val botEditorViewModel: BotEditorViewModel = viewModel(
                 key = botId ?: "new",
-                factory = BotEditorViewModel.provideFactory(botId, container.botRepository)
+                factory = BotEditorViewModel.provideFactory(botId, container.botRepository, container.antigravityModelRepository)
             )
             BotEditorScreen(
                 viewModel = botEditorViewModel,

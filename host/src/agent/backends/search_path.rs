@@ -51,6 +51,7 @@ fn well_known_dirs_for(home: &Path, data_local: Option<&Path>) -> Vec<PathBuf> {
         "Library/pnpm",
         ".npm-global/bin",
         ".opencode/bin",
+        ".gemini/antigravity-cli/bin",
         ".deno/bin",
         "go/bin",
     ] {

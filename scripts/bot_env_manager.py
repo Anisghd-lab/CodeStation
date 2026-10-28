@@ -265,6 +265,133 @@ exec {PROOT_BIN} \\
                 results.append(m)
         return results
 
+    def detect_clis(self) -> list:
+        clis = []
+
+        # 1. Google Antigravity (agy) - Primary
+        agy_paths = ["/root/.local/bin/agy", "/root/.gemini/antigravity-cli/bin/agy"]
+        agy_bin = None
+        for p in agy_paths:
+            if os.path.isfile(p) and os.access(p, os.X_OK):
+                agy_bin = p
+                break
+        if not agy_bin:
+            agy_bin = shutil.which("agy")
+
+        if agy_bin:
+            version = "1.4.9"
+            try:
+                res = subprocess.run([agy_bin, "--version"], capture_output=True, text=True, timeout=3)
+                if res.returncode == 0 and res.stdout.strip():
+                    version = res.stdout.strip().splitlines()[0]
+            except Exception:
+                pass
+            clis.append({
+                "id": "antigravity",
+                "name": "Google Antigravity",
+                "binary": "agy",
+                "path": agy_bin,
+                "version": version,
+                "status": "READY",
+                "is_primary": True,
+                "environment": "bot-antigravity",
+                "details": f"CLI agy {version} opérationnel via ACP Bridge"
+            })
+        else:
+            clis.append({
+                "id": "antigravity",
+                "name": "Google Antigravity",
+                "binary": "agy",
+                "path": None,
+                "version": None,
+                "status": "NOT_DETECTED",
+                "is_primary": True,
+                "environment": "bot-antigravity",
+                "details": "Binaire agy introuvable dans PATH et répertoires d'installation"
+            })
+
+        # 2. OpenCode CLI (opencode) - Primary
+        opencode_paths = ["/usr/local/bin/opencode", "/root/.opencode/bin/opencode"]
+        opencode_bin = None
+        for p in opencode_paths:
+            if os.path.isfile(p) and os.access(p, os.X_OK):
+                opencode_bin = p
+                break
+        if not opencode_bin:
+            opencode_bin = shutil.which("opencode")
+
+        if opencode_bin:
+            version = "v2.2.0"
+            try:
+                res = subprocess.run([opencode_bin, "--version"], capture_output=True, text=True, timeout=3)
+                if res.returncode == 0 and res.stdout.strip():
+                    version = res.stdout.strip().splitlines()[0]
+            except Exception:
+                pass
+            clis.append({
+                "id": "opencode",
+                "name": "OpenCode GLM",
+                "binary": "opencode",
+                "path": opencode_bin,
+                "version": version,
+                "status": "READY",
+                "is_primary": True,
+                "environment": "bot-opencode-glm",
+                "details": f"CLI opencode {version} prêt avec GLM-5.3-Flash Free"
+            })
+        else:
+            clis.append({
+                "id": "opencode",
+                "name": "OpenCode GLM",
+                "binary": "opencode",
+                "path": None,
+                "version": None,
+                "status": "NOT_DETECTED",
+                "is_primary": True,
+                "environment": "bot-opencode-glm",
+                "details": "Binaire opencode introuvable dans l'environnement"
+            })
+
+        # 3. Autres CLI détectées
+        other_candidates = [
+            ("codex", "OpenAI Codex", ["/data/data/com.termux/files/usr/bin/codex", "/usr/local/bin/codex"]),
+            ("claude", "Claude Code", ["/usr/local/bin/claude", "/root/.local/bin/claude"]),
+            ("gemini", "Google Gemini CLI", ["/usr/local/bin/gemini", "/root/.local/bin/gemini"]),
+            ("cursor", "Cursor CLI", ["/usr/local/bin/cursor", "/root/.local/bin/cursor"])
+        ]
+
+        for cid, cname, paths in other_candidates:
+            found_bin = None
+            for p in paths:
+                if os.path.isfile(p) and os.access(p, os.X_OK):
+                    found_bin = p
+                    break
+            if not found_bin:
+                found_bin = shutil.which(cid)
+
+            if found_bin:
+                ver = "installé"
+                try:
+                    res = subprocess.run([found_bin, "--version"], capture_output=True, text=True, timeout=2)
+                    if res.returncode == 0 and res.stdout.strip():
+                        ver = res.stdout.strip().splitlines()[0]
+                except Exception:
+                    pass
+                env_type = "termux" if "/data/data/com.termux" in found_bin else "ubuntu"
+                clis.append({
+                    "id": cid,
+                    "name": cname,
+                    "binary": cid,
+                    "path": found_bin,
+                    "version": ver,
+                    "status": "INSTALLED",
+                    "is_primary": False,
+                    "environment": env_type,
+                    "details": f"Installé dans l'environnement {env_type} ({found_bin})"
+                })
+
+        return clis
+
     def get_system_resources(self) -> dict:
         total_ram_mb = 0
         avail_ram_mb = 0
@@ -302,7 +429,13 @@ if __name__ == "__main__":
 
     cmd = sys.argv[1]
     if cmd == "list":
-        print(json.dumps({"environments": manager.list_all_environments(), "resources": manager.get_system_resources()}, indent=2))
+        print(json.dumps({
+            "environments": manager.list_all_environments(),
+            "resources": manager.get_system_resources(),
+            "clis": manager.detect_clis()
+        }, indent=2))
+    elif cmd in ("detect", "clis"):
+        print(json.dumps({"clis": manager.detect_clis()}, indent=2))
     elif cmd == "create" and len(sys.argv) >= 3:
         bot_id = sys.argv[2]
         engine = sys.argv[3] if len(sys.argv) >= 4 else "opencode"

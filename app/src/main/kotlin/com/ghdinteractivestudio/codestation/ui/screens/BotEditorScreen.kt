@@ -26,6 +26,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,6 +61,7 @@ fun BotEditorScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val antigravityCatalogState by (viewModel.antigravityCatalogState?.collectAsState() ?: remember { mutableStateOf(null) })
 
     Column(
         modifier = modifier
@@ -199,17 +202,26 @@ fun BotEditorScreen(
                 row {
                     Column(
                         Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "Moteur CLI sélectionné",
-                            style = Type.caption,
-                            color = Palette.secondary
+                            text = "Agents prioritaires (Ubuntu PRoot)",
+                            style = Type.caption.semibold,
+                            color = Palette.accent
                         )
 
-                        // Disposition en cartes équilibrées
-                        ProviderType.entries.forEach { provider ->
+                        val primaryProviders = listOf(ProviderType.ANTIGRAVITY, ProviderType.OPENCODE)
+                        val otherProviders = ProviderType.entries.filter { it !in primaryProviders }
+
+                        // Section 1: Agents Prioritaires (Antigravity & OpenCode GLM)
+                        primaryProviders.forEach { provider ->
                             val isSelected = state.provider == provider
+                            val (badgeText, badgeColor) = when (provider) {
+                                ProviderType.ANTIGRAVITY -> "Prête (agy v1.4.9)" to Palette.emeraldAccent
+                                ProviderType.OPENCODE -> "Prête (GLM-5.3-Flash)" to Palette.emeraldAccent
+                                else -> "Prête" to Palette.emeraldAccent
+                            }
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -257,13 +269,95 @@ fun BotEditorScreen(
                                             style = Type.body.semibold,
                                             color = if (isSelected) Palette.text else Palette.secondary
                                         )
-                                        if (provider == ProviderType.OPENCODE) {
-                                            Text(
-                                                text = "Gratuit",
-                                                style = Type.system(9f).semibold,
-                                                color = Palette.emeraldAccent
-                                            )
-                                        }
+                                        Text(
+                                            text = badgeText,
+                                            style = Type.system(9f).semibold,
+                                            color = badgeColor
+                                        )
+                                    }
+                                    Text(
+                                        text = "Défaut : ${provider.defaultModel}",
+                                        style = Type.caption,
+                                        color = Palette.tertiary
+                                    )
+                                }
+
+                                if (isSelected) {
+                                    Symbol("checkmark", size = 15.dp, tint = Palette.emeraldAccent)
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "Autres CLI détectées",
+                            style = Type.caption,
+                            color = Palette.secondary
+                        )
+
+                        // Section 2: Autres CLI
+                        otherProviders.forEach { provider ->
+                            val isSelected = state.provider == provider
+                            val badgeText = when (provider) {
+                                ProviderType.OPENAI_CODEX -> "Installée (Termux)"
+                                else -> "À configurer"
+                            }
+                            val badgeColor = when (provider) {
+                                ProviderType.OPENAI_CODEX -> Palette.accent
+                                else -> Palette.tertiary
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedRectangle(10.dp))
+                                    .background(if (isSelected) Palette.bubbleUser.copy(alpha = 0.5f) else Color.Transparent)
+                                    .border(
+                                        width = if (isSelected) 1.dp else 0.5.dp,
+                                        color = if (isSelected) Palette.emeraldAccent.copy(alpha = 0.7f) else Palette.glassBorder,
+                                        shape = RoundedRectangle(10.dp)
+                                    )
+                                    .clickable { viewModel.onProviderChanged(provider) }
+                                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .clip(Capsule())
+                                        .border(
+                                            width = if (isSelected) 2.dp else 1.5.dp,
+                                            color = if (isSelected) Palette.emeraldAccent else Palette.tertiary,
+                                            shape = Capsule()
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSelected) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(Capsule())
+                                                .background(Palette.emeraldAccent)
+                                        )
+                                    }
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = provider.displayName,
+                                            style = Type.body,
+                                            color = if (isSelected) Palette.text else Palette.secondary
+                                        )
+                                        Text(
+                                            text = badgeText,
+                                            style = Type.system(9f),
+                                            color = badgeColor
+                                        )
                                     }
                                     Text(
                                         text = "Défaut : ${provider.defaultModel}",
@@ -286,13 +380,120 @@ fun BotEditorScreen(
                         Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = "Modèle pour ${state.provider.displayName}",
-                            style = Type.caption,
-                            color = Palette.secondary
-                        )
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Modèle pour ${state.provider.displayName}",
+                                style = Type.caption,
+                                color = Palette.secondary
+                            )
 
-                        val availableModels = state.provider.getAvailableModels()
+                            if (state.provider == ProviderType.ANTIGRAVITY) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    val lastUpdated = antigravityCatalogState?.lastUpdated
+                                    if (lastUpdated != null && lastUpdated > 0L) {
+                                        val timeFormat = remember { java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()) }
+                                        Text(
+                                            text = "Màj ${timeFormat.format(java.util.Date(lastUpdated))}",
+                                            style = Type.system(10f),
+                                            color = Palette.tertiary
+                                        )
+                                    }
+
+                                    val isRefreshing = antigravityCatalogState?.isRefreshing == true
+                                    if (isRefreshing) {
+                                        androidx.compose.material3.CircularProgressIndicator(
+                                            modifier = Modifier.size(13.dp),
+                                            strokeWidth = 2.dp,
+                                            color = Palette.emeraldAccent
+                                        )
+                                    } else {
+                                        Row(
+                                            modifier = Modifier
+                                                .clip(RoundedRectangle(4.dp))
+                                                .clickable { viewModel.refreshAntigravityModels(force = true) }
+                                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Symbol("arrow.clockwise", size = 11.dp, tint = Palette.emeraldAccent)
+                                            Text(
+                                                text = "Actualiser",
+                                                style = Type.system(10f).semibold,
+                                                color = Palette.emeraldAccent
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Message d'erreur ou d'avertissement catalogue si applicable
+                        if (state.provider == ProviderType.ANTIGRAVITY && antigravityCatalogState?.errorMessage != null) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedRectangle(6.dp))
+                                    .background(Palette.warning.copy(alpha = 0.12f))
+                                    .border(0.5.dp, Palette.warning.copy(alpha = 0.4f), RoundedRectangle(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Symbol("exclamationmark.triangle", size = 12.dp, tint = Palette.warning)
+                                Text(
+                                    text = antigravityCatalogState?.errorMessage.orEmpty(),
+                                    style = Type.system(10f),
+                                    color = Palette.warning
+                                )
+                            }
+                        }
+
+                        // Alerte si le modèle courant n'est pas vérifié
+                        if (state.provider == ProviderType.ANTIGRAVITY && !viewModel.isCurrentModelVerified()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedRectangle(6.dp))
+                                    .background(Palette.warning.copy(alpha = 0.12f))
+                                    .border(0.5.dp, Palette.warning.copy(alpha = 0.5f), RoundedRectangle(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Symbol("exclamationmark.triangle.fill", size = 13.dp, tint = Palette.warning)
+                                Text(
+                                    text = "Modèle non vérifié par agy : '${state.model}'. Il sera transmis tel quel.",
+                                    style = Type.system(10f).semibold,
+                                    color = Palette.warning
+                                )
+                            }
+                        }
+
+                        val rawModels = if (state.provider == ProviderType.ANTIGRAVITY) {
+                            antigravityCatalogState?.models?.takeIf { it.isNotEmpty() } ?: state.provider.getAvailableModels()
+                        } else {
+                            state.provider.getAvailableModels()
+                        }
+                        val availableModels = if (state.model.isNotBlank() && rawModels.none { it.id == state.model }) {
+                            listOf(
+                                com.ghdinteractivestudio.codestation.domain.model.ModelInfo(
+                                    id = state.model,
+                                    displayName = "${state.model} (Non vérifié)",
+                                    isFree = false,
+                                    isVerified = false
+                                )
+                            ) + rawModels
+                        } else {
+                            rawModels
+                        }
+
                         if (availableModels.isNotEmpty()) {
                             availableModels.forEach { modelInfo ->
                                 val isModelSelected = state.model == modelInfo.id
@@ -326,6 +527,12 @@ fun BotEditorScreen(
                                                     text = "Gratuit",
                                                     style = Type.system(9f).semibold,
                                                     color = Palette.emeraldAccent
+                                                )
+                                            } else if (!modelInfo.isVerified) {
+                                                Text(
+                                                    text = "Non vérifié",
+                                                    style = Type.system(9f).semibold,
+                                                    color = Palette.warning
                                                 )
                                             }
                                         }

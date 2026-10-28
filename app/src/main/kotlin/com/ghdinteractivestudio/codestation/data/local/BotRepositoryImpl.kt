@@ -1,16 +1,21 @@
 package com.ghdinteractivestudio.codestation.data.local
 
+import com.ghdinteractivestudio.codestation.data.remote.CodeStationApiService
+import com.ghdinteractivestudio.codestation.data.remote.StopTurnRequest
 import com.ghdinteractivestudio.codestation.domain.model.Bot
 import com.ghdinteractivestudio.codestation.domain.model.BotStatus
 import com.ghdinteractivestudio.codestation.domain.model.PermissionPolicy
 import com.ghdinteractivestudio.codestation.domain.model.ProviderType
 import com.ghdinteractivestudio.codestation.domain.model.WorkspaceMode
 import com.ghdinteractivestudio.codestation.domain.repository.BotRepository
+import com.ghdinteractivestudio.codestation.domain.repository.ServerRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class BotRepositoryImpl(
-    private val botDao: BotDao
+    private val botDao: BotDao,
+    private val apiServiceProvider: (suspend () -> CodeStationApiService?)? = null,
+    private val serverRepository: ServerRepository? = null
 ) : BotRepository {
 
     override fun getBotsStream(): Flow<List<Bot>> {
@@ -93,6 +98,17 @@ class BotRepositoryImpl(
     override suspend fun stopBotTurn(botId: String): Result<Unit> {
         return runCatching {
             botDao.updateStatus(botId, BotStatus.IDLE.name)
+            if (apiServiceProvider != null && serverRepository != null) {
+                val config = serverRepository.getServerConfig()
+                val api = apiServiceProvider.invoke()
+                if (api != null && !config.token.isNullOrBlank()) {
+                    val auth = "Bearer ${config.token}"
+                    api.stopTurn(
+                        StopTurnRequest(botId = botId),
+                        authHeader = auth
+                    )
+                }
+            }
         }
     }
 

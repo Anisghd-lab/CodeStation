@@ -62,6 +62,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        val app = application as? CodeStationApplication ?: return
+        val container = app.container
+        CoroutineScope(Dispatchers.IO).launch {
+            container.botRepository.refreshBots()
+            container.serverRepository.checkHealth()
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)

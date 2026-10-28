@@ -144,9 +144,14 @@ class CodeStationEventStreamClient(
 
                     botDao.updateStatus(botId, mappedStatus.name)
 
-                    // Gestion rigoureuse des notifications : uniquement sur changement d'état réel
+                    // Gestion rigoureuse des notifications et traçage : uniquement sur changement d'état réel
                     when (rawStatus) {
                         "working" -> {
+                            com.ghdinteractivestudio.codestation.util.RequestTracer.logEvent(
+                                requestId = "status-$botId",
+                                event = com.ghdinteractivestudio.codestation.util.RequestTracer.EVENT_PROCESS_STARTED,
+                                details = mapOf("botId" to botId, "backend" to backend, "activity" to activity)
+                            )
                             val summary = if (activity.isNotBlank()) activity else "Exécution d'instructions en cours..."
                             CodeStationNotificationManager.updateTaskNotification(
                                 context = context,
@@ -169,6 +174,11 @@ class CodeStationEventStreamClient(
                             )
                         }
                         "error" -> {
+                            com.ghdinteractivestudio.codestation.util.RequestTracer.logEvent(
+                                requestId = "status-$botId",
+                                event = com.ghdinteractivestudio.codestation.util.RequestTracer.EVENT_REQUEST_FAILED,
+                                details = mapOf("botId" to botId, "backend" to backend, "activity" to activity)
+                            )
                             CodeStationNotificationManager.updateTaskNotification(
                                 context = context,
                                 botId = botId,
@@ -180,6 +190,11 @@ class CodeStationEventStreamClient(
                         }
                         "idle" -> {
                             if (prevStatus == "working") {
+                                com.ghdinteractivestudio.codestation.util.RequestTracer.logEvent(
+                                    requestId = "status-$botId",
+                                    event = com.ghdinteractivestudio.codestation.util.RequestTracer.EVENT_RESPONSE_COMPLETED,
+                                    details = mapOf("botId" to botId)
+                                )
                                 CodeStationNotificationManager.updateTaskNotification(
                                     context = context,
                                     botId = botId,
@@ -236,8 +251,27 @@ class CodeStationEventStreamClient(
                         botDao.updateLastMessage(botId, displayText, entity.timestamp)
 
                         if (isAgent && isFinal) {
+                            com.ghdinteractivestudio.codestation.util.RequestTracer.logEvent(
+                                requestId = entryId,
+                                event = com.ghdinteractivestudio.codestation.util.RequestTracer.EVENT_RESPONSE_COMPLETED,
+                                details = mapOf("botId" to botId, "textLength" to text.length)
+                            )
                             botDao.updateStatus(botId, BotStatus.IDLE.name)
                             botPreviousStatus[botId] = "idle"
+                            CodeStationNotificationManager.updateTaskNotification(
+                                context = context,
+                                botId = botId,
+                                botName = botName,
+                                agentBackend = "agent",
+                                phase = TaskNotificationPhase.COMPLETED,
+                                summary = "Réponse terminée avec succès"
+                            )
+                        } else if (isAgent) {
+                            com.ghdinteractivestudio.codestation.util.RequestTracer.logEvent(
+                                requestId = entryId,
+                                event = com.ghdinteractivestudio.codestation.util.RequestTracer.EVENT_FIRST_OUTPUT_RECEIVED,
+                                details = mapOf("botId" to botId, "chunkLength" to text.length)
+                            )
                         }
                     }
 

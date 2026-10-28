@@ -83,9 +83,23 @@ data class SystemResourcesDto(
 )
 
 @Serializable
+data class DetectedCliDto(
+    @SerialName("id") val id: String = "",
+    @SerialName("name") val name: String = "",
+    @SerialName("binary") val binary: String = "",
+    @SerialName("path") val path: String? = null,
+    @SerialName("version") val version: String? = null,
+    @SerialName("status") val status: String = "NOT_DETECTED",
+    @SerialName("is_primary") val isPrimary: Boolean = false,
+    @SerialName("environment") val environment: String = "host",
+    @SerialName("details") val details: String? = null
+)
+
+@Serializable
 data class EnvironmentsResponse(
     @SerialName("environments") val environments: List<EnvironmentDto> = emptyList(),
-    @SerialName("resources") val resources: SystemResourcesDto = SystemResourcesDto()
+    @SerialName("resources") val resources: SystemResourcesDto = SystemResourcesDto(),
+    @SerialName("clis") val clis: List<DetectedCliDto> = emptyList()
 )
 
 @Serializable
@@ -159,4 +173,59 @@ interface CodeStationApiService {
         @Body request: EnvironmentCreateRequest,
         @Header("Authorization") authHeader: String? = null
     ): Response<GenericApiResponse>
+
+    /** `POST /api/agentModels`, discover supported models for a backend. */
+    @POST("api/agentModels")
+    suspend fun getAgentModels(
+        @Body request: AgentModelsRequest,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<AgentModelsResponse>
+
+    /** `POST /api/upload`, upload a file attachment chunk. */
+    @POST("api/upload")
+    suspend fun uploadChunk(
+        @Body request: UploadChunkRequest,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<UploadChunkResponse>
 }
+
+@Serializable
+data class UploadChunkRequest(
+    @SerialName("botId") val botId: String,
+    @SerialName("uploadId") val uploadId: String,
+    @SerialName("name") val name: String,
+    @SerialName("data") val data: String,
+    @SerialName("offset") val offset: Long,
+    @SerialName("done") val done: Boolean
+)
+
+@Serializable
+data class UploadAttachmentDto(
+    @SerialName("id") val id: String,
+    @SerialName("name") val name: String,
+    @SerialName("size") val size: Long? = 0
+)
+
+@Serializable
+data class UploadChunkResponse(
+    @SerialName("attachment") val attachment: UploadAttachmentDto? = null
+)
+
+@Serializable
+data class AgentModelsRequest(
+    @SerialName("backend") val backend: String
+)
+
+@Serializable
+data class AgentModelsResponse(
+    @SerialName("models") val models: List<AgentModelItem> = emptyList(),
+    @SerialName("currentModelId") val currentModelId: String? = null,
+    @SerialName("fastMode") val fastMode: Boolean = false
+)
+
+@Serializable
+data class AgentModelItem(
+    @SerialName("id") val id: String,
+    @SerialName("name") val name: String,
+    @SerialName("description") val description: String? = null
+)

@@ -47,12 +47,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.ghdinteractivestudio.codestation.domain.model.PendingAttachment
 import com.ghdinteractivestudio.codestation.domain.model.QuotedReply
 import com.ghdinteractivestudio.codestation.ui.theme.Capsule
 import com.ghdinteractivestudio.codestation.ui.theme.Motion
 import com.ghdinteractivestudio.codestation.ui.theme.Palette
 import com.ghdinteractivestudio.codestation.ui.theme.RoundedRectangle
 import com.ghdinteractivestudio.codestation.ui.theme.Type
+import java.util.Locale
 
 private enum class TrailingState { Call, Send, Stop }
 
@@ -62,6 +64,17 @@ fun MessageComposer(
     isWorking: Boolean = false,
     replyTo: QuotedReply? = null,
     onCancelReply: () -> Unit = {},
+    attachments: List<PendingAttachment> = emptyList(),
+    onRemoveAttachment: (String) -> Unit = {},
+    onPickPhoto: () -> Unit = {},
+    onPickVideo: () -> Unit = {},
+    onPickDocument: () -> Unit = {},
+    isVoiceRecording: Boolean = false,
+    voiceDurationSeconds: Int = 0,
+    isTranscribing: Boolean = false,
+    onStartVoice: () -> Unit = {},
+    onStopVoice: () -> Unit = {},
+    onCancelVoice: () -> Unit = {},
     onSend: (String) -> Unit,
     onStop: () -> Unit = {},
     onAttach: () -> Unit = {},
@@ -69,9 +82,10 @@ fun MessageComposer(
 ) {
     val textState = rememberTextFieldState()
     val focusRequester = remember { FocusRequester() }
+    var isAttachmentMenuOpen by remember { androidx.compose.runtime.mutableStateOf(false) }
 
     val rawText = textState.text.toString()
-    val canSend = rawText.isNotBlank()
+    val canSend = rawText.isNotBlank() || attachments.isNotEmpty()
     val trailing = when {
         isWorking && !canSend -> TrailingState.Stop
         canSend -> TrailingState.Send
@@ -92,106 +106,200 @@ fun MessageComposer(
         }
     }
 
-    Row(
-        modifier
+    Column(
+        modifier = modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 16.dp),
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(bottom = 16.dp)
     ) {
-        // Glass + button for attachments
-        Box(
-            Modifier
-                .size(54.dp)
-                .glass(Capsule())
-                .clickable(role = Role.Button, onClick = onAttach)
-                .semantics { contentDescription = "Add files" },
-            contentAlignment = Alignment.Center
-        ) {
-            Symbol("plus", size = 26.dp, tint = Palette.text)
-        }
+        // Prévisualisation des pièces jointes sélectionnées
+        AttachmentPreviewRow(
+            attachments = attachments,
+            onRemoveAttachment = onRemoveAttachment
+        )
 
-        // Expandable input container
-        Column(
+        Row(
             Modifier
-                .weight(1f)
-                .glass(RoundedRectangle(24.dp))
-                .animateContentSize(Motion.layout())
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (replyTo != null) {
-                Row(
-                    Modifier.padding(start = 18.dp, end = 6.dp, top = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            // Glass + button for attachments with menu
+            Box {
+                Box(
+                    Modifier
+                        .size(54.dp)
+                        .glass(Capsule())
+                        .clickable(role = Role.Button) { isAttachmentMenuOpen = true }
+                        .semantics { contentDescription = "Ajouter des fichiers" },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            replyTo.authorName,
-                            style = Type.caption2,
-                            color = Palette.secondary
-                        )
-                        Text(
-                            replyTo.textExcerpt,
-                            style = Type.footnote,
-                            color = Palette.text,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    IconButton("Cancel reply", "xmark", action = onCancelReply)
+                    Symbol("plus", size = 26.dp, tint = Palette.text)
                 }
+
+                AttachmentMenu(
+                    expanded = isAttachmentMenuOpen,
+                    onDismissRequest = { isAttachmentMenuOpen = false },
+                    onPickPhoto = onPickPhoto,
+                    onPickVideo = onPickVideo,
+                    onPickDocument = onPickDocument
+                )
             }
 
-            Row(
-                Modifier.padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Expandable input container or Voice recording bar
+            Column(
+                Modifier
+                    .weight(1f)
+                    .glass(RoundedRectangle(24.dp))
+                    .animateContentSize(Motion.layout())
             ) {
-                val sendKey = Modifier.onPreviewKeyEvent { e ->
-                    val ctrlEnter = e.type == KeyEventType.KeyDown && e.key == Key.Enter && (e.isCtrlPressed || e.isMetaPressed)
-                    if (ctrlEnter && canSend) {
-                        submit()
-                        true
-                    } else false
-                }
+                if (isVoiceRecording) {
+                    // Interface d'enregistrement vocal
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(10.dp)
+                                    .clip(Capsule())
+                                    .background(Palette.danger)
+                            )
+                            val minutes = voiceDurationSeconds / 60
+                            val seconds = voiceDurationSeconds % 60
+                            Text(
+                                text = String.format(Locale.US, "%02d:%02d", minutes, seconds),
+                                style = Type.body.semibold,
+                                color = Palette.text
+                            )
+                            Text(
+                                text = "Enregistrement...",
+                                style = Type.caption,
+                                color = Palette.secondary
+                            )
+                        }
 
-                BasicTextField(
-                    state = textState,
-                    modifier = Modifier
-                        .weight(1f)
-                        .focusRequester(focusRequester)
-                        .then(sendKey)
-                        .padding(vertical = 10.dp),
-                    textStyle = Type.body.copy(color = Palette.text),
-                    cursorBrush = SolidColor(Palette.accent),
-                    lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 8),
-                    decorator = { input ->
-                        Box {
-                            if (rawText.isEmpty()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            IconButton("Annuler", "trash", action = onCancelVoice)
+                            Box(
+                                Modifier
+                                    .size(32.dp)
+                                    .clip(Capsule())
+                                    .background(Palette.emeraldAccent)
+                                    .clickable(role = Role.Button, onClick = onStopVoice),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Symbol("checkmark", size = 16.dp, tint = Color.Black)
+                            }
+                        }
+                    }
+                } else if (isTranscribing) {
+                    // Indicateur de transcription
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = Palette.accent
+                        )
+                        Text(
+                            text = "Transcription vocale en cours...",
+                            style = Type.body,
+                            color = Palette.secondary
+                        )
+                    }
+                } else {
+                    if (replyTo != null) {
+                        Row(
+                            Modifier.padding(start = 18.dp, end = 6.dp, top = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
                                 Text(
-                                    placeholder,
-                                    style = Type.body,
-                                    color = Palette.tertiary,
+                                    replyTo.authorName,
+                                    style = Type.caption2,
+                                    color = Palette.secondary
+                                )
+                                Text(
+                                    replyTo.textExcerpt,
+                                    style = Type.footnote,
+                                    color = Palette.text,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            input()
+                            IconButton("Cancel reply", "xmark", action = onCancelReply)
                         }
                     }
-                )
 
-                TrailingButton(
-                    state = trailing,
-                    canSend = canSend,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                    onClick = {
-                        when (trailing) {
-                            TrailingState.Send -> submit()
-                            TrailingState.Stop -> onStop()
-                            TrailingState.Call -> { /* Voice call toggle */ }
+                    Row(
+                        Modifier.padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val sendKey = Modifier.onPreviewKeyEvent { e ->
+                            val ctrlEnter = e.type == KeyEventType.KeyDown && e.key == Key.Enter && (e.isCtrlPressed || e.isMetaPressed)
+                            if (ctrlEnter && canSend) {
+                                submit()
+                                true
+                            } else false
                         }
+
+                        BasicTextField(
+                            state = textState,
+                            modifier = Modifier
+                                .weight(1f)
+                                .focusRequester(focusRequester)
+                                .then(sendKey)
+                                .padding(vertical = 10.dp),
+                            textStyle = Type.body.copy(color = Palette.text),
+                            cursorBrush = SolidColor(Palette.accent),
+                            lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 8),
+                            decorator = { input ->
+                                Box {
+                                    if (rawText.isEmpty()) {
+                                        Text(
+                                            placeholder,
+                                            style = Type.body,
+                                            color = Palette.tertiary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    input()
+                                }
+                            }
+                        )
+
+                        TrailingButton(
+                            state = trailing,
+                            canSend = canSend,
+                            modifier = Modifier.padding(bottom = 4.dp),
+                            onClick = {
+                                when (trailing) {
+                                    TrailingState.Send -> submit()
+                                    TrailingState.Stop -> onStop()
+                                    TrailingState.Call -> onStartVoice()
+                                }
+                            }
+                        )
                     }
-                )
+                }
             }
         }
     }

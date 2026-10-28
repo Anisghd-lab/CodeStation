@@ -11,7 +11,7 @@ import androidx.room.RoomDatabase
         ChatMessageEntity::class,
         ApprovalEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class CodeStationDatabase : RoomDatabase() {

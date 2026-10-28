@@ -101,6 +101,46 @@ fun ChatMessageItem(
                     }
                 }
 
+                if (message.attachments.isNotEmpty()) {
+                    message.attachments.forEach { att ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedRectangle(8.dp))
+                                .background(Palette.text.copy(alpha = 0.08f))
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            val icon = when {
+                                att.mimeType.startsWith("image/") -> "photo"
+                                att.mimeType.startsWith("video/") -> "video"
+                                else -> "doc"
+                            }
+                            Symbol(icon, size = 16.dp, tint = Palette.accent)
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    att.name,
+                                    style = Type.caption2.semibold,
+                                    color = Palette.text,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                val formatted = when {
+                                    att.sizeBytes >= 1024 * 1024 -> String.format(java.util.Locale.US, "%.1f Mo", att.sizeBytes / (1024.0 * 1024.0))
+                                    att.sizeBytes >= 1024 -> String.format(java.util.Locale.US, "%.0f Ko", att.sizeBytes / 1024.0)
+                                    else -> "${att.sizeBytes} o"
+                                }
+                                Text(
+                                    formatted,
+                                    style = Type.system(9f),
+                                    color = Palette.tertiary
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Text(
                     text = message.text,
                     style = Type.body,

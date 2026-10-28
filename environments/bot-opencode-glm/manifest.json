@@ -1,0 +1,9 @@
+{
+  "status": "READY",
+  "updated_at": 1793197231804,
+  "bot_id": "bot-opencode-glm",
+  "engine": "opencode",
+  "model": "opencode/glm-5.3-flash-free",
+  "rootfs": "/root/CodeStation/environments/bot-opencode-glm/rootfs",
+  "run_script": "/root/CodeStation/environments/bot-opencode-glm/run.sh"
+}

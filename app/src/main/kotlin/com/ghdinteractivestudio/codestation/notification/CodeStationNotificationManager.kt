@@ -16,12 +16,14 @@ import com.ghdinteractivestudio.codestation.MainActivity
 import com.ghdinteractivestudio.codestation.R
 
 enum class TaskNotificationPhase {
-    QUEUED,
+    STARTING,
     WORKING,
+    RESPONSE_RECEIVED,
     NEEDS_APPROVAL,
     COMPLETED,
     FAILED,
     STOPPED,
+    CANCELLED,
     DISCONNECTED
 }
 
@@ -37,17 +39,20 @@ object CodeStationNotificationManager {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = context.getSystemService(NotificationManager::class.java) ?: return
 
-            // 1. Canal des tâches en cours (Live Updates / silencieux mais persistant)
+            // 1. Canal des tâches en cours (Live Updates / silencieux mais AVEC icône visible dans la barre d'état)
+            // IMPORTANCE_DEFAULT combiné avec setSound(null, null) garantit l'icône dans la barre d'état Android 14/15/16
             val liveChannel = NotificationChannel(
                 CHANNEL_LIVE_TASKS,
                 "Tâches en cours (Live Updates)",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Progression et états d'exécution en temps réel des bots"
-                setShowBadge(false)
+                description = "Progression et états d'exécution en temps réel des agents"
+                setSound(null, null)
+                enableVibration(false)
+                setShowBadge(true)
             }
 
-            // 2. Canal des approvations (Haute priorité avec son/vibration)
+            // 2. Canal des approbations (Haute priorité avec son/vibration)
             val approvalChannel = NotificationChannel(
                 CHANNEL_APPROVALS,
                 "Demandes d'autorisation",
@@ -58,7 +63,7 @@ object CodeStationNotificationManager {
                 setShowBadge(true)
             }
 
-            // 3. Canal des tâches terminées (Priorité normale révocable)
+            // 3. Canal des tâches terminées (Priorité par défaut avec alerte discrète)
             val completedChannel = NotificationChannel(
                 CHANNEL_COMPLETED,
                 "Tâches terminées",
@@ -106,22 +111,26 @@ object CodeStationNotificationManager {
             TaskNotificationPhase.NEEDS_APPROVAL -> CHANNEL_APPROVALS
             TaskNotificationPhase.COMPLETED,
             TaskNotificationPhase.FAILED,
-            TaskNotificationPhase.STOPPED -> CHANNEL_COMPLETED
+            TaskNotificationPhase.STOPPED,
+            TaskNotificationPhase.CANCELLED -> CHANNEL_COMPLETED
             else -> CHANNEL_LIVE_TASKS
         }
 
         val title = when (phase) {
-            TaskNotificationPhase.QUEUED -> "$botName · En attente"
-            TaskNotificationPhase.WORKING -> "$botName · Au travail"
-            TaskNotificationPhase.NEEDS_APPROVAL -> "$botName · Needs you"
-            TaskNotificationPhase.COMPLETED -> "$botName · Done"
-            TaskNotificationPhase.FAILED -> "$botName · Failed"
-            TaskNotificationPhase.STOPPED -> "$botName · Arrêté"
+            TaskNotificationPhase.STARTING -> "$botName · Démarrage"
+            TaskNotificationPhase.WORKING -> "$botName · En cours"
+            TaskNotificationPhase.RESPONSE_RECEIVED -> "$botName · Réponse reçue"
+            TaskNotificationPhase.NEEDS_APPROVAL -> "$botName · Autorisation requise"
+            TaskNotificationPhase.COMPLETED -> "$botName · Terminé"
+            TaskNotificationPhase.FAILED -> "$botName · Échec"
+            TaskNotificationPhase.STOPPED,
+            TaskNotificationPhase.CANCELLED -> "$botName · Arrêté"
             TaskNotificationPhase.DISCONNECTED -> "CodeStation · Déconnecté"
         }
 
         val ongoing = phase == TaskNotificationPhase.WORKING ||
-                phase == TaskNotificationPhase.QUEUED ||
+                phase == TaskNotificationPhase.STARTING ||
+                phase == TaskNotificationPhase.RESPONSE_RECEIVED ||
                 phase == TaskNotificationPhase.NEEDS_APPROVAL
 
         val tapIntent = Intent(context, MainActivity::class.java).apply {
@@ -146,12 +155,39 @@ object CodeStationNotificationManager {
             .setContentIntent(pendingIntent)
             .setOngoing(ongoing)
             .setAutoCancel(!ongoing)
-            .setOnlyAlertOnce(phase == TaskNotificationPhase.WORKING)
+            .setOnlyAlertOnce(ongoing)
 
-        if (phase == TaskNotificationPhase.WORKING && startedAtMs != null && startedAtMs > 0) {
+        if ((phase == TaskNotificationPhase.WORKING || phase == TaskNotificationPhase.STARTING) && startedAtMs != null && startedAtMs > 0) {
             builder.setUsesChronometer(true)
             builder.setWhen(startedAtMs)
             builder.setShowWhen(true)
+        }
+
+        // Action 1 : Ouvrir le chat dans l'application
+        builder.addAction(
+            R.drawable.sf_star_fill,
+            "Ouvrir",
+            pendingIntent
+        )
+
+        // Action 2 : Arrêter la tâche si le bot est actif
+        if (ongoing) {
+            val stopIntent = Intent(context, NotificationActionReceiver::class.java).apply {
+                action = NotificationActionReceiver.ACTION_STOP_BOT
+                putExtra(NotificationActionReceiver.EXTRA_BOT_ID, botId)
+                putExtra(NotificationActionReceiver.EXTRA_BOT_NAME, botName)
+            }
+            val stopPendingIntent = PendingIntent.getBroadcast(
+                context,
+                notificationId + 1,
+                stopIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.addAction(
+                R.drawable.sf_star_fill,
+                "Arrêter",
+                stopPendingIntent
+            )
         }
 
         if (phase == TaskNotificationPhase.NEEDS_APPROVAL) {

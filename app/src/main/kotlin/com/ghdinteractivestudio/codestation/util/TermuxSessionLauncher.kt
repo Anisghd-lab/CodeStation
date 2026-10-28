@@ -17,11 +17,22 @@ object TermuxSessionLauncher {
     const val EXTRA_SESSION_ACTION = "com.termux.RUN_COMMAND_SESSION_ACTION"
 
     /**
-     * Ouvre une session Termux visible exécutant l'environnement Ubuntu PRoot du bot spécifié.
+     * Ouvre une session Termux visible exécutant le CLI interactif de l'agent (OpenCode / Antigravity).
      */
     fun openBotTerminalSession(context: Context, botId: String, engine: String) {
-        val launchCmd = "proot-distro login ubuntu -- bash -c '/root/CodeStation/environments/$botId/run.sh bash'"
+        val launchCmd = "proot-distro login ubuntu -- bash -c '/root/CodeStation/environments/$botId/run.sh cli'"
+        executeTermuxLaunch(context, botId, launchCmd, "CLI interactif")
+    }
 
+    /**
+     * Ouvre un shell interactif bash dans le workspace du bot.
+     */
+    fun openBotShellSession(context: Context, botId: String) {
+        val launchCmd = "proot-distro login ubuntu -- bash -c '/root/CodeStation/environments/$botId/run.sh shell'"
+        executeTermuxLaunch(context, botId, launchCmd, "Shell")
+    }
+
+    private fun executeTermuxLaunch(context: Context, botId: String, launchCmd: String, label: String) {
         // 1. Copie de secours dans le presse-papier
         val clipboard = context.getSystemService(ClipboardManager::class.java)
         clipboard?.setPrimaryClip(ClipData.newPlainText("Termux Bot Command", launchCmd))
@@ -48,7 +59,7 @@ object TermuxSessionLauncher {
             if (launchIntent != null) {
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(launchIntent)
-                val msg = if (serviceStarted) "Session $botId lancée dans Termux" else "Termux ouvert (Commande copiée)"
+                val msg = if (serviceStarted) "Session $label lancée dans Termux" else "Termux ouvert (Commande copiée)"
                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(context, "Application Termux non trouvée", Toast.LENGTH_SHORT).show()

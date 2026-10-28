@@ -1,12 +1,14 @@
 package com.ghdinteractivestudio.codestation
 
 import android.content.Context
+import com.ghdinteractivestudio.codestation.data.local.AntigravityModelRepositoryImpl
 import com.ghdinteractivestudio.codestation.data.local.BotRepositoryImpl
 import com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl
 import com.ghdinteractivestudio.codestation.data.local.ServerRepositoryImpl
 import com.ghdinteractivestudio.codestation.data.local.CodeStationDatabase
 import com.ghdinteractivestudio.codestation.data.preferences.PreferencesRepositoryImpl
 import com.ghdinteractivestudio.codestation.data.remote.CodeStationApiService
+import com.ghdinteractivestudio.codestation.domain.repository.AntigravityModelRepository
 import com.ghdinteractivestudio.codestation.domain.repository.BotRepository
 import com.ghdinteractivestudio.codestation.domain.repository.ChatRepository
 import com.ghdinteractivestudio.codestation.domain.repository.PreferencesRepository
@@ -23,6 +25,7 @@ interface AppContainer {
     val chatRepository: ChatRepository
     val serverRepository: ServerRepository
     val preferencesRepository: PreferencesRepository
+    val antigravityModelRepository: AntigravityModelRepository
     val eventStreamClient: com.ghdinteractivestudio.codestation.data.remote.CodeStationEventStreamClient
 }
 
@@ -73,7 +76,14 @@ class CodeStationContainer(private val context: Context) : AppContainer {
     }
 
     override val botRepository: BotRepository by lazy {
-        BotRepositoryImpl(database.botDao())
+        BotRepositoryImpl(
+            botDao = database.botDao(),
+            apiServiceProvider = {
+                val config = serverRepository.getServerConfig()
+                createApiService(config.url)
+            },
+            serverRepository = serverRepository
+        )
     }
 
     override val chatRepository: ChatRepository by lazy {
@@ -86,6 +96,17 @@ class CodeStationContainer(private val context: Context) : AppContainer {
                 createApiService(config.url)
             },
             serverRepository = serverRepository
+        )
+    }
+
+    override val antigravityModelRepository: AntigravityModelRepository by lazy {
+        AntigravityModelRepositoryImpl(
+            context = context,
+            serverRepository = serverRepository,
+            apiServiceProvider = {
+                val config = serverRepository.getServerConfig()
+                createApiService(config.url)
+            }
         )
     }
 

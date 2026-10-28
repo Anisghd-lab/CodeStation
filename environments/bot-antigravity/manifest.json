@@ -1,0 +1,9 @@
+{
+  "status": "READY",
+  "updated_at": 1793197230787,
+  "bot_id": "bot-antigravity",
+  "engine": "antigravity",
+  "model": null,
+  "rootfs": "/root/CodeStation/environments/bot-antigravity/rootfs",
+  "run_script": "/root/CodeStation/environments/bot-antigravity/run.sh"
+}

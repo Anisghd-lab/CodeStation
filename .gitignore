@@ -20,7 +20,8 @@ app/build/
 target/
 host/target/
 .cargo/
-environments/
+environments/**/rootfs/
+environments/**/workspace/
 __pycache__/
 *.pyc
 *.zip

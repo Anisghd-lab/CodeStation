@@ -344,7 +344,7 @@ pub const HARNESSES: &[Harness] = &[
         id: "antigravity",
         name: "Google Antigravity",
         bins: &["agy"],
-        local: None,
+        local: Some("python3 /root/CodeStation/environments/bot-antigravity/agy_acp_bridge.py"),
         registry: Some("antigravity-acp"),
         setup: "Install the Antigravity CLI (curl -fsSL https://antigravity.google/cli/install.sh | bash), then sign in from Codync with Log in with Google.",
         install: Some(Install::Scripts {

@@ -1,5 +1,12 @@
 package com.ghdinteractivestudio.codestation.ui.screens
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -37,6 +44,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,11 +55,19 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.ghdinteractivestudio.codestation.domain.model.ApprovalStatus
 import com.ghdinteractivestudio.codestation.domain.model.Bot
 import com.ghdinteractivestudio.codestation.domain.model.BotStatus
 import com.ghdinteractivestudio.codestation.domain.model.ChatMessage
+import com.ghdinteractivestudio.codestation.domain.model.PendingAttachment
 import com.ghdinteractivestudio.codestation.domain.model.QuotedReply
+import com.ghdinteractivestudio.codestation.util.TranscriptionResult
+import com.ghdinteractivestudio.codestation.util.VoiceRecorder
+import com.ghdinteractivestudio.codestation.util.VoiceTranscriptionService
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.util.UUID
 import com.ghdinteractivestudio.codestation.ui.components.ApprovalCardItem
 import com.ghdinteractivestudio.codestation.ui.components.BotAvatar
 import com.ghdinteractivestudio.codestation.ui.components.ChatMessageItem
@@ -88,8 +104,148 @@ fun ChatScreen(
     val state by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var isMenuOpen by remember { mutableStateOf(false) }
     var activeQuotedReply by remember { mutableStateOf<QuotedReply?>(null) }
+
+    val voiceRecorder = remember { VoiceRecorder(context) }
+    val transcriptionService = remember { VoiceTranscriptionService(context) }
+    var recordingTimerJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+
+    // Launcher pour sélection de photos
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            val details = getChatUriDetails(context, uri)
+            viewModel.addAttachment(
+                PendingAttachment(
+                    id = UUID.randomUUID().toString(),
+                    uri = uri,
+                    name = details.first,
+                    mimeType = details.second.ifBlank { "image/jpeg" },
+                    sizeBytes = details.third,
+                    isImage = true
+                )
+            )
+        }
+    }
+
+    // Launcher pour sélection de vidéos
+    val videoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            val details = getChatUriDetails(context, uri)
+            viewModel.addAttachment(
+                PendingAttachment(
+                    id = UUID.randomUUID().toString(),
+                    uri = uri,
+                    name = details.first,
+                    mimeType = details.second.ifBlank { "video/mp4" },
+                    sizeBytes = details.third,
+                    isVideo = true
+                )
+            )
+        }
+    }
+
+    // Launcher pour sélection de documents et fichiers
+    val documentPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            val details = getChatUriDetails(context, uri)
+            viewModel.addAttachment(
+                PendingAttachment(
+                    id = UUID.randomUUID().toString(),
+                    uri = uri,
+                    name = details.first,
+                    mimeType = details.second.ifBlank { "application/octet-stream" },
+                    sizeBytes = details.third
+                )
+            )
+        }
+    }
+
+    // Permission audio pour enregistrement vocal
+    var hasAudioPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    fun startVoiceRecordingAction() {
+        val result = voiceRecorder.startRecording()
+        if (result.isSuccess) {
+            viewModel.setVoiceRecording(true, 0)
+            recordingTimerJob?.cancel()
+            recordingTimerJob = coroutineScope.launch {
+                while (voiceRecorder.isRecording) {
+                    delay(1000)
+                    viewModel.setVoiceRecording(true, voiceRecorder.getDurationSeconds())
+                }
+            }
+        } else {
+            viewModel.onVoiceTranscriptionFailed("Échec de démarrage de l'enregistrement : ${result.exceptionOrNull()?.message}")
+        }
+    }
+
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasAudioPermission = isGranted
+        if (isGranted) {
+            startVoiceRecordingAction()
+        } else {
+            viewModel.onVoiceTranscriptionFailed("Permission microphone refusée. Impossible d'enregistrer.")
+        }
+    }
+
+    fun handleStartVoice() {
+        if (!hasAudioPermission) {
+            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        } else {
+            startVoiceRecordingAction()
+        }
+    }
+
+    fun handleStopVoice() {
+        recordingTimerJob?.cancel()
+        val audioFile = voiceRecorder.stopRecording()
+        viewModel.setVoiceRecording(false, 0)
+        viewModel.setTranscribing(true)
+
+        if (transcriptionService.isAvailable()) {
+            coroutineScope.launch {
+                transcriptionService.startListeningFlow().collect { res ->
+                    when (res) {
+                        is TranscriptionResult.Success -> {
+                            viewModel.onVoiceTranscriptionCompleted(res.text)
+                            voiceRecorder.cleanup(audioFile)
+                        }
+                        is TranscriptionResult.Error -> {
+                            viewModel.onVoiceTranscriptionFailed(res.message)
+                            voiceRecorder.cleanup(audioFile)
+                        }
+                        is TranscriptionResult.Partial -> {}
+                    }
+                }
+            }
+        } else {
+            viewModel.onVoiceTranscriptionFailed("Reconnaissance vocale non disponible sur cet appareil.")
+            voiceRecorder.cleanup(audioFile)
+        }
+    }
+
+    fun handleCancelVoice() {
+        recordingTimerJob?.cancel()
+        voiceRecorder.cancelRecording()
+        viewModel.setVoiceRecording(false, 0)
+    }
 
     val bot = state.bot
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -273,13 +429,33 @@ fun ChatScreen(
                     isWorking = state.isBotWorking,
                     replyTo = activeQuotedReply,
                     onCancelReply = { activeQuotedReply = null },
+                    attachments = state.attachments,
+                    onRemoveAttachment = { viewModel.removeAttachment(it) },
+                    onPickPhoto = {
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    onPickVideo = {
+                        videoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
+                        )
+                    },
+                    onPickDocument = {
+                        documentPickerLauncher.launch(arrayOf("*/*"))
+                    },
+                    isVoiceRecording = state.isVoiceRecording,
+                    voiceDurationSeconds = state.voiceDurationSeconds,
+                    isTranscribing = state.isTranscribing,
+                    onStartVoice = { handleStartVoice() },
+                    onStopVoice = { handleStopVoice() },
+                    onCancelVoice = { handleCancelVoice() },
                     onSend = { text ->
                         viewModel.onInputChanged(text)
                         viewModel.sendMessage()
                         activeQuotedReply = null
                     },
-                    onStop = { viewModel.stopTurn() },
-                    onAttach = { /* Sélecteur de fichiers */ }
+                    onStop = { viewModel.stopTurn() }
                 )
             }
         }
@@ -341,4 +517,20 @@ fun ChatScreen(
             }
         }
     }
+}
+
+private fun getChatUriDetails(context: Context, uri: Uri): Triple<String, String, Long> {
+    var name = "fichier"
+    var size = 0L
+    val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+
+    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+        val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+        val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+        if (cursor.moveToFirst()) {
+            if (nameIndex != -1) name = cursor.getString(nameIndex) ?: "fichier"
+            if (sizeIndex != -1) size = cursor.getLong(sizeIndex)
+        }
+    }
+    return Triple(name, mimeType, size)
 }

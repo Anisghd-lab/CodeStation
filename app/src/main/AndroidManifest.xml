@@ -63,6 +63,14 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <receiver
+            android:name=".notification.NotificationActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.ghdinteractivestudio.codestation.ACTION_STOP_BOT" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

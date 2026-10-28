@@ -166,3 +166,60 @@ sequenceDiagram
 - **Installation** : `adb -s 192.168.1.23:33931 install -r CodeStation-v1.0.3-debug.apk` -> `Performing Streamed Install -> Success`.
 - **Démarrage automatique** : Lancement de `MainActivity` avec succès (`mCurrentFocus=Window{... MainActivity}`).
 
+---
+
+## 6. Audit Critique de Bout en Bout, Détection des CLI, Messages Illimités, Pièces Jointes, Messages Vocaux et UI Glassmorphism
+
+**Date :** 28 Octobre 2026  
+**Branche :** `fix/bot-launch-and-persistent-notifications`
+
+### A. Traçage Complet du Chemin des Messages (Phase 1)
+- Implémentation du traceur d'audit structuré `RequestTracer.kt` corrélant chaque message avec un `requestId` unique à travers 13 étapes d'audit :
+  1. `message_created` (création avec longueur et pièces jointes)
+  2. `message_queued` (file d'attente locale)
+  3. `request_sent` (envoi réseau HTTP local)
+  4. `request_received` (réception par CodeStation Host)
+  5. `bot_resolved` (résolution configuration bot)
+  6. `cli_resolved` (moteur résolu : `antigravity` ou `opencode`)
+  7. `process_started` (lancement ACP / sous-processus)
+  8. `cli_input_delivered` (délivrance stdin sans argument shell)
+  9. `provider_request_started` (requête vers fournisseur LLM)
+  10. `first_output_received` (premier chunk de réponse)
+  11. `response_completed` (réponse finale reçue)
+  12. `request_failed` (échec ou timeout explicite)
+  13. `request_cancelled` (interruption manuelle par l'utilisateur)
+- **Sécurité** : Filtre automatique supprimant tout jeton, mot de passe ou clé API des détails de traçage.
+
+### B. Détection Réelle des CLI dans Ubuntu PRoot (Phase 2)
+- Implémentation de la détection réelle dans `scripts/bot_env_manager.py detect` et propagation via `EnvironmentsResponse` :
+  - **Google Antigravity (`agy`)** : Détecté dans `/root/.local/bin/agy` (v1.4.9), statut `READY`, `is_primary=true`, environnement `bot-antigravity`.
+  - **OpenCode GLM (`opencode`)** : Détecté dans `/usr/local/bin/opencode` (v2.2.0), statut `READY`, `is_primary=true`, environnement `bot-opencode-glm`.
+  - **OpenAI Codex (`codex`)** : Détecté dans `/data/data/com.termux/files/usr/bin/codex` (v0.153.3), statut `INSTALLED`, `is_primary=false`, environnement `termux`.
+- Dans `BotEditorScreen.kt` : Moteurs prioritaires Google Antigravity et OpenCode GLM placés en tête avec badges d'état en temps réel, suivis d'une section distincte « Autres CLI détectées ».
+
+### C. Messages Sans Limite Artificielle de Caractères (Phase 3)
+- **Suppression des contraintes arbitraires** : Aucun `maxLength` dans Compose. Le composant `BasicTextField` s'adapte en hauteur et défile pour les messages très longs.
+- **Délivrance sécurisée via stdin** :
+  - `environments/bot-antigravity/run.sh` et `agy_acp_bridge.py` utilisent l'argument officiel `agy -p -` avec injection directe sur le flux standard `stdin=subprocess.PIPE`.
+  - `environments/bot-opencode-glm/run.sh` utilise le passage de flux standard `printf '%s' | opencode run`.
+  - Élimination des limites de taille de ligne de commande (`ARG_MAX`), avec préservation intégrale des retours à la ligne, guillemets, emojis et caractères accentués.
+
+### D. Bouton « + » Pièces Jointes & Design Glassmorphism (Phase 4 & 6)
+- **Menu Glassmorphism iPhone-inspired** (`AttachmentMenu.kt`) avec options Photo, Vidéo et Fichier.
+- Sélecteurs natifs Android `PickVisualMedia` et `OpenDocument` (Storage Access Framework) sans demander de permissions excessives.
+- Cartes d'aperçu de pièces jointes compactes (`AttachmentPreviewRow.kt` et `ChatMessageItem.kt`) avec nom, taille formatée et badge d'avertissement explicite pour les vidéos (« Modèle texte seul »).
+
+### E. Messages Vocaux et Transcription (Phase 5)
+- **Enregistreur vocal natif** (`VoiceRecorder.kt`) avec encodage AAC / MediaRecorder, calcul de durée en temps réel et permission `RECORD_AUDIO`.
+- **Moteur de transcription** (`VoiceTranscriptionService.kt`) avec `SpeechRecognizer` natif et conversion parole-en-texte injectée dans le compositeur ou envoyée à l'agent.
+- Nettoyage automatique des fichiers audio temporaires après transcription.
+
+### F. Validation E2E & Tests Unitaires (Phase 7)
+- **Suite de tests E2E `scripts/test_agents_e2e.py`** : **10/10 tests réussis**.
+- **Tests unitaires dédiés** :
+  - `CliDetectionTest.kt` : Détection des CLI, validation des statuts `READY`/`INSTALLED`, et vérification de l'isolation des rootfs.
+  - `MessagePipelineAndLengthTest.kt` : Validation des 13 étapes de traçage, corrélation par `requestId`, filtrage des secrets et intégrité des longs messages.
+  - `AttachmentAndVoiceTest.kt` : Classification des pièces jointes et cycle de vie audio.
+  - `AntigravityDynamicModelTest.kt` : Découverte dynamique des modèles `agy` et rétention de cache.
+  - `BotNotificationAndTraceTest.kt` : Notifications persistantes d'exécution des agents.
+

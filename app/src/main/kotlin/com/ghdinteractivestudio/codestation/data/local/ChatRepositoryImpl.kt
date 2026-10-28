@@ -42,7 +42,8 @@ class ChatRepositoryImpl(
     override suspend fun sendMessage(
         botId: String,
         text: String,
-        replyTo: QuotedReply?
+        replyTo: QuotedReply?,
+        attachments: List<com.ghdinteractivestudio.codestation.domain.model.FileAttachment>
     ): Result<ChatMessage> {
         return runCatching {
             val userMsg = ChatMessage(
@@ -52,10 +53,12 @@ class ChatRepositoryImpl(
                 text = text,
                 timestamp = System.currentTimeMillis(),
                 isFinal = true,
-                replyTo = replyTo
+                replyTo = replyTo,
+                attachments = attachments
             )
             messageDao.insertMessage(ChatMessageEntity.fromDomain(userMsg))
-            botDao.updateLastMessage(botId, text, userMsg.timestamp)
+            val previewText = text.ifBlank { if (attachments.isNotEmpty()) "[Pièce jointe: ${attachments.first().name}]" else "" }
+            botDao.updateLastMessage(botId, previewText, userMsg.timestamp)
 
             // Envoi réseau vers apiService si connecté
             if (apiServiceProvider != null && serverRepository != null) {
@@ -70,7 +73,8 @@ class ChatRepositoryImpl(
                         botId = botId,
                         text = text,
                         clientNonce = userMsg.id,
-                        replyTo = replyTo?.messageId
+                        replyTo = replyTo?.messageId,
+                        attachments = attachments.map { it.id }
                     ),
                     authHeader = auth
                 )

@@ -68,7 +68,7 @@ impl Install {
 }
 
 pub fn harness(id: &str) -> Option<&'static Harness> {
-    HARNESSES.iter().find(|h| h.id == id)
+    HARNESSES.iter().find(|h| h.id == id || h.bins.contains(&id))
 }
 
 // MARK: listing + launching

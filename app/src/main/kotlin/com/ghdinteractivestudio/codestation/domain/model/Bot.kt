@@ -11,7 +11,7 @@ enum class ProviderType(val displayName: String, val defaultModel: String, val b
     CLAUDE_CODE("Claude Code", "claude-3-7-sonnet", "claude"),
     OPENAI_CODEX("OpenAI Codex", "gpt-4o", "codex"),
     GEMINI_CLI("Google Gemini CLI", "gemini-2.0-flash", "gemini"),
-    ANTIGRAVITY("Google Antigravity", "gemini-2.5-pro", "antigravity"),
+    ANTIGRAVITY("Google Antigravity", "gemini-4-argon-medium", "antigravity"),
     OPENCODE("OpenCode", "opencode/glm-5.3-flash-free", "opencode"),
     ACP_LOCAL("ACP Local Agent", "local-qwen-2.5", "acp"),
     CUSTOM("Custom Agent", "default", "custom");
@@ -42,8 +42,19 @@ enum class ProviderType(val displayName: String, val defaultModel: String, val b
                 ModelInfo("gemini-2.5-pro", "Gemini 2.5 Pro", isFree = false)
             )
             ANTIGRAVITY -> listOf(
-                ModelInfo("gemini-2.5-pro", "Gemini 2.5 Pro (AGY)", isFree = true, isDefault = true),
-                ModelInfo("gemini-2.0-flash", "Gemini 2.0 Flash (AGY)", isFree = true)
+                ModelInfo("gemini-4-argon-medium", "Gemini 4 Argon (Medium)", isFree = false, isDefault = true, isVerified = true),
+                ModelInfo("gemini-4-argon-high", "Gemini 4 Argon (High)", isFree = false, isVerified = true),
+                ModelInfo("gemini-4-argon-low", "Gemini 4 Argon (Low)", isFree = false, isVerified = true),
+                ModelInfo("gemini-3.8-flash-high", "Gemini 3.8 Flash (High)", isFree = false, isVerified = true),
+                ModelInfo("gemini-3.8-flash-medium", "Gemini 3.8 Flash (Medium)", isFree = false, isVerified = true),
+                ModelInfo("gemini-3.8-flash-low", "Gemini 3.8 Flash (Low)", isFree = false, isVerified = true),
+                ModelInfo("claude-opus-5-5-low", "Claude Opus 5.5 (Low)", isFree = false, isVerified = true),
+                ModelInfo("claude-opus-5-5-medium", "Claude Opus 5.5 (Medium)", isFree = false, isVerified = true),
+                ModelInfo("claude-opus-5-5-high", "Claude Opus 5.5 (High)", isFree = false, isVerified = true),
+                ModelInfo("claude-sonnet-5-5-low", "Claude Sonnet 5.5 (Low)", isFree = false, isVerified = true),
+                ModelInfo("claude-sonnet-5-5-medium", "Claude Sonnet 5.5 (Medium)", isFree = false, isVerified = true),
+                ModelInfo("claude-sonnet-5-5-high", "Claude Sonnet 5.5 (High)", isFree = false, isVerified = true),
+                ModelInfo("gpt-oss-120b-medium", "GPT-OSS 120B (Medium)", isFree = false, isVerified = true)
             )
             ACP_LOCAL -> listOf(
                 ModelInfo("local-qwen-2.5", "Qwen 2.5 (Local)", isFree = true, isDefault = true)
@@ -59,7 +70,8 @@ data class ModelInfo(
     val id: String,
     val displayName: String,
     val isFree: Boolean = false,
-    val isDefault: Boolean = false
+    val isDefault: Boolean = false,
+    val isVerified: Boolean = true
 )
 
 enum class WorkspaceMode(val displayName: String) {
