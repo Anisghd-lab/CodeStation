@@ -7,16 +7,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.mockito.Mockito.mock
 
 class AttachmentAndVoiceTest {
 
     @Test
     fun `test PendingAttachment image classification and formatted size`() {
-        val mockUri = mock(Uri::class.java)
+        val testUri = Uri.parse("content://media/external/images/media/1")
         val imageAttachment = PendingAttachment(
             id = "att-1",
-            uri = mockUri,
+            uri = testUri,
             name = "screenshot.png",
             mimeType = "image/png",
             sizeBytes = 1536 * 1024L // 1.5 MB
@@ -29,10 +28,10 @@ class AttachmentAndVoiceTest {
 
     @Test
     fun `test PendingAttachment video warning flag`() {
-        val mockUri = mock(Uri::class.java)
+        val testUri = Uri.parse("content://media/external/video/media/2")
         val videoAttachment = PendingAttachment(
             id = "att-2",
-            uri = mockUri,
+            uri = testUri,
             name = "demo_recording.mp4",
             mimeType = "video/mp4",
             sizeBytes = 850 * 1024L // 850 KB
@@ -45,10 +44,10 @@ class AttachmentAndVoiceTest {
 
     @Test
     fun `test PendingAttachment document file handling`() {
-        val mockUri = mock(Uri::class.java)
+        val testUri = Uri.parse("content://com.android.providers.downloads/document/3")
         val docAttachment = PendingAttachment(
             id = "att-3",
-            uri = mockUri,
+            uri = testUri,
             name = "report.pdf",
             mimeType = "application/pdf",
             sizeBytes = 500L
@@ -60,18 +59,16 @@ class AttachmentAndVoiceTest {
     }
 
     @Test
-    fun `test TranscriptionResult sealed class handling`() {
-        val success = TranscriptionResult.Success("Bonjour comment vas-tu")
-        val error = TranscriptionResult.Error("Microphone muet")
-        val partial = TranscriptionResult.Partial("Bonj...")
+    fun `test voice transcription result sealed class states`() {
+        val success = TranscriptionResult.Success("Bonjour CodeStation", isFinal = true)
+        val partial = TranscriptionResult.Partial("Bonjour")
+        val error = TranscriptionResult.Error("Microphone occupé")
 
-        assertTrue(success is TranscriptionResult.Success)
-        assertEquals("Bonjour comment vas-tu", success.text)
+        assertEquals("Bonjour CodeStation", success.text)
+        assertTrue(success.isFinal)
 
-        assertTrue(error is TranscriptionResult.Error)
-        assertEquals("Microphone muet", error.message)
+        assertEquals("Bonjour", partial.text)
 
-        assertTrue(partial is TranscriptionResult.Partial)
-        assertEquals("Bonj...", partial.text)
+        assertEquals("Microphone occupé", error.message)
     }
 }

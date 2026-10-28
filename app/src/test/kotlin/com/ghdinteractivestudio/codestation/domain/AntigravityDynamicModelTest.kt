@@ -154,6 +154,7 @@ class AntigravityDynamicModelTest {
     private class FakeBotRepository : BotRepository {
         private val bots = mutableMapOf<String, Bot>()
         override fun getBotsStream() = MutableStateFlow(bots.values.toList())
+        override fun getBotByIdStream(id: String) = MutableStateFlow(bots[id])
         override suspend fun getBotById(id: String) = bots[id]
         override suspend fun createBot(bot: Bot): Result<Bot> {
             bots[bot.id] = bot
@@ -171,7 +172,9 @@ class AntigravityDynamicModelTest {
             bots.remove(id)
             return Result.success(Unit)
         }
-        override suspend fun updateStatus(id: String, status: com.ghdinteractivestudio.codestation.domain.model.BotStatus): Result<Unit> = Result.success(Unit)
-        override suspend fun stopBotTurn(id: String): Result<Unit> = Result.success(Unit)
+        override suspend fun togglePin(id: String): Result<Unit> = Result.success(Unit)
+        override suspend fun updateBotStatus(id: String, status: com.ghdinteractivestudio.codestation.domain.model.BotStatus): Result<Unit> = Result.success(Unit)
+        override suspend fun refreshBots(): Result<List<Bot>> = Result.success(bots.values.toList())
+        override suspend fun stopBotTurn(botId: String): Result<Unit> = Result.success(Unit)
     }
 }
