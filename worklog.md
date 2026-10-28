@@ -152,3 +152,17 @@ sequenceDiagram
 
 3. **Validation & Tests** :
    - Ajout du fichier de tests unitaires `ComponentVersionsTest.kt` validant la séparation stricte des versions, la détection de l'état déconnecté et la non-pollution mutuelle des versions.
+
+---
+
+## 5. Déploiement et Installation Physique sur Appareil Réel (ADB)
+
+**Cible :** `192.168.1.23:33931`  
+**Package :** `com.ghdinteractivestudio.codestation.debug`  
+**Version installée :** `versionName=1.0.3`, `versionCode=4`  
+**SHA-256 APK :** `9fa3a6d4cc6ec1f9e67e1d58d5764614747a15dd8778f5f3ddf19a585062dd5e`
+
+- **Connexion ADB** : `adb connect 192.168.1.23:33931` (état `device`).
+- **Installation** : `adb -s 192.168.1.23:33931 install -r CodeStation-v1.0.3-debug.apk` -> `Performing Streamed Install -> Success`.
+- **Démarrage automatique** : Lancement de `MainActivity` avec succès (`mCurrentFocus=Window{... MainActivity}`).
+
