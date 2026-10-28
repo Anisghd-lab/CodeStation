@@ -328,6 +328,18 @@ sequenceDiagram
   - Réponse réelle Antigravity (`AGY_OK`) : `PASS`
   - Réponse réelle OpenCode GLM : `PASS`
 
+### 9.3 Publication CI/CD et Déploiement Réel sur l'Appareil
+- **Build GitHub Actions (Run 40781104875)** : Exécution complète des tests unitaires et compilation APK réussies en 4m46s.
+- **Release GitHub v1.0.4** : Publiée sur `https://github.com/Anisghd-lab/CodeStation/releases/tag/v1.0.4`.
+  - SHA-256 : `e125d0c10d573b5953276945f1005e1cd82ede24c2823d0eae756ea920e7efbb`
+  - Artefacts : `CodeStation-v1.0.4-debug.apk`, `CodeStation-debug.apk`, `CodeStation-debug.apk.sha256`.
+- **Installation directe ADB (192.168.1.23:33931)** : `Performing Streamed Install -> Success`.
+  - `versionName=1.0.4`, `versionCode=5`.
+- **Lancement et Capture Logcat en temps réel** :
+  - Application démarrée sur le téléphone.
+  - Journalisation continue en tâche de fond active dans `/root/codestation_app.logcat.log`.
+
+
 
 
 
