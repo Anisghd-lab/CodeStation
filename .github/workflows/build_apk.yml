@@ -46,19 +46,28 @@ jobs:
 
       - name: Rename APK Artifact
         run: |
+          VERSION_NAME=$(grep -m1 'versionName' app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "VERSION_NAME=${VERSION_NAME}" >> "$GITHUB_ENV"
           mkdir -p output_artifacts
-          cp app/build/outputs/apk/debug/app-debug.apk output_artifacts/CodeStation-v1.0.0-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk "output_artifacts/CodeStation-v${VERSION_NAME}-debug.apk"
           cp app/build/outputs/apk/debug/app-debug.apk output_artifacts/CodeStation-debug.apk
           cd output_artifacts
-          sha256sum CodeStation-debug.apk CodeStation-v1.0.0-debug.apk > CodeStation-debug.apk.sha256
+          sha256sum CodeStation-debug.apk "CodeStation-v${VERSION_NAME}-debug.apk" > CodeStation-debug.apk.sha256
           cat CodeStation-debug.apk.sha256
+
+      - name: Verify stable signing certificate
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs output_artifacts/CodeStation-debug.apk | tee signer.txt
+          grep -qi "3a57a1a45a53bfc51b8ec13b4ebfa2bb25205f3fba7dff22c5a29dfd3abb4e8b" signer.txt \
+            || { echo "::error::APK not signed with the stable CodeStation debug key"; exit 1; }
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CodeStation-v1.0.0-debug-apk
+          name: CodeStation-v${{ env.VERSION_NAME }}-debug-apk
           path: |
-            output_artifacts/CodeStation-v1.0.0-debug.apk
+            output_artifacts/CodeStation-v${{ env.VERSION_NAME }}-debug.apk
             output_artifacts/CodeStation-debug.apk
             output_artifacts/CodeStation-debug.apk.sha256
           retention-days: 14

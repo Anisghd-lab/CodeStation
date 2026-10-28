@@ -14,12 +14,25 @@ android {
         applicationId = "com.ghdinteractivestudio.codestation"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
+        }
+    }
+
+    // Stable debug signing key committed to the repo so that every CI build
+    // (each GitHub runner otherwise generates a random ~/.android/debug.keystore)
+    // carries the same signature and can be installed over the previous one.
+    // Debug-only key: never use it for Play Store / production release builds.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("codestation-debug.jks")
+            storePassword = "codestation"
+            keyAlias = "codestation-debug"
+            keyPassword = "codestation"
         }
     }
 
@@ -34,6 +47,7 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             isDebuggable = true
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
