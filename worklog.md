@@ -131,3 +131,24 @@ sequenceDiagram
      - Moteurs compacts avec badges d'état et modèles compatibles avec sélecteur clair (badge « Gratuit » pour `GLM-5.3-Flash Free`).
      - Interrupteurs Fast Mode et Pinned directement accolés à leurs descriptions.
      - Barre d'actions inférieure fixe (`Surface` avec `imePadding()` et `navigationBarsPadding()`) garantissant la présence permanente des boutons « Annuler » et « Créer l'Agent ».
+
+---
+
+## 4. Affichage Distinct des Versions Android et Backend
+
+**Date :** 28 Octobre 2026
+
+### A. Implémentation
+1. **CodeStation Android** :
+   - Activation de `buildFeatures { buildConfig = true }` dans `app/build.gradle.kts`.
+   - Lecture réelle du `versionName` (`1.0.3`) et `versionCode` (`4`) via `BuildConfig` et l'API `PackageManager` d'Android.
+   - Affichage explicite : `CodeStation Android : 1.0.3 (Build 4)`.
+
+2. **CodeStation Host** :
+   - Récupération de la version réelle du backend connecté via `ServerConfig.serverVersion` (alimenté par les routes `/health` et `/hello`).
+   - Affichage dynamique :
+     - Si connecté avec version vérifiée : `CodeStation Host : 2.28.0` (vert émeraude).
+     - Si serveur arrêté ou hors ligne : `CodeStation Host : Indisponible`.
+
+3. **Validation & Tests** :
+   - Ajout du fichier de tests unitaires `ComponentVersionsTest.kt` validant la séparation stricte des versions, la détection de l'état déconnecté et la non-pollution mutuelle des versions.

@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.ghdinteractivestudio.codestation.BuildConfig
 import com.ghdinteractivestudio.codestation.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.codestation.ui.components.CardForm
 import com.ghdinteractivestudio.codestation.ui.components.CardSection
@@ -81,6 +82,21 @@ fun SettingsScreen(
     var shareAnalytics by rememberSaveable { mutableStateOf(false) }
     var appLanguage by rememberSaveable { mutableStateOf("system") }
     var confirmStartOver by remember { mutableStateOf(false) }
+
+    val androidVersionName = remember(context) {
+        try {
+            val pInfo = if (Build.VERSION.SDK_INT >= 33) {
+                context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }
+            val code = if (Build.VERSION.SDK_INT >= 28) pInfo.longVersionCode else @Suppress("DEPRECATION") pInfo.versionCode.toLong()
+            "${pInfo.versionName ?: BuildConfig.VERSION_NAME} (Build $code)"
+        } catch (_: Exception) {
+            "${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})"
+        }
+    }
 
     Column(
         modifier = modifier
@@ -237,20 +253,60 @@ fun SettingsScreen(
                 }
             }
 
-            // Section 4: Informations de version et Réinitialisation (Compact et directement visible)
+            // Section 4: Versions des composants & Réinitialisation (Deux lignes distinctes)
             CardSection(
-                title = "À propos de CodeStation"
+                title = "Versions des composants"
             ) {
+                // Ligne 1 : Application Android native
                 row {
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Version de l'application", style = Type.body, color = Palette.text)
-                        Text("1.0.3 (Build 4)", style = Type.body.semibold, color = Palette.secondary)
+                        Column {
+                            Text("CodeStation Android", style = Type.body, color = Palette.text)
+                            Text("Application mobile native", style = Type.caption, color = Palette.secondary)
+                        }
+                        Text(
+                            text = androidVersionName,
+                            style = Type.body.semibold,
+                            color = Palette.text
+                        )
                     }
                 }
+
+                // Ligne 2 : CodeStation Host (Serveur Termux connecté)
+                row {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("CodeStation Host", style = Type.body, color = Palette.text)
+                            Text(
+                                if (isConnected) "Serveur Termux local (127.0.0.1:19222)" else "Processus serveur Termux",
+                                style = Type.caption,
+                                color = Palette.secondary
+                            )
+                        }
+                        val hostVersionText = if (isConnected && !state.serverConfig.serverVersion.isNullOrBlank()) {
+                            state.serverConfig.serverVersion!!
+                        } else if (isConnected) {
+                            "Inconnue"
+                        } else {
+                            "Indisponible"
+                        }
+                        Text(
+                            text = hostVersionText,
+                            style = Type.body.semibold,
+                            color = if (isConnected) Palette.emeraldAccent else Palette.secondary
+                        )
+                    }
+                }
+
+                // Ligne 3 : Dépôt GitHub & Code source
                 row {
                     Row(
                         Modifier.fillMaxWidth(),
@@ -263,6 +319,8 @@ fun SettingsScreen(
                         }
                     }
                 }
+
+                // Ligne 4 : Réinitialisation
                 row {
                     Row(
                         Modifier
