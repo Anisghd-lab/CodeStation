@@ -56,7 +56,6 @@ import com.ghdinteractivestudio.codestation.ui.theme.Palette
 import com.ghdinteractivestudio.codestation.ui.theme.RoundedRectangle
 import com.ghdinteractivestudio.codestation.ui.theme.Type
 import com.ghdinteractivestudio.codestation.ui.theme.bold
-import com.ghdinteractivestudio.codestation.ui.theme.caption2
 import com.ghdinteractivestudio.codestation.ui.theme.medium
 import com.ghdinteractivestudio.codestation.ui.theme.monospaced
 import com.ghdinteractivestudio.codestation.ui.theme.semibold
