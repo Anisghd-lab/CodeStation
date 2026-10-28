@@ -288,7 +288,7 @@ fun BotEditorScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedRectangle(8.dp))
-                                            .background(if (isModelSelected) Palette.emeraldAccent.copy(alpha = 0.15f) else Palette.glass)
+                                            .background(if (isModelSelected) Palette.emeraldAccent.copy(alpha = 0.15f) else Palette.glassSurface)
                                             .border(
                                                 width = if (isModelSelected) 1.dp else 0.5.dp,
                                                 color = if (isModelSelected) Palette.emeraldAccent else Palette.glassBorder,
