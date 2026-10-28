@@ -85,9 +85,9 @@ case "$ACTION" in
         fi
         PROMPT="$*"
         if [ -z "$PROMPT" ]; then
-            exec "$AGY_BIN" -p - "${MODEL_ARGS[@]}" --dangerously-skip-permissions
+            exec "$AGY_BIN" "${MODEL_ARGS[@]}" --dangerously-skip-permissions
         else
-            printf "%s" "$PROMPT" | exec "$AGY_BIN" -p - "${MODEL_ARGS[@]}" --dangerously-skip-permissions
+            exec "$AGY_BIN" -p "$PROMPT" "${MODEL_ARGS[@]}" --dangerously-skip-permissions
         fi
         ;;
 

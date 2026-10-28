@@ -215,8 +215,15 @@ fun ChatScreen(
 
     fun handleStopVoice() {
         recordingTimerJob?.cancel()
+        val duration = voiceRecorder.getDurationSeconds()
         val audioFile = voiceRecorder.stopRecording()
         viewModel.setVoiceRecording(false, 0)
+
+        if (audioFile == null || !audioFile.exists()) {
+            viewModel.onVoiceTranscriptionFailed("Aucun fichier audio enregistré.")
+            return
+        }
+
         viewModel.setTranscribing(true)
 
         if (transcriptionService.isAvailable()) {
@@ -228,16 +235,40 @@ fun ChatScreen(
                             voiceRecorder.cleanup(audioFile)
                         }
                         is TranscriptionResult.Error -> {
-                            viewModel.onVoiceTranscriptionFailed(res.message)
-                            voiceRecorder.cleanup(audioFile)
+                            // Si la reconnaissance échoue, conserver l'enregistrement audio comme pièce jointe vocale
+                            val fileUri = android.net.Uri.fromFile(audioFile)
+                            viewModel.addAttachment(
+                                PendingAttachment(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    name = "Message vocal (${duration}s).m4a",
+                                    sizeBytes = audioFile.length(),
+                                    mimeType = "audio/mp4",
+                                    uri = fileUri,
+                                    type = com.ghdinteractivestudio.codestation.domain.model.AttachmentType.AUDIO
+                                )
+                            )
+                            viewModel.setTranscribing(false)
                         }
-                        is TranscriptionResult.Partial -> {}
+                        is TranscriptionResult.Partial -> {
+                            viewModel.onVoiceTranscriptionCompleted(res.text)
+                        }
                     }
                 }
             }
         } else {
-            viewModel.onVoiceTranscriptionFailed("Reconnaissance vocale non disponible sur cet appareil.")
-            voiceRecorder.cleanup(audioFile)
+            // Moteur de transcription non présent : conservation garantie du message vocal en pièce jointe
+            val fileUri = android.net.Uri.fromFile(audioFile)
+            viewModel.addAttachment(
+                PendingAttachment(
+                    id = java.util.UUID.randomUUID().toString(),
+                    name = "Message vocal (${duration}s).m4a",
+                    sizeBytes = audioFile.length(),
+                    mimeType = "audio/mp4",
+                    uri = fileUri,
+                    type = com.ghdinteractivestudio.codestation.domain.model.AttachmentType.AUDIO
+                )
+            )
+            viewModel.setTranscribing(false)
         }
     }
 

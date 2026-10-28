@@ -64,23 +64,40 @@ class ChatRepositoryImpl(
             if (apiServiceProvider != null && serverRepository != null) {
                 val config = serverRepository.getServerConfig()
                 val api = apiServiceProvider.invoke()
-                if (api == null || config.token.isNullOrBlank()) {
-                    throw IllegalStateException("Serveur CodeStation non connecté ou jeton d'authentification manquant.")
+                if (config.token.isNullOrBlank()) {
+                    throw IllegalStateException("Authentification absente : hôte non appairé. Lancez './start_code_station.sh pair' dans Termux ou saisissez le jeton dans les Paramètres.")
+                }
+                if (api == null) {
+                    throw IllegalStateException("Serveur inaccessible sur ${config.url}. Vérifiez que CodeStation Host est démarré.")
                 }
                 val auth = "Bearer ${config.token}"
-                val response = api.sendMessage(
-                    SendMessageRequest(
-                        botId = botId,
-                        text = text,
-                        clientNonce = userMsg.id,
-                        replyTo = replyTo?.messageId,
-                        attachments = attachments.map { it.id }
-                    ),
-                    authHeader = auth
-                )
+                val response = try {
+                    api.sendMessage(
+                        SendMessageRequest(
+                            botId = botId,
+                            text = text,
+                            clientNonce = userMsg.id,
+                            replyTo = replyTo?.messageId,
+                            attachments = attachments.map { it.id }
+                        ),
+                        authHeader = auth
+                    )
+                } catch (e: java.net.ConnectException) {
+                    throw IllegalStateException("Serveur inaccessible (${config.url}). Vérifiez que CodeStation Host est démarré.")
+                } catch (e: java.net.SocketTimeoutException) {
+                    throw IllegalStateException("Délai de connexion dépassé lors de l'envoi au serveur.")
+                } catch (e: Exception) {
+                    throw IllegalStateException("Transmission impossible : ${e.localizedMessage ?: "erreur réseau"}")
+                }
                 if (!response.isSuccessful) {
-                    val err = response.errorBody()?.string() ?: "Erreur HTTP ${response.code()}"
-                    throw IllegalStateException("Le serveur a refusé le message ($err)")
+                    val code = response.code()
+                    val err = response.errorBody()?.string().orEmpty()
+                    when (code) {
+                        401, 403 -> throw IllegalStateException("Authentification refusée (HTTP $code) : jeton invalide ou non autorisé.")
+                        404 -> throw IllegalStateException("Route inconnue ou bot '$botId' non trouvé sur le serveur.")
+                        502, 503 -> throw IllegalStateException("Fournisseur de modèle indisponible (HTTP $code).")
+                        else -> throw IllegalStateException("Le serveur a refusé la requête (HTTP $code: $err)")
+                    }
                 }
             }
 
