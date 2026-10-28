@@ -244,4 +244,33 @@ sequenceDiagram
    - `Autoriser` / `Refuser` : Prise de décision directe pour les commandes shell et modifications depuis la notification d'approbation (`ACTION_APPROVE` / `ACTION_REJECT`).
 6. **Mise à niveau des canaux (Migration v2)** : Canaux créés avec IDs mis à jour (`codestation_live_tasks_v2`, `codestation_approvals_v2`, `codestation_completed_v2`) avec suppression des versions obsolètes pour forcer la prise en compte sur les appareils ayant déjà exécuté une version antérieure.
 
+---
+
+## 8. Déploiement GitHub Release v1.0.3 et Installation ADB
+
+**Date :** 28 Octobre 2026  
+**Cible :** `com.ghdinteractivestudio.codestation` (debug: `com.ghdinteractivestudio.codestation.debug`)  
+**Appareil connecté :** `192.168.1.23:33931`
+
+### 8.1 Publication de la Release GitHub
+- **URL de Release :** [https://github.com/Anisghd-lab/CodeStation/releases/tag/v1.0.3](https://github.com/Anisghd-lab/CodeStation/releases/tag/v1.0.3)
+- **Tag :** `v1.0.3`
+- **Titre :** `CodeStation v1.0.3 — Notifications persistantes & détection CLI`
+- **Artefacts attachés :**
+  - `CodeStation-v1.0.3-debug.apk` (19 956 728 octets)
+  - `CodeStation-debug.apk` (19 956 728 octets)
+  - `CodeStation-debug.apk.sha256`
+- **Empreinte SHA-256 :**
+  `13d33ce9542a65cd4d5d2a48c24be3e5e216190eb2ce63faa5e7d2ac4994aceb`
+
+### 8.2 Installation et Vérification sur l'Appareil Réel (ADB)
+- **Commande d'installation :** `adb -s 192.168.1.23:33931 install -r /root/codestation_apk/CodeStation-debug.apk`
+- **Résultat :** `Performing Streamed Install -> Success`
+- **Vérification du paquet :**
+  - `versionCode` : `4`
+  - `versionName` : `1.0.3`
+  - `minSdk` : `26`, `targetSdk` : `35`
+- **Lancement effectif :** App lancée avec succès (`PID 27016`), activité `com.ghdinteractivestudio.codestation.MainActivity` active.
+
+
 
