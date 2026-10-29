@@ -35,6 +35,16 @@ class BotRepositoryImpl(
     override suspend fun createBot(bot: Bot): Result<Bot> {
         return runCatching {
             botDao.insertBot(BotEntity.fromDomain(bot))
+            val repo = serverRepository
+            if (repo != null) {
+                runCatching {
+                    repo.createEnvironment(
+                        botId = bot.id,
+                        engine = bot.provider.backendId,
+                        model = bot.model
+                    )
+                }
+            }
             bot
         }
     }
@@ -51,6 +61,16 @@ class BotRepositoryImpl(
             val existing = botDao.getBotById(bot.id)
             if (existing == null) {
                 botDao.insertBot(BotEntity.fromDomain(bot))
+                val repo = serverRepository
+                if (repo != null) {
+                    runCatching {
+                        repo.createEnvironment(
+                            botId = bot.id,
+                            engine = bot.provider.backendId,
+                            model = bot.model
+                        )
+                    }
+                }
             } else {
                 botDao.updateBot(BotEntity.fromDomain(bot))
             }
@@ -65,6 +85,12 @@ class BotRepositoryImpl(
                 error("Le Lead Bot ne peut pas être supprimé.")
             }
             botDao.deleteBotById(id)
+            val repo = serverRepository
+            if (repo != null) {
+                runCatching {
+                    repo.stopEnvironment(id)
+                }
+            }
         }
     }
 

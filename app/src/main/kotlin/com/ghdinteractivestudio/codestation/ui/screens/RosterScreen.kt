@@ -20,8 +20,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -41,6 +39,9 @@ import com.ghdinteractivestudio.codestation.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.codestation.ui.components.BotCard
 import com.ghdinteractivestudio.codestation.ui.components.CharacterAvatar
 import com.ghdinteractivestudio.codestation.ui.components.Edge
+import com.ghdinteractivestudio.codestation.ui.components.GlassMenu
+import com.ghdinteractivestudio.codestation.ui.components.GlassMenuDivider
+import com.ghdinteractivestudio.codestation.ui.components.GlassMenuItem
 import com.ghdinteractivestudio.codestation.ui.components.GlassStage
 import com.ghdinteractivestudio.codestation.ui.components.GlassTabBar
 import com.ghdinteractivestudio.codestation.ui.components.IconButton
@@ -131,37 +132,35 @@ fun RosterScreen(
                             Symbol("chevron.down", size = 13.dp, tint = Palette.secondary)
                         }
 
-                        DropdownMenu(
+                        GlassMenu(
                             expanded = isComputerMenuOpen,
-                            onDismissRequest = { isComputerMenuOpen = false }
+                            onDismissRequest = { isComputerMenuOpen = false },
+                            width = 260.dp
                         ) {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        if (isConnected) "Termux (127.0.0.1) · En ligne" else "Termux (127.0.0.1) · Déconnecté",
-                                        style = Type.body
-                                    )
-                                },
-                                leadingIcon = {
-                                    Symbol(
-                                        if (isConnected) "checkmark.circle.fill" else "exclamationmark.circle.fill",
-                                        size = 18.dp,
-                                        tint = if (isConnected) Palette.added else Palette.danger
-                                    )
-                                },
+                            GlassMenuItem(
+                                title = "Termux (127.0.0.1)",
+                                subtitle = if (isConnected) "Serveur opérationnel" else "Hôte déconnecté",
+                                icon = if (isConnected) "checkmark.circle.fill" else "exclamationmark.circle.fill",
+                                tint = if (isConnected) Palette.added else Palette.danger,
                                 onClick = { isComputerMenuOpen = false }
                             )
-                            DropdownMenuItem(
-                                text = { Text("Reconnecter", style = Type.body) },
-                                leadingIcon = { Symbol("arrow.clockwise", size = 18.dp, tint = Palette.text) },
+                            GlassMenuDivider()
+                            GlassMenuItem(
+                                title = "Tester / Reconnecter",
+                                subtitle = "Interroger l'hôte local",
+                                icon = "arrow.clockwise",
+                                tint = Palette.electricBlue,
                                 onClick = {
                                     isComputerMenuOpen = false
                                     viewModel.refresh()
                                 }
                             )
-                            DropdownMenuItem(
-                                text = { Text("Gérer les ordinateurs", style = Type.body) },
-                                leadingIcon = { Symbol("desktopcomputer", size = 18.dp, tint = Palette.text) },
+                            GlassMenuDivider()
+                            GlassMenuItem(
+                                title = "Gérer les ordinateurs",
+                                subtitle = "Configuration IP & Conteneurs",
+                                icon = "desktopcomputer",
+                                tint = Palette.secondary,
                                 onClick = {
                                     isComputerMenuOpen = false
                                     onConfigureServerClick()
@@ -182,21 +181,27 @@ fun RosterScreen(
                             Symbol("plus", size = 22.dp, tint = Palette.text)
                         }
 
-                        DropdownMenu(
+                        GlassMenu(
                             expanded = isNewMenuOpen,
-                            onDismissRequest = { isNewMenuOpen = false }
+                            onDismissRequest = { isNewMenuOpen = false },
+                            width = 240.dp
                         ) {
-                            DropdownMenuItem(
-                                text = { Text("New bot", style = Type.body) },
-                                leadingIcon = { Symbol("plus", size = 18.dp, tint = Palette.text) },
+                            GlassMenuItem(
+                                title = "Nouvel Agent",
+                                subtitle = "Créer un bot dédié",
+                                icon = "plus.circle.fill",
+                                tint = Palette.electricBlue,
                                 onClick = {
                                     isNewMenuOpen = false
                                     onCreateBotClick()
                                 }
                             )
-                            DropdownMenuItem(
-                                text = { Text("New group chat", style = Type.body) },
-                                leadingIcon = { Symbol("person.2", size = 18.dp, tint = Palette.text) },
+                            GlassMenuDivider()
+                            GlassMenuItem(
+                                title = "Nouvelle Discussion",
+                                subtitle = "Groupe multi-agents",
+                                icon = "person.2.fill",
+                                tint = Palette.electricBlue,
                                 onClick = {
                                     isNewMenuOpen = false
                                     onCreateGroupClick()

@@ -37,8 +37,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -73,6 +71,9 @@ import java.util.UUID
 import com.ghdinteractivestudio.codestation.ui.components.ApprovalCardItem
 import com.ghdinteractivestudio.codestation.ui.components.BotAvatar
 import com.ghdinteractivestudio.codestation.ui.components.ChatMessageItem
+import com.ghdinteractivestudio.codestation.ui.components.GlassMenu
+import com.ghdinteractivestudio.codestation.ui.components.GlassMenuDivider
+import com.ghdinteractivestudio.codestation.ui.components.GlassMenuItem
 import com.ghdinteractivestudio.codestation.ui.components.GlassStage
 import com.ghdinteractivestudio.codestation.ui.components.IconButton
 import com.ghdinteractivestudio.codestation.ui.components.MessageComposer
@@ -287,17 +288,32 @@ fun ChatScreen(
     val bottomInset = if (imeBottom > navBottom) imeBottom else navBottom
 
     var userJustSentMessage by remember { mutableStateOf(false) }
+    var initialScrolledBotId by remember { mutableStateOf<String?>(null) }
 
-    // Auto-scroll when messages arrive: preserve reading position unless at bottom or user just sent
-    LaunchedEffect(state.messages.size) {
+    // 6.1 — Ouverture d'un bot : positionnement automatique et instantané sur le dernier message
+    LaunchedEffect(state.messages.size, bot?.id) {
         if (state.messages.isNotEmpty()) {
-            val totalItems = listState.layoutInfo.totalItemsCount
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            val wasNearBottom = totalItems <= 1 || lastVisible >= (totalItems - 3).coerceAtLeast(0)
-
-            if (userJustSentMessage || wasNearBottom) {
+            val currentBotId = bot?.id
+            if (initialScrolledBotId != currentBotId) {
+                // Accès direct sans animation lente à la fin de la conversation (dernier message)
+                listState.scrollToItem(
+                    index = state.messages.size - 1,
+                    scrollOffset = 100000
+                )
+                initialScrolledBotId = currentBotId
+            } else if (userJustSentMessage) {
+                // L'utilisateur vient d'envoyer un message : défilement fluide vers son message
                 listState.animateScrollToItem(state.messages.size - 1)
                 userJustSentMessage = false
+            } else {
+                // Réception de nouveaux messages ou progression streaming :
+                // Suivre le défilement uniquement si l'utilisateur est déjà en bas
+                val totalItems = listState.layoutInfo.totalItemsCount
+                val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                val isNearBottom = totalItems <= 1 || lastVisible >= (totalItems - 3).coerceAtLeast(0)
+                if (isNearBottom) {
+                    listState.animateScrollToItem(state.messages.size - 1)
+                }
             }
         }
     }
@@ -384,13 +400,16 @@ fun ChatScreen(
                 Box {
                     IconButton("More", "ellipsis.circle", action = { isMenuOpen = true })
 
-                    DropdownMenu(
+                    GlassMenu(
                         expanded = isMenuOpen,
-                        onDismissRequest = { isMenuOpen = false }
+                        onDismissRequest = { isMenuOpen = false },
+                        width = 250.dp
                     ) {
-                        DropdownMenuItem(
-                            text = { Text("Ouvrir la session Termux", style = Type.body) },
-                            leadingIcon = { Symbol("terminal", size = 18.dp, tint = Palette.accent) },
+                        GlassMenuItem(
+                            title = "Session Termux",
+                            subtitle = "Console interactive PRoot",
+                            icon = "terminal",
+                            tint = Palette.electricBlue,
                             onClick = {
                                 isMenuOpen = false
                                 val targetBot = bot
@@ -405,25 +424,34 @@ fun ChatScreen(
                                 }
                             }
                         )
-                        DropdownMenuItem(
-                            text = { Text("Traces d'exécution", style = Type.body) },
-                            leadingIcon = { Symbol("doc.text", size = 18.dp, tint = Palette.text) },
+                        GlassMenuDivider()
+                        GlassMenuItem(
+                            title = "Traces d'exécution",
+                            subtitle = "Logs et étapes du raisonnement",
+                            icon = "doc.text",
+                            tint = Palette.text,
                             onClick = {
                                 isMenuOpen = false
                                 onViewTrace()
                             }
                         )
-                        DropdownMenuItem(
-                            text = { Text("Paramètres du Bot", style = Type.body) },
-                            leadingIcon = { Symbol("gearshape", size = 18.dp, tint = Palette.text) },
+                        GlassMenuDivider()
+                        GlassMenuItem(
+                            title = "Paramètres de l'Agent",
+                            subtitle = "Modèle, prompt et permissions",
+                            icon = "gearshape",
+                            tint = Palette.secondary,
                             onClick = {
                                 isMenuOpen = false
                                 bot?.id?.let { onEditBot(it) }
                             }
                         )
-                        DropdownMenuItem(
-                            text = { Text("Effacer l'historique", style = Type.body, color = Palette.danger) },
-                            leadingIcon = { Symbol("trash", size = 18.dp, tint = Palette.danger) },
+                        GlassMenuDivider()
+                        GlassMenuItem(
+                            title = "Effacer l'historique",
+                            subtitle = "Supprimer les messages locaux",
+                            icon = "trash",
+                            destructive = true,
                             onClick = {
                                 isMenuOpen = false
                                 viewModel.clearHistory()

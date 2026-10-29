@@ -7,17 +7,22 @@ import com.ghdinteractivestudio.codestation.data.remote.CodeStationApiService
 import com.ghdinteractivestudio.codestation.data.remote.EnvironmentActionRequest
 import com.ghdinteractivestudio.codestation.data.remote.EnvironmentCreateRequest
 import com.ghdinteractivestudio.codestation.domain.model.BotEnvironment
+import com.ghdinteractivestudio.codestation.domain.model.CliHealthStatus
+import com.ghdinteractivestudio.codestation.domain.model.DetectedCli
 import com.ghdinteractivestudio.codestation.domain.model.EnvironmentStatus
 import com.ghdinteractivestudio.codestation.domain.model.ServerConfig
 import com.ghdinteractivestudio.codestation.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.codestation.domain.model.ServerMode
 import com.ghdinteractivestudio.codestation.domain.model.SystemResources
+import com.ghdinteractivestudio.codestation.domain.repository.ServerEnvironmentsData
 import com.ghdinteractivestudio.codestation.domain.repository.ServerRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class ServerRepositoryImpl(
     private val preferencesRepository: PreferencesRepositoryImpl,
@@ -26,6 +31,11 @@ class ServerRepositoryImpl(
 
     private val _serverState = MutableStateFlow(ServerConfig())
     val serverState = _serverState.asStateFlow()
+
+    private val _environmentsState = MutableStateFlow(ServerEnvironmentsData())
+    override val environmentsStream: Flow<ServerEnvironmentsData> = _environmentsState.asStateFlow()
+
+    private val refreshMutex = Mutex()
 
     override fun getServerConfigStream(): Flow<ServerConfig> {
         return combine(
@@ -159,6 +169,8 @@ class ServerRepositoryImpl(
                 lastConnectedAt = System.currentTimeMillis()
             )
             _serverState.value = connected
+            // Refresh environments concurrently upon successful connection
+            runCatching { refreshEnvironments(force = true) }
             connected
         }
     }
@@ -193,35 +205,97 @@ class ServerRepositoryImpl(
         }
     }
 
+    override suspend fun refreshEnvironments(force: Boolean): Result<ServerEnvironmentsData> {
+        return runCatching {
+            val currentEnv = _environmentsState.value
+            val now = System.currentTimeMillis()
+            if (!force && currentEnv.isRefreshing) {
+                return@runCatching currentEnv
+            }
+            if (!force && (now - currentEnv.lastRefreshedAt < 5000) && currentEnv.environments.isNotEmpty()) {
+                return@runCatching currentEnv
+            }
+
+            refreshMutex.withLock {
+                val current = getServerConfig()
+                val api = apiServiceProvider(current.url)
+                    ?: error("Client HTTP non initialisable pour l'URL: ${current.url}")
+                val authHeader = current.token?.let { "Bearer $it" }
+
+                _environmentsState.value = _environmentsState.value.copy(isRefreshing = true, errorMessage = null)
+
+                val response = try {
+                    api.getEnvironments(emptyMap(), authHeader)
+                } catch (e: Exception) {
+                    val errMsg = "Serveur injoignable: ${e.message ?: e.javaClass.simpleName}"
+                    val fallback = _environmentsState.value.copy(
+                        isRefreshing = false,
+                        errorMessage = errMsg
+                    )
+                    _environmentsState.value = fallback
+                    return@runCatching fallback
+                }
+
+                if (!response.isSuccessful || response.body() == null) {
+                    val errMsg = "Erreur HTTP ${response.code()}: ${response.message()}"
+                    val fallback = _environmentsState.value.copy(
+                        isRefreshing = false,
+                        errorMessage = errMsg
+                    )
+                    _environmentsState.value = fallback
+                    return@runCatching fallback
+                }
+
+                val body = response.body()!!
+                val envs = body.environments.map { dto ->
+                    BotEnvironment(
+                        botId = dto.botId,
+                        engine = dto.engine,
+                        model = dto.model,
+                        status = EnvironmentStatus.fromString(dto.status),
+                        rootfsPath = dto.rootfs,
+                        diskMb = dto.diskMb,
+                        lastError = dto.lastError
+                    )
+                }
+                val res = SystemResources(
+                    ramTotalMb = body.resources.ramTotalMb,
+                    ramAvailableMb = body.resources.ramAvailableMb,
+                    diskTotalGb = body.resources.diskTotalGb,
+                    diskAvailableGb = body.resources.diskAvailableGb
+                )
+                val clis = body.clis.map { dto ->
+                    DetectedCli(
+                        id = dto.id,
+                        name = dto.name,
+                        binaryName = dto.binary,
+                        installedPath = dto.path,
+                        version = dto.version,
+                        status = CliHealthStatus.fromString(dto.status),
+                        environment = dto.environment,
+                        isPrimary = dto.isPrimary,
+                        details = dto.details
+                    )
+                }
+
+                val updated = ServerEnvironmentsData(
+                    environments = envs,
+                    resources = res,
+                    clis = clis,
+                    isRefreshing = false,
+                    lastRefreshedAt = System.currentTimeMillis(),
+                    errorMessage = null
+                )
+                _environmentsState.value = updated
+                updated
+            }
+        }
+    }
+
     override suspend fun getEnvironments(): Result<Pair<List<BotEnvironment>, SystemResources>> {
         return runCatching {
-            val current = getServerConfig()
-            val api = apiServiceProvider(current.url)
-                ?: error("Client HTTP non initialisable pour l'URL: ${current.url}")
-            val authHeader = current.token?.let { "Bearer $it" }
-            val response = api.getEnvironments(emptyMap(), authHeader)
-            if (!response.isSuccessful || response.body() == null) {
-                error("Erreur HTTP ${response.code()}: ${response.message()}")
-            }
-            val body = response.body()!!
-            val envs = body.environments.map { dto ->
-                BotEnvironment(
-                    botId = dto.botId,
-                    engine = dto.engine,
-                    model = dto.model,
-                    status = EnvironmentStatus.fromString(dto.status),
-                    rootfsPath = dto.rootfs,
-                    diskMb = dto.diskMb,
-                    lastError = dto.lastError
-                )
-            }
-            val res = SystemResources(
-                ramTotalMb = body.resources.ramTotalMb,
-                ramAvailableMb = body.resources.ramAvailableMb,
-                diskTotalGb = body.resources.diskTotalGb,
-                diskAvailableGb = body.resources.diskAvailableGb
-            )
-            Pair(envs, res)
+            val data = refreshEnvironments(force = false).getOrThrow()
+            Pair(data.environments, data.resources)
         }
     }
 
@@ -235,6 +309,8 @@ class ServerRepositoryImpl(
             if (!response.isSuccessful || response.body()?.ok != true) {
                 error(response.body()?.error ?: "Erreur HTTP ${response.code()}")
             }
+            refreshEnvironments(force = true)
+            Unit
         }
     }
 
@@ -248,6 +324,8 @@ class ServerRepositoryImpl(
             if (!response.isSuccessful || response.body()?.ok != true) {
                 error(response.body()?.error ?: "Erreur HTTP ${response.code()}")
             }
+            refreshEnvironments(force = true)
+            Unit
         }
     }
 
@@ -261,6 +339,8 @@ class ServerRepositoryImpl(
             if (!response.isSuccessful || response.body()?.ok != true) {
                 error(response.body()?.error ?: "Erreur HTTP ${response.code()}")
             }
+            refreshEnvironments(force = true)
+            Unit
         }
     }
 }

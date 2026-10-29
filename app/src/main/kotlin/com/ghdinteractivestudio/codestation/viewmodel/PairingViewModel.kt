@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ghdinteractivestudio.codestation.domain.model.BotEnvironment
+import com.ghdinteractivestudio.codestation.domain.model.DetectedCli
 import com.ghdinteractivestudio.codestation.domain.model.ServerConfig
 import com.ghdinteractivestudio.codestation.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.codestation.domain.model.ServerMode
@@ -28,8 +29,10 @@ data class PairingUiState(
     val isPairingSuccess: Boolean = false,
     val environments: List<BotEnvironment> = emptyList(),
     val resources: SystemResources = SystemResources(),
+    val clis: List<DetectedCli> = emptyList(),
     val isLoadingEnvironments: Boolean = false,
-    val environmentMessage: String? = null
+    val environmentMessage: String? = null,
+    val lastRefreshedAt: Long = 0L
 ) {
     val serverUrl: String get() = urlInput
     val pairingToken: String? get() = tokenInput.takeIf { it.isNotEmpty() }
@@ -43,25 +46,19 @@ private data class ServerFormState(
     val errorMessage: String? = null
 )
 
-private data class EnvironmentState(
-    val environments: List<BotEnvironment> = emptyList(),
-    val resources: SystemResources = SystemResources(),
-    val isLoading: Boolean = false,
-    val message: String? = null
-)
-
 class PairingViewModel(
     private val serverRepository: ServerRepository
 ) : ViewModel() {
 
     private val _formState = MutableStateFlow(ServerFormState())
-    private val _envState = MutableStateFlow(EnvironmentState())
+    private val _actionMessage = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<PairingUiState> = combine(
         serverRepository.getServerConfigStream(),
         _formState,
-        _envState
-    ) { config, form, env ->
+        serverRepository.environmentsStream,
+        _actionMessage
+    ) { config, form, envData, actionMsg ->
         PairingUiState(
             urlInput = form.url,
             tokenInput = form.token,
@@ -72,10 +69,12 @@ class PairingViewModel(
             isTesting = form.isTesting || config.status == ServerConnectionStatus.CONNECTING,
             errorMessage = form.errorMessage ?: config.errorMessage,
             isPairingSuccess = config.status == ServerConnectionStatus.CONNECTED,
-            environments = env.environments,
-            resources = env.resources,
-            isLoadingEnvironments = env.isLoading,
-            environmentMessage = env.message
+            environments = envData.environments,
+            resources = envData.resources,
+            clis = envData.clis,
+            isLoadingEnvironments = envData.isRefreshing,
+            environmentMessage = actionMsg ?: envData.errorMessage,
+            lastRefreshedAt = envData.lastRefreshedAt
         )
     }.stateIn(
         scope = viewModelScope,
@@ -90,8 +89,9 @@ class PairingViewModel(
                 url = config.url,
                 token = config.token ?: ""
             )
+            // Trigger light initial refresh if connected
             if (config.status == ServerConnectionStatus.CONNECTED) {
-                refreshEnvironments()
+                serverRepository.refreshEnvironments(force = false)
             }
         }
     }
@@ -132,7 +132,7 @@ class PairingViewModel(
                     errorMessage = result.exceptionOrNull()?.message ?: "Impossible de joindre le serveur hôte."
                 )
             } else {
-                refreshEnvironments()
+                refreshEnvironments(force = true)
             }
         }
     }
@@ -147,74 +147,51 @@ class PairingViewModel(
                     errorMessage = result.exceptionOrNull()?.message ?: "URI d'appairage invalide."
                 )
             } else {
-                refreshEnvironments()
+                refreshEnvironments(force = true)
             }
         }
     }
 
-    fun refreshEnvironments() {
+    fun refreshEnvironments(force: Boolean = true) {
         viewModelScope.launch {
-            _envState.value = _envState.value.copy(isLoading = true, message = null)
-            serverRepository.getEnvironments()
-                .onSuccess { (envs, res) ->
-                    _envState.value = _envState.value.copy(
-                        environments = envs,
-                        resources = res,
-                        isLoading = false
-                    )
-                }
-                .onFailure {
-                    _envState.value = _envState.value.copy(
-                        message = "Erreur de chargement: ${it.message}",
-                        isLoading = false
-                    )
-                }
+            _actionMessage.value = null
+            serverRepository.refreshEnvironments(force = force)
         }
     }
 
     fun startEnvironment(botId: String) {
         viewModelScope.launch {
-            _envState.value = _envState.value.copy(isLoading = true, message = "Démarrage de $botId...")
-            serverRepository.startEnvironment(botId)
-                .onSuccess {
-                    _envState.value = _envState.value.copy(message = "Environnement $botId prêt.")
-                    refreshEnvironments()
-                }
-                .onFailure {
-                    _envState.value = _envState.value.copy(
-                        isLoading = false,
-                        message = "Échec du démarrage ($botId): ${it.message}"
-                    )
-                }
+            _actionMessage.value = "Démarrage de $botId..."
+            val result = serverRepository.startEnvironment(botId)
+            if (result.isSuccess) {
+                _actionMessage.value = "Environnement $botId prêt."
+            } else {
+                _actionMessage.value = "Échec du démarrage ($botId): ${result.exceptionOrNull()?.message}"
+            }
         }
     }
 
     fun stopEnvironment(botId: String) {
         viewModelScope.launch {
-            _envState.value = _envState.value.copy(isLoading = true, message = "Arrêt de $botId...")
-            serverRepository.stopEnvironment(botId)
-                .onSuccess {
-                    _envState.value = _envState.value.copy(message = "Environnement $botId arrêté.")
-                    refreshEnvironments()
-                }
-                .onFailure {
-                    _envState.value = _envState.value.copy(
-                        isLoading = false,
-                        message = "Échec de l'arrêt ($botId): ${it.message}"
-                    )
-                }
+            _actionMessage.value = "Arrêt de $botId..."
+            val result = serverRepository.stopEnvironment(botId)
+            if (result.isSuccess) {
+                _actionMessage.value = "Environnement $botId arrêté."
+            } else {
+                _actionMessage.value = "Échec de l'arrêt ($botId): ${result.exceptionOrNull()?.message}"
+            }
         }
     }
 
     fun startAllEnvironments() {
         viewModelScope.launch {
-            _envState.value = _envState.value.copy(isLoading = true, message = "Démarrage de tous les environnements...")
-            val list = _envState.value.environments
+            _actionMessage.value = "Démarrage de tous les environnements..."
+            val list = uiState.value.environments
             for (env in list) {
                 serverRepository.startEnvironment(env.botId)
             }
-            refreshEnvironments()
-            _envState.value = _envState.value.copy(message = "Tous les environnements ont été lancés.")
+            refreshEnvironments(force = true)
+            _actionMessage.value = "Tous les environnements ont été lancés."
         }
     }
 
