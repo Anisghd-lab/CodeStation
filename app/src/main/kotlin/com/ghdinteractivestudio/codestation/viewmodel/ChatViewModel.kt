@@ -62,7 +62,53 @@ class ChatViewModel(
 
     private var lastSentText: String? = null
     private var lastSentAttachments: List<PendingAttachment> = emptyList()
+    private var lastSentMessageId: String? = null
     private var turnTimeoutJob: Job? = null
+    private var isSending = false
+    private var turnStartTimeMs = 0L
+    private var lastBotMsgId: String? = null
+    private var lastBotMsgLength: Int = 0
+
+    private fun resetTurnTimeout(timeoutMs: Long, isStreaming: Boolean = false) {
+        turnTimeoutJob?.cancel()
+        turnTimeoutJob = viewModelScope.launch {
+            delay(timeoutMs)
+            if (_isBotWorking.value) {
+                _isBotWorking.value = false
+                botRepository.updateBotStatus(botId, BotStatus.IDLE)
+                val timeoutSec = timeoutMs / 1000
+                val reason = if (isStreaming) {
+                    "Délai d'inactivité dépassé pendant la génération (${timeoutSec}s)."
+                } else {
+                    "Délai d'attente dépassé (${timeoutSec}s). Le modèle ou le serveur n'a pas répondu à temps."
+                }
+                _errorMessage.value = reason
+                RequestTracer.logEvent(
+                    requestId = lastSentMessageId ?: "turn-$botId",
+                    event = RequestTracer.EVENT_REQUEST_FAILED,
+                    botId = botId,
+                    details = mapOf("reason" to "turn_timeout_${timeoutSec}s", "isStreaming" to isStreaming)
+                )
+                val bot = botRepository.getBotById(botId)
+                val displayName = CodeStationNotificationManager.formatAgentDisplayName(botId, bot?.name)
+                val engine = bot?.provider?.backendId ?: "opencode"
+                context?.let { ctx ->
+                    CodeStationNotificationManager.updateTaskNotification(
+                        context = ctx,
+                        botId = botId,
+                        botName = displayName,
+                        agentBackend = engine,
+                        phase = TaskNotificationPhase.FAILED,
+                        summary = reason
+                    )
+                }
+                (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.insertNotice(
+                    botId = botId,
+                    text = "⏱️ $reason Vérifiez que Termux et le CLI du bot sont actifs, puis appuyez sur Réessayer."
+                )
+            }
+        }
+    }
 
     private data class InputState(
         val draft: String,
@@ -138,23 +184,36 @@ class ChatViewModel(
             chatRepository.markChatRead(botId)
         }
 
-        // Observer l'état du bot : s'il passe à IDLE, libérer l'état de génération
+        // Observer l'état du bot : s'il passe à IDLE, libérer l'état de génération (hors transition de démarrage)
         viewModelScope.launch {
             botRepository.getBotByIdStream(botId).collect { bot ->
-                if (bot?.status == BotStatus.IDLE && _isBotWorking.value) {
+                if (bot?.status == BotStatus.IDLE && _isBotWorking.value && (System.currentTimeMillis() - turnStartTimeMs > 1500L)) {
                     turnTimeoutJob?.cancel()
+                    turnTimeoutJob = null
                     _isBotWorking.value = false
                 }
             }
         }
 
-        // Observer les messages : si une réponse finale du bot arrive, libérer l'état de génération
+        // Observer les messages : si une réponse finale du bot arrive, libérer l'état de génération.
+        // Pendant le streaming actif (chunks), prolonger dynamiquement le délai d'inactivité.
         viewModelScope.launch {
             chatRepository.getMessagesStream(botId).collect { msgs ->
                 val lastMsg = msgs.lastOrNull()
-                if (lastMsg != null && lastMsg.author.type == com.ghdinteractivestudio.codestation.domain.model.MessageAuthorType.BOT && lastMsg.isFinal) {
-                    turnTimeoutJob?.cancel()
-                    _isBotWorking.value = false
+                if (lastMsg != null && lastMsg.author.type == com.ghdinteractivestudio.codestation.domain.model.MessageAuthorType.BOT) {
+                    if (lastMsg.isFinal) {
+                        turnTimeoutJob?.cancel()
+                        turnTimeoutJob = null
+                        _isBotWorking.value = false
+                        lastBotMsgId = null
+                        lastBotMsgLength = 0
+                    } else if (_isBotWorking.value) {
+                        if (lastMsg.id != lastBotMsgId || lastMsg.text.length != lastBotMsgLength) {
+                            lastBotMsgId = lastMsg.id
+                            lastBotMsgLength = lastMsg.text.length
+                            resetTurnTimeout(60000L, isStreaming = true)
+                        }
+                    }
                 }
             }
         }
@@ -210,19 +269,24 @@ class ChatViewModel(
     }
 
     fun sendMessage() {
+        if (isSending) return
         val text = _inputDraft.value.trim()
         val currentAttachments = _attachments.value
         if (text.isBlank() && currentAttachments.isEmpty()) return
 
+        isSending = true
         val reply = _quotedReply.value
+        val clientMsgId = java.util.UUID.randomUUID().toString()
         lastSentText = text
         lastSentAttachments = currentAttachments
+        lastSentMessageId = clientMsgId
+        turnStartTimeMs = System.currentTimeMillis()
         _inputDraft.value = ""
         _quotedReply.value = null
         _attachments.value = emptyList()
         _errorMessage.value = null
 
-        val reqId = java.util.UUID.randomUUID().toString()
+        val reqId = clientMsgId
 
         RequestTracer.logEvent(
             requestId = reqId,
@@ -237,72 +301,92 @@ class ChatViewModel(
         )
 
         viewModelScope.launch {
-            _isBotWorking.value = true
-            botRepository.updateBotStatus(botId, BotStatus.WORKING)
+            try {
+                _isBotWorking.value = true
+                botRepository.updateBotStatus(botId, BotStatus.WORKING)
 
-            RequestTracer.logEvent(
-                requestId = reqId,
-                event = RequestTracer.EVENT_REQUEST_SENT,
-                botId = botId
-            )
-            RequestTracer.logEvent(
-                requestId = reqId,
-                event = RequestTracer.EVENT_REQUEST_RECEIVED,
-                botId = botId
-            )
-            RequestTracer.logEvent(
-                requestId = reqId,
-                event = RequestTracer.EVENT_BOT_RESOLVED,
-                botId = botId
-            )
-            val bot = botRepository.getBotById(botId)
-            val displayName = CodeStationNotificationManager.formatAgentDisplayName(botId, bot?.name)
-            val engine = bot?.provider?.backendId ?: "opencode"
-
-            // Déclenchement immédiat de la notification persistante dans la barre d'état
-            context?.let { ctx ->
-                CodeStationNotificationManager.updateTaskNotification(
-                    context = ctx,
-                    botId = botId,
-                    botName = displayName,
-                    agentBackend = engine,
-                    phase = TaskNotificationPhase.WORKING,
-                    summary = "Envoi et réflexion en cours...",
-                    startedAtMs = System.currentTimeMillis()
+                RequestTracer.logEvent(
+                    requestId = reqId,
+                    event = RequestTracer.EVENT_REQUEST_SENT,
+                    botId = botId
                 )
-            }
+                RequestTracer.logEvent(
+                    requestId = reqId,
+                    event = RequestTracer.EVENT_REQUEST_RECEIVED,
+                    botId = botId
+                )
+                RequestTracer.logEvent(
+                    requestId = reqId,
+                    event = RequestTracer.EVENT_BOT_RESOLVED,
+                    botId = botId
+                )
+                val bot = botRepository.getBotById(botId)
+                val displayName = CodeStationNotificationManager.formatAgentDisplayName(botId, bot?.name)
+                val engine = bot?.provider?.backendId ?: "opencode"
 
-            RequestTracer.logEvent(
-                requestId = reqId,
-                event = RequestTracer.EVENT_CLI_RESOLVED,
-                botId = botId,
-                details = mapOf("engine" to engine, "model" to (bot?.model ?: "default"))
-            )
-            RequestTracer.logEvent(
-                requestId = reqId,
-                event = RequestTracer.EVENT_PROCESS_STARTED,
-                botId = botId
-            )
-            RequestTracer.logEvent(
-                requestId = reqId,
-                event = RequestTracer.EVENT_CLI_INPUT_DELIVERED,
-                botId = botId,
-                details = mapOf("hasAttachments" to currentAttachments.isNotEmpty())
-            )
+                // Déclenchement immédiat de la notification persistante dans la barre d'état
+                context?.let { ctx ->
+                    CodeStationNotificationManager.updateTaskNotification(
+                        context = ctx,
+                        botId = botId,
+                        botName = displayName,
+                        agentBackend = engine,
+                        phase = TaskNotificationPhase.WORKING,
+                        summary = "Envoi et réflexion en cours...",
+                        startedAtMs = System.currentTimeMillis()
+                    )
+                }
 
-            // Démarrer un délai d'attente raisonnable (60s) pour éviter l'attente infinie
-            turnTimeoutJob?.cancel()
-            turnTimeoutJob = launch {
-                delay(60000)
-                if (_isBotWorking.value) {
+                RequestTracer.logEvent(
+                    requestId = reqId,
+                    event = RequestTracer.EVENT_CLI_RESOLVED,
+                    botId = botId,
+                    details = mapOf("engine" to engine, "model" to (bot?.model ?: "default"))
+                )
+                RequestTracer.logEvent(
+                    requestId = reqId,
+                    event = RequestTracer.EVENT_PROCESS_STARTED,
+                    botId = botId
+                )
+                RequestTracer.logEvent(
+                    requestId = reqId,
+                    event = RequestTracer.EVENT_CLI_INPUT_DELIVERED,
+                    botId = botId,
+                    details = mapOf("hasAttachments" to currentAttachments.isNotEmpty())
+                )
+
+                // Démarrer un délai d'attente adaptatif (120s pour la phase initiale de démarrage/réflexion)
+                resetTurnTimeout(120000L, isStreaming = false)
+
+                val domainAttachments = currentAttachments.map {
+                    FileAttachment(
+                        id = it.id,
+                        name = it.name,
+                        sizeBytes = it.sizeBytes,
+                        mimeType = it.mimeType,
+                        localUri = it.uri.toString()
+                    )
+                }
+
+                val result = chatRepository.sendMessage(botId, text, reply, domainAttachments)
+                result.onSuccess {
+                    RequestTracer.logEvent(
+                        requestId = reqId,
+                        event = RequestTracer.EVENT_PROVIDER_REQUEST_STARTED,
+                        botId = botId
+                    )
+                }
+                result.onFailure { error ->
+                    turnTimeoutJob?.cancel()
+                    turnTimeoutJob = null
                     _isBotWorking.value = false
                     botRepository.updateBotStatus(botId, BotStatus.IDLE)
-                    _errorMessage.value = "Délai d'attente dépassé (60s). Le modèle ou le serveur n'a pas répondu à temps."
+                    _errorMessage.value = error.message ?: "Échec de l'envoi au serveur"
                     RequestTracer.logEvent(
                         requestId = reqId,
                         event = RequestTracer.EVENT_REQUEST_FAILED,
                         botId = botId,
-                        details = mapOf("reason" to "turn_timeout_60s")
+                        details = mapOf("error" to error.localizedMessage)
                     )
                     context?.let { ctx ->
                         CodeStationNotificationManager.updateTaskNotification(
@@ -311,59 +395,16 @@ class ChatViewModel(
                             botName = displayName,
                             agentBackend = engine,
                             phase = TaskNotificationPhase.FAILED,
-                            summary = "Délai d'attente dépassé (60s). L'agent n'a pas répondu à temps."
+                            summary = "Erreur de transmission : ${error.localizedMessage}"
                         )
                     }
                     (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.insertNotice(
                         botId = botId,
-                        text = "⏱️ Délai de réponse dépassé (60s). Vérifiez que Termux et le CLI du bot sont actifs, puis appuyez sur Réessayer."
+                        text = "Erreur de transmission : ${error.localizedMessage}"
                     )
                 }
-            }
-
-            val domainAttachments = currentAttachments.map {
-                FileAttachment(
-                    id = it.id,
-                    name = it.name,
-                    sizeBytes = it.sizeBytes,
-                    mimeType = it.mimeType,
-                    localUri = it.uri.toString()
-                )
-            }
-
-            val result = chatRepository.sendMessage(botId, text, reply, domainAttachments)
-            result.onSuccess {
-                RequestTracer.logEvent(
-                    requestId = reqId,
-                    event = RequestTracer.EVENT_PROVIDER_REQUEST_STARTED,
-                    botId = botId
-                )
-            }
-            result.onFailure { error ->
-                turnTimeoutJob?.cancel()
-                _isBotWorking.value = false
-                botRepository.updateBotStatus(botId, BotStatus.IDLE)
-                _errorMessage.value = error.message ?: "Échec de l'envoi au serveur"
-                RequestTracer.logEvent(
-                    requestId = reqId,
-                    event = RequestTracer.EVENT_REQUEST_FAILED,
-                    botId = botId,
-                    details = mapOf("error" to error.localizedMessage)
-                )
-                context?.let { ctx ->
-                    CodeStationNotificationManager.updateTaskNotification(
-                        context = ctx,
-                        botId = botId,
-                        botName = displayName,
-                        agentBackend = engine,
-                        phase = TaskNotificationPhase.FAILED,
-                        summary = "Erreur de transmission : ${error.localizedMessage}"
-                    )
-                }
-                (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.insertNotice(
-                    botId = botId,
-                    text = "Erreur de transmission : ${error.localizedMessage}"
-                )
+            } finally {
+                isSending = false
             }
         }
     }
@@ -387,6 +428,8 @@ class ChatViewModel(
 
     fun stopTurn() {
         turnTimeoutJob?.cancel()
+        turnTimeoutJob = null
+        isSending = false
         _isBotWorking.value = false
         com.ghdinteractivestudio.codestation.util.RequestTracer.logEvent(
             requestId = "cancel-$botId",

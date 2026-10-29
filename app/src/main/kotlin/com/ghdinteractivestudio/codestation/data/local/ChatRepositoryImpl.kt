@@ -47,17 +47,27 @@ class ChatRepositoryImpl(
         attachments: List<com.ghdinteractivestudio.codestation.domain.model.FileAttachment>
     ): Result<ChatMessage> {
         return runCatching {
-            val userMsg = ChatMessage(
-                id = UUID.randomUUID().toString(),
-                botId = botId,
-                author = MessageAuthor(MessageAuthorType.USER, "user", "Moi"),
-                text = text,
-                timestamp = System.currentTimeMillis(),
-                isFinal = true,
-                replyTo = replyTo,
-                attachments = attachments
-            )
-            messageDao.insertMessage(ChatMessageEntity.fromDomain(userMsg))
+            val now = System.currentTimeMillis()
+            val recentMsg = messageDao.findRecentUserMessage(botId, text)
+            val isRetry = recentMsg != null && (now - recentMsg.timestamp < 120_000L)
+
+            val userMsg = if (isRetry && recentMsg != null) {
+                recentMsg.toDomain()
+            } else {
+                val newMsg = ChatMessage(
+                    id = UUID.randomUUID().toString(),
+                    botId = botId,
+                    author = MessageAuthor(MessageAuthorType.USER, "user", "Moi"),
+                    text = text,
+                    timestamp = now,
+                    isFinal = true,
+                    replyTo = replyTo,
+                    attachments = attachments
+                )
+                messageDao.insertMessage(ChatMessageEntity.fromDomain(newMsg))
+                newMsg
+            }
+
             val previewText = text.ifBlank { if (attachments.isNotEmpty()) "[Pièce jointe: ${attachments.first().name}]" else "" }
             botDao.updateLastMessage(botId, previewText, userMsg.timestamp)
 

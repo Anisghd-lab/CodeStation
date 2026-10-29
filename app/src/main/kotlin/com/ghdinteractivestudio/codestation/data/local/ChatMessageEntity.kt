@@ -110,6 +110,15 @@ interface MessageDao {
     @Query("SELECT * FROM chat_messages WHERE botId = :botId ORDER BY timestamp ASC")
     fun getMessagesByBotIdStream(botId: String): Flow<List<ChatMessageEntity>>
 
+    @Query("SELECT * FROM chat_messages WHERE id = :id LIMIT 1")
+    suspend fun getMessageById(id: String): ChatMessageEntity?
+
+    @Query("SELECT * FROM chat_messages WHERE botId = :botId AND authorType = 'USER' AND text = :text ORDER BY timestamp DESC LIMIT 1")
+    suspend fun findRecentUserMessage(botId: String, text: String): ChatMessageEntity?
+
+    @Query("DELETE FROM chat_messages WHERE id = :id")
+    suspend fun deleteMessageById(id: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: ChatMessageEntity)
 
@@ -118,4 +127,23 @@ interface MessageDao {
 
     @Query("DELETE FROM chat_messages WHERE botId = :botId")
     suspend fun deleteMessagesForBot(botId: String)
+
+    @androidx.room.Transaction
+    suspend fun reconcileUserMessage(clientNonce: String?, serverEntity: ChatMessageEntity) {
+        if (!clientNonce.isNullOrBlank()) {
+            val existing = getMessageById(clientNonce)
+            if (existing != null) {
+                deleteMessageById(clientNonce)
+                val merged = serverEntity.copy(
+                    replyToMessageId = serverEntity.replyToMessageId ?: existing.replyToMessageId,
+                    replyToAuthor = serverEntity.replyToAuthor ?: existing.replyToAuthor,
+                    replyToText = serverEntity.replyToText ?: existing.replyToText,
+                    attachmentsJson = serverEntity.attachmentsJson ?: existing.attachmentsJson
+                )
+                insertMessage(merged)
+                return
+            }
+        }
+        insertMessage(serverEntity)
+    }
 }

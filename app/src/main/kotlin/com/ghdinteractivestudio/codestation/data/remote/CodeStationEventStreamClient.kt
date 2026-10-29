@@ -255,7 +255,13 @@ class CodeStationEventStreamClient(
                             replyToAuthor = null,
                             replyToText = null
                         )
-                        messageDao.insertMessage(entity)
+                        if (isUser) {
+                            val clientNonce = dataObj["clientNonce"]?.jsonPrimitive?.content
+                                ?: dataObj["client_nonce"]?.jsonPrimitive?.content
+                            messageDao.reconcileUserMessage(clientNonce, entity)
+                        } else {
+                            messageDao.insertMessage(entity)
+                        }
                         botDao.updateLastMessage(botId, displayText, entity.timestamp)
 
                         val formattedBotName = CodeStationNotificationManager.formatAgentDisplayName(botId, botName)

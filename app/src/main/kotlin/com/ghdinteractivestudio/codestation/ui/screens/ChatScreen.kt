@@ -25,7 +25,9 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -280,11 +282,34 @@ fun ChatScreen(
 
     val bot = state.bot
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottomInset = if (imeBottom > navBottom) imeBottom else navBottom
 
-    // Auto-scroll when messages arrive
-    LaunchedEffect(state.messages.size, state.isBotWorking) {
+    var userJustSentMessage by remember { mutableStateOf(false) }
+
+    // Auto-scroll when messages arrive: preserve reading position unless at bottom or user just sent
+    LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
-            listState.animateScrollToItem(state.messages.size - 1)
+            val totalItems = listState.layoutInfo.totalItemsCount
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val wasNearBottom = totalItems <= 1 || lastVisible >= (totalItems - 3).coerceAtLeast(0)
+
+            if (userJustSentMessage || wasNearBottom) {
+                listState.animateScrollToItem(state.messages.size - 1)
+                userJustSentMessage = false
+            }
+        }
+    }
+
+    // Garder le bas de la conversation visible lors de l'ouverture du clavier
+    LaunchedEffect(imeBottom) {
+        if (imeBottom > 0.dp && state.messages.isNotEmpty()) {
+            val totalItems = listState.layoutInfo.totalItemsCount
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            if (totalItems <= 1 || lastVisible >= (totalItems - 3).coerceAtLeast(0)) {
+                listState.animateScrollToItem(state.messages.size - 1)
+            }
         }
     }
 
@@ -413,8 +438,7 @@ fun ChatScreen(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .imePadding()
-                    .navigationBarsPadding()
+                    .padding(bottom = bottomInset)
             ) {
                 // Banner d'erreur / expiration de délai avec bouton Réessayer
                 AnimatedVisibility(
@@ -482,6 +506,7 @@ fun ChatScreen(
                     onStopVoice = { handleStopVoice() },
                     onCancelVoice = { handleCancelVoice() },
                     onSend = { text ->
+                        userJustSentMessage = true
                         viewModel.onInputChanged(text)
                         viewModel.sendMessage()
                         activeQuotedReply = null
@@ -493,7 +518,9 @@ fun ChatScreen(
     ) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = bottomInset),
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,

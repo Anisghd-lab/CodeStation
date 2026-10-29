@@ -100,8 +100,13 @@ fun MessageComposer(
         else -> tr("Ask {name}").replace("{name}", botName)
     }
 
+    var lastSubmitTimeMs by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
+
     fun submit() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastSubmitTimeMs < 500L) return
         if (canSend) {
+            lastSubmitTimeMs = now
             val toSend = rawText.trim()
             textState.edit { replace(0, length, "") }
             onSend(toSend)
