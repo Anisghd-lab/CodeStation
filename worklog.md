@@ -339,6 +339,34 @@ sequenceDiagram
   - Application démarrée sur le téléphone.
   - Journalisation continue en tâche de fond active dans `/root/codestation_app.logcat.log`.
 
+---
+
+## 10. Audit Logcat Réel & Résolution des 3 Anomalies Critiques (Version 1.0.5)
+
+**Branche :** `main`  
+**Version :** `1.0.5` (`versionCode: 6`)
+
+### 10.1 Anomalies Détectées en Direct dans `/root/codestation_app.logcat.log`
+1. **Perte silencieuse des réponses des bots dans l'interface Android (EventStream SSE)** :
+   - *Preuve Logcat / DB* : OpenCode GLM répondait avec succès (`rev=294 kind=agent text="Hi! 👋 Ready when you are — just tell me what you need."`), mais le message n'apparaissait jamais sur l'écran Android.
+   - *Cause Racine* : Dans `CodeStationEventStreamClient.kt`, le parsing de l'événement SSE `entry` lisait `entryObj["bot_id"]`. Or, le modèle Host Rust (`host/src/store/model.rs:200`) est annoté `#[serde(rename_all = "camelCase")]`, sérialisant la clé en `"botId"`. La condition `?: return` éliminait silencieusement chaque message de réponse avant son insertion dans la base Room locale.
+   - *Correction* : Lecture universelle `entryObj["botId"] ?: entryObj["bot_id"]` et horodatage aligné sur `createdAt`.
+
+2. **Échec d'envoi de messages vocaux et pièces jointes (HTTP 400 "unknown upload")** :
+   - *Preuve Logcat* : `[req:1c9210f8...] event=request_failed | details={error=Le serveur a refusé la requête (HTTP 400: {"error":"unknown upload: No such file or directory (os error 2)"})}`.
+   - *Cause Racine* : `ChatRepositoryImpl.kt` transmettait directement les identifiants d'attachements dans `SendMessageRequest` sans téléverser préalablement les fragments binaires sur l'API hôte `POST /api/upload`. L'hôte tentait de résoudre le dossier d'upload local inexistant et rejetait la requête.
+   - *Correction* : Implémentation du téléversement découpé par fragments de 256 Ko via `api.uploadChunk(...)` avec encodage Base64 et signalement `done = true` sur le dernier fragment avant l'appel à `sendMessage`.
+
+3. **Crash au lancement d'Antigravity ("Couldn't start the agent: agent process exited")** :
+   - *Preuve DB* : `codync.db` enregistrait systématiquement `Couldn't start the agent: agent process exited` sur `bot-antigravity`.
+   - *Cause Racine* : Dans `host/src/agent/backends.rs:211`, `local_candidate` supposait que le template local commençait par `{bin}` et concaténait le chemin binaire `agy` avec la commande complète, exécutant `/root/.local/bin/agy python3 /root/CodeStation/environments/bot-antigravity/agy_acp_bridge.py`. Le CLI `agy` rejetait `python3` comme argument inconnu avec le code 2.
+   - *Correction* : `local_candidate` détecte les commandes personnalisées explicites et extrait proprement l'exécutable (`python3`) et ses arguments.
+
+### 10.2 Validation E2E & Tests Unitaires
+- Suite de tests `scripts/test_agents_e2e.py` : **16/16 tests réussis**.
+- Compilation et vérification Rust release `cargo check --release` : Validée sans erreur.
+
+
 
 
 

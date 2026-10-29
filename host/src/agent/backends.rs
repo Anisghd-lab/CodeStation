@@ -208,8 +208,21 @@ fn local_candidate(id: &str) -> Option<registry::Cmd> {
     let h = harness(id)?;
     let template = h.local?;
     let path = installed_cli(h)?;
-    let args = template.strip_prefix("{bin}").unwrap_or(template).trim().to_owned();
-    Some(registry::Cmd { program: shell::quote(&path.to_string_lossy()), args })
+    if let Some(args) = template.strip_prefix("{bin}") {
+        Some(registry::Cmd {
+            program: shell::quote(&path.to_string_lossy()),
+            args: args.trim().to_owned(),
+        })
+    } else {
+        // Explicit launcher command (e.g. "python3 /root/CodeStation/environments/bot-antigravity/agy_acp_bridge.py")
+        let mut parts = template.split_whitespace();
+        let prog = parts.next()?;
+        let args = parts.collect::<Vec<_>>().join(" ");
+        Some(registry::Cmd {
+            program: prog.to_owned(),
+            args,
+        })
+    }
 }
 
 #[cfg(test)]

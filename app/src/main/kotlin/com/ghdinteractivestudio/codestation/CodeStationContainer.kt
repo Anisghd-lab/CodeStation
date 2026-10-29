@@ -96,7 +96,8 @@ class CodeStationContainer(override val context: Context) : AppContainer {
                 val config = serverRepository.getServerConfig()
                 createApiService(config.url)
             },
-            serverRepository = serverRepository
+            serverRepository = serverRepository,
+            context = context
         )
     }
 

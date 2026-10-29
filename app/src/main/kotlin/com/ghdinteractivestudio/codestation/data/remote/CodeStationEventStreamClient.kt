@@ -217,11 +217,16 @@ class CodeStationEventStreamClient(
                 "entry" -> {
                     val entryObj = root["entry"]?.jsonObject ?: return
                     val entryId = entryObj["id"]?.jsonPrimitive?.content ?: return
-                    val botId = entryObj["bot_id"]?.jsonPrimitive?.content ?: return
+                    val botId = entryObj["botId"]?.jsonPrimitive?.content
+                        ?: entryObj["bot_id"]?.jsonPrimitive?.content
+                        ?: return
                     val kind = entryObj["kind"]?.jsonPrimitive?.content ?: return
                     val dataObj = entryObj["data"]?.jsonObject ?: return
                     val text = dataObj["text"]?.jsonPrimitive?.content ?: ""
                     val isFinal = dataObj["final"]?.jsonPrimitive?.booleanOrNull ?: false
+                    val createdAt = entryObj["createdAt"]?.jsonPrimitive?.longOrNull
+                        ?: entryObj["created_at"]?.jsonPrimitive?.longOrNull
+                        ?: System.currentTimeMillis()
 
                     val isAgent = (kind == "agent" || kind == "assistant")
                     val isUser = (kind == "user")
@@ -244,7 +249,7 @@ class CodeStationEventStreamClient(
                             authorId = if (isUser) "user" else botId,
                             authorName = if (isUser) "Moi" else botName,
                             text = displayText,
-                            timestamp = System.currentTimeMillis(),
+                            timestamp = createdAt,
                             isFinal = isFinal || isNotice || isUser,
                             replyToMessageId = null,
                             replyToAuthor = null,

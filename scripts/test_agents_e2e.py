@@ -177,6 +177,18 @@ def test_speech_recognition_queries_manifest():
     assert "android.speech.RecognitionService" in content, "L'action android.speech.RecognitionService doit être déclarée dans <queries>"
     assert "com.google.android.tts" in content, "Le package com.google.android.tts doit être déclaré dans <queries>"
 
+def test_event_stream_entry_bot_id_parsing():
+    stream_client_path = "/root/CodeStation/app/src/main/kotlin/com/ghdinteractivestudio/codestation/data/remote/CodeStationEventStreamClient.kt"
+    with open(stream_client_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    assert 'entryObj["botId"]' in content, "CodeStationEventStreamClient doit supporter le format camelCase botId de l'hôte CodeStation"
+
+def test_attachment_chunk_upload_in_repository():
+    repo_path = "/root/CodeStation/app/src/main/kotlin/com/ghdinteractivestudio/codestation/data/local/ChatRepositoryImpl.kt"
+    with open(repo_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    assert "uploadChunk" in content, "ChatRepositoryImpl doit téléverser les fragments de pièces jointes via uploadChunk avant l'envoi du message"
+
 def main():
     print("=" * 60)
     print("CodeStation E2E Agents & Environments Test Suite")
@@ -195,6 +207,8 @@ def main():
         ("Configuration notifications persistantes Android 16", test_persistent_notification_configuration),
         ("Suppression du faux notch in-app (Zone système Android)", test_no_fake_in_app_notch),
         ("Déclaration package visibility Speech & TTS dans Manifest", test_speech_recognition_queries_manifest),
+        ("Parsing universel botId/bot_id dans SSE EventStream", test_event_stream_entry_bot_id_parsing),
+        ("Téléversement sécurisé des pièces jointes via uploadChunk", test_attachment_chunk_upload_in_repository),
         ("Réponse réelle Google Antigravity (AGY_OK)", test_antigravity_real_query),
         ("Réponse réelle OpenCode GLM-5.3-Flash Free", test_opencode_real_glm_query),
     ]

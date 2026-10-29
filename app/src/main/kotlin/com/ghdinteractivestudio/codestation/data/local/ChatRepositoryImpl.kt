@@ -21,7 +21,8 @@ class ChatRepositoryImpl(
     private val approvalDao: ApprovalDao,
     private val botDao: BotDao,
     private val apiServiceProvider: (suspend () -> CodeStationApiService?)? = null,
-    private val serverRepository: ServerRepository? = null
+    private val serverRepository: ServerRepository? = null,
+    private val context: android.content.Context? = null
 ) : ChatRepository {
 
     override fun getMessagesStream(botId: String): Flow<List<ChatMessage>> {
@@ -71,6 +72,60 @@ class ChatRepositoryImpl(
                     throw IllegalStateException("Serveur inaccessible sur ${config.url}. Vérifiez que CodeStation Host est démarré.")
                 }
                 val auth = "Bearer ${config.token}"
+
+                // Téléversement préalable obligatoire de chaque pièce jointe vers l'hôte CodeStation
+                for (att in attachments) {
+                    val localUriStr = att.localUri ?: continue
+                    val uri = android.net.Uri.parse(localUriStr)
+                    val fileBytes = try {
+                        context?.contentResolver?.openInputStream(uri)?.use { it.readBytes() }
+                            ?: java.io.File(uri.path ?: "").readBytes()
+                    } catch (e: Exception) {
+                        throw IllegalStateException("Impossible de lire la pièce jointe '${att.name}' : ${e.localizedMessage}")
+                    }
+
+                    val totalSize = fileBytes.size.toLong()
+                    val chunkSize = 256 * 1024 // 256 Ko par fragment
+                    var offset = 0L
+
+                    if (fileBytes.isEmpty()) {
+                        val req = com.ghdinteractivestudio.codestation.data.remote.UploadChunkRequest(
+                            botId = botId,
+                            uploadId = att.id,
+                            name = att.name,
+                            data = "",
+                            offset = 0L,
+                            done = true
+                        )
+                        val uploadRes = api.uploadChunk(req, authHeader = auth)
+                        if (!uploadRes.isSuccessful) {
+                            throw IllegalStateException("Échec de l'envoi de '${att.name}' (HTTP ${uploadRes.code()})")
+                        }
+                    } else {
+                        while (offset < totalSize) {
+                            val chunkLen = ((totalSize - offset).toInt()).coerceAtMost(chunkSize)
+                            val chunkSlice = fileBytes.copyOfRange(offset.toInt(), offset.toInt() + chunkLen)
+                            val base64Data = android.util.Base64.encodeToString(chunkSlice, android.util.Base64.NO_WRAP)
+                            val isDone = (offset + chunkLen >= totalSize)
+
+                            val req = com.ghdinteractivestudio.codestation.data.remote.UploadChunkRequest(
+                                botId = botId,
+                                uploadId = att.id,
+                                name = att.name,
+                                data = base64Data,
+                                offset = offset,
+                                done = isDone
+                            )
+                            val uploadRes = api.uploadChunk(req, authHeader = auth)
+                            if (!uploadRes.isSuccessful) {
+                                val errBody = uploadRes.errorBody()?.string().orEmpty()
+                                throw IllegalStateException("Échec de l'envoi de la pièce jointe '${att.name}' (HTTP ${uploadRes.code()}: $errBody)")
+                            }
+                            offset += chunkLen
+                        }
+                    }
+                }
+
                 val response = try {
                     api.sendMessage(
                         SendMessageRequest(
