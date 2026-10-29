@@ -7,6 +7,15 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Auto-détection de l'environnement : Si invoqué sous Termux hors Ubuntu PRoot
+if [ -d "/data/data/com.termux/files" ] && [ ! -f "/proc/sys/kernel/cap_last_cap" ] && [ -z "$PROOT_L2S_DIR" ]; then
+    if command -v proot-distro >/dev/null 2>&1; then
+        echo "[CodeStation] Environnement Termux détecté : basculement automatique dans Ubuntu PRoot..."
+        exec proot-distro login ubuntu -- bash -c "cd /root/CodeStation && ./start_code_station.sh $*"
+    fi
+fi
+
 export PATH="/root/.gemini/antigravity-cli/bin:/root/.local/bin:/usr/local/bin:/usr/bin:/bin:/data/data/com.termux/files/usr/bin:$PATH"
 
 # Configuration réseau et environnement (personnalisable par variables d'environnement)

@@ -14,15 +14,24 @@ import time
 
 active_proc = None
 active_proc_lock = threading.Lock()
-current_selected_model = "gemini-4-argon-medium"
+current_selected_model = "gemini-3.8-flash-medium"
 
 _models_cache = None
 _models_cache_time = 0
 CACHE_TTL_SECONDS = 300  # 5 minutes cache
 
+LOG_FILE_PATH = "/tmp/codestation-agy-bridge.log"
+
 def log(msg):
-    sys.stderr.write(f"[agy_acp_bridge] {msg}\n")
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    formatted = f"[{ts}] [agy_acp_bridge] {msg}\n"
+    sys.stderr.write(formatted)
     sys.stderr.flush()
+    try:
+        with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
+            f.write(formatted)
+    except Exception:
+        pass
 
 def fetch_agy_models(force_refresh=False):
     global _models_cache, _models_cache_time
@@ -54,20 +63,13 @@ def fetch_agy_models(force_refresh=False):
     except Exception as e:
         log(f"Failed to discover agy models dynamically: {e}")
 
-    # Fallback to verified models for agy CLI 1.4.9 if CLI query fails
+    # Fallback to verified models for agy CLI 1.4.10 if CLI query fails
     fallback = [
-        {"value": "gemini-4-argon-medium", "name": "Gemini 4 Argon (Medium)"},
-        {"value": "gemini-4-argon-high", "name": "Gemini 4 Argon (High)"},
-        {"value": "gemini-4-argon-low", "name": "Gemini 4 Argon (Low)"},
         {"value": "gemini-3.8-flash-high", "name": "Gemini 3.8 Flash (High)"},
         {"value": "gemini-3.8-flash-medium", "name": "Gemini 3.8 Flash (Medium)"},
         {"value": "gemini-3.8-flash-low", "name": "Gemini 3.8 Flash (Low)"},
-        {"value": "claude-opus-5-5-low", "name": "Claude Opus 5.5 (Low)"},
-        {"value": "claude-opus-5-5-medium", "name": "Claude Opus 5.5 (Medium)"},
-        {"value": "claude-opus-5-5-high", "name": "Claude Opus 5.5 (High)"},
-        {"value": "claude-sonnet-5-5-low", "name": "Claude Sonnet 5.5 (Low)"},
-        {"value": "claude-sonnet-5-5-medium", "name": "Claude Sonnet 5.5 (Medium)"},
-        {"value": "claude-sonnet-5-5-high", "name": "Claude Sonnet 5.5 (High)"},
+        {"value": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6 (Thinking)"},
+        {"value": "claude-opus-4-6-thinking", "name": "Claude Opus 4.6 (Thinking)"},
         {"value": "gpt-oss-120b-medium", "name": "GPT-OSS 120B (Medium)"}
     ]
     return fallback
@@ -92,9 +94,14 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
         env = os.environ.copy()
         env["PATH"] = "/root/.gemini/antigravity-cli/bin:/root/.local/bin:/usr/local/bin:/usr/bin:/bin:" + env.get("PATH", "")
         
-        cmd = ["agy", "-p", prompt_text, "--dangerously-skip-permissions"]
-        if model_id:
-            cmd.extend(["--model", model_id])
+        # Validate model against available models
+        avail_models = [m["value"] for m in fetch_agy_models()]
+        if not model_id or model_id not in avail_models:
+            model_id = "gemini-3.8-flash-medium"
+            log(f"Falling back to default model: {model_id}")
+
+        cmd = ["agy", "-p", prompt_text, "--dangerously-skip-permissions", "--model", model_id]
+        log(f"Executing: {' '.join(cmd)} (cwd={cwd})")
 
         with active_proc_lock:
             active_proc = subprocess.Popen(
@@ -109,6 +116,17 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
             )
         
         output_chunks = []
+        stderr_chunks = []
+
+        # Stream stdout chunks
+        def read_stderr():
+            for sline in active_proc.stderr:
+                stderr_chunks.append(sline)
+                log(f"[agy stderr] {sline.strip()}")
+
+        stderr_thread = threading.Thread(target=read_stderr, daemon=True)
+        stderr_thread.start()
+
         for line in active_proc.stdout:
             output_chunks.append(line)
             # Use ACP standard snake_case "agent_message_chunk"
@@ -121,9 +139,20 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
             })
             
         active_proc.wait()
+        stderr_thread.join(timeout=2.0)
         
+        exit_code = active_proc.returncode
         with active_proc_lock:
             active_proc = None
+
+        full_stdout = "".join(output_chunks).strip()
+        full_stderr = "".join(stderr_chunks).strip()
+
+        if exit_code != 0 and not full_stdout:
+            err_msg = full_stderr or f"agy exited with code {exit_code}"
+            log(f"agy execution failed: {err_msg}")
+            send_response(req_id, error={"code": -32603, "message": err_msg})
+            return
             
         send_response(req_id, {
             "stopReason": "end_turn",

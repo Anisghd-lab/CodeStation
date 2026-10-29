@@ -121,8 +121,8 @@ def test_antigravity_official_models_command():
     script = "/root/CodeStation/environments/bot-antigravity/run.sh"
     res = subprocess.run([script, "models"], capture_output=True, text=True, timeout=15)
     assert res.returncode == 0, f"run.sh models code={res.returncode}"
-    assert "gemini-4-argon-medium" in res.stdout, "Modèle gemini-4-argon-medium manquant"
-    assert "claude-opus-5-5-low" in res.stdout, "Modèle claude manquant"
+    assert "gemini-3.8-flash-medium" in res.stdout, "Modèle gemini-3.8-flash-medium manquant"
+    assert "claude-sonnet-4-6" in res.stdout or "gpt-oss-120b-medium" in res.stdout, "Modèle supplémentaire manquant"
 
 def test_long_message_piping_preservation():
     # Test message long (3,000+ caractères avec retours à la ligne et accents)

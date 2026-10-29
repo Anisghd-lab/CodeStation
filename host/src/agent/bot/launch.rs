@@ -40,27 +40,20 @@ fn claude_options(cfg: &BotConfig) -> Value {
 
 /// Ways to start the bot's agent over ACP, best first: its own command, else its backend's.
 pub(crate) fn launch_commands(cfg: &BotConfig) -> Result<Vec<Candidate>> {
-    let mut candidates = match cfg.command.as_deref().map(str::trim) {
+    // Multi-bot PRoot isolation: if an independent dedicated runner exists for this bot,
+    // invoke its canonical ACP server action.
+    let run_script = format!("/root/CodeStation/environments/{}/run.sh", cfg.id);
+    if std::path::Path::new(&run_script).exists() {
+        return Ok(vec![Candidate::Ready(Cmd {
+            program: run_script,
+            args: "acp".to_string(),
+        })]);
+    }
+
+    let candidates = match cfg.command.as_deref().map(str::trim) {
         Some(c) if !c.is_empty() => vec![Candidate::Ready(Cmd { program: c.to_owned(), args: String::new() })],
         _ => crate::agent::backends::launch_candidates(&cfg.backend)?,
     };
-
-    // Multi-bot PRoot isolation: if an independent rootfs environment exists for this bot,
-    // wrap the candidate command with the bot's dedicated PRoot runner.
-    let run_script = format!("/root/CodeStation/environments/{}/run.sh", cfg.id);
-    if std::path::Path::new(&run_script).exists() {
-        for cand in &mut candidates {
-            if let Candidate::Ready(cmd) = cand {
-                let full = if cmd.args.is_empty() {
-                    cmd.program.clone()
-                } else {
-                    format!("{} {}", cmd.program, cmd.args)
-                };
-                cmd.program = run_script.clone();
-                cmd.args = full;
-            }
-        }
-    }
 
     Ok(candidates)
 }

@@ -244,9 +244,22 @@ impl Acp {
                         _ => {}
                     }
                 }
-                // Process gone: dropping the waiters fails them as `FailureKind::Exited`.
-                pending.locked().clear();
+                // Process gone: fail any remaining waiters with the captured stderr details.
                 let stderr_tail = tail.locked().iter().cloned().collect::<Vec<_>>().join("\n");
+                let err_detail = if stderr_tail.trim().is_empty() {
+                    "agent process exited".to_string()
+                } else {
+                    format!("agent process exited: {}", stderr_tail.trim())
+                };
+                let exit_val = json!({
+                    "code": -32000,
+                    "message": err_detail,
+                    "data": {"category": "process_exit", "details": stderr_tail}
+                });
+                let mut p = pending.locked();
+                for (_, waiter) in p.drain() {
+                    let _ = waiter.send(Err(exit_val.clone()));
+                }
                 let _ = tx.send(Incoming::Closed { stderr_tail });
             });
         }

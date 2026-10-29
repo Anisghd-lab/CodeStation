@@ -371,3 +371,48 @@ sequenceDiagram
 
 
 
+
+
+## Mission — Audit Vidéo CodeStation : Démarrage, Orchestrateur et Communication Réelle des Agents (29 Octobre 2026)
+
+### 1. Diagnostic Approfondi & Causes Racines Identifiées depuis la Vidéo
+
+1. **Erreur de Démarrage sous Termux (`No such file or directory`)** :
+   - *Cause* : L'utilisateur a tenté de lancer `/root/CodeStation/start_code_station.sh` directement depuis le shell Termux natif (`/data/data/com.termux/files/home`). Le chemin `/root` n'existe que dans le conteneur Ubuntu PRoot.
+   - *Correction* :
+     - Création d'un wrapper universel `/data/data/com.termux/files/usr/bin/codestation` et symlink `~/start_code_station.sh` dans Termux.
+     - Auto-détection dans `start_code_station.sh` : si le script est lancé depuis Termux hors PRoot, il bascule automatiquement via `proot-distro login ubuntu`.
+     - L'utilisateur peut désormais taper `codestation start`, `./start_code_station.sh start` ou `codestation pair` indifféremment dans Termux ou Ubuntu.
+
+2. **Échec "Couldn't start the agent: agent process exited" sur Google Antigravity** :
+   - *Causes Racines* :
+     a. **Masquage d'erreur dans ACP stdio** : `host/src/agent/acp.rs` droppait silencieusement les waiters lors de la fermeture inattendue du processus, renvoyant un message générique sans le stderr ni l'exit code.
+     b. **Modèle invalide dans `agy_acp_bridge.py`** : Le bridge sélectionnait `gemini-4-argon-medium` (inexistant dans la CLI Antigravity 1.4.10), ce qui causait le crash immédiat d'agy à chaque tour.
+     c. **Incohérence de dispatching ACP dans `launch.rs`** : Le wrapper imbriqué construisait des lignes de commande hybrides au lieu d'invoquer l'action canonique dédiée `run.sh acp`.
+   - *Corrections Appliquées* :
+     - Enrichissement d'`acp.rs` : capture et propagation directe du `stderr_tail` aux requêtes en attente (`agent process exited: <stderr exact>`).
+     - Mise à jour de `agy_acp_bridge.py` : sélection par défaut du modèle `gemini-3.8-flash-medium`, streaming en direct des chunks `agent_message_chunk`, validation contre `agy models` et journalisation dans `/tmp/codestation-agy-bridge.log`.
+     - Refonte de `launch.rs` : routage direct vers `/root/CodeStation/environments/{id}/run.sh acp`.
+
+3. **Incohérence de la découverte des conteneurs ("Aucun conteneur configuré")** :
+   - *Cause* : `get_disk_size_mb` dans `scripts/bot_env_manager.py` appelait `du -sm` de manière synchrone avec un timeout de 2s qui expirait sur le rootfs PRoot sous Android, causant un timeout HTTP ou le renvoi d'une liste vide.
+   - *Correction* : Remplacement de l'inspection récursive bloquante par une estimation instantanée (360 Mo) et mise en cache des CLIs détectées dans `/tmp/codestation_clis_cache.json` (réponse < 50ms sur `/api/environments`).
+
+### 2. Preuves Formelles de Fonctionnement Réel (Ubuntu PRoot & Android Device)
+
+- **Test E2E de la suite complète** :
+  `python3 /root/CodeStation/scripts/test_agents_e2e.py` -> **16/16 tests réussis (100%)**
+- **Test Réel Antigravity (`Réponds uniquement : AGY_OK`)** :
+  - Requête HTTP envoyée à `http://127.0.0.1:19222/api/send` pour `bot-antigravity`.
+  - Résultat persisté en DB `codync.db` (Turn 13, seq 155) :
+    `[155] agent: {"text":"AGY_OK\n","final":true,"author":"bot-antigravity"}`
+- **Test Réel OpenCode GLM (`Réponds uniquement : OPENCODE_OK`)** :
+  - Requête HTTP envoyée à `http://127.0.0.1:19222/api/send` pour `bot-opencode-glm`.
+  - Résultat persisté en DB `codync.db` (Turn 13, seq 158) :
+    `[158] agent: {"text":"OPENCODE_OK","final":true,"author":"bot-opencode-glm"}`
+- **Appairage et Communication Mobile Live** :
+  - Smartphone Android connecté via ADB (`192.168.1.23:38047`).
+  - CodeStation démarré et appairé avec le jeton local.
+  - Trace Logcat temps réel Android :
+    `CodeStationTrace: event=first_output_received | bot=bot-opencode-glm`
+    `CodeStationTrace: event=response_completed | details={botId=bot-opencode-glm, textLength=137}`

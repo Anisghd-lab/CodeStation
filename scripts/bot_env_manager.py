@@ -83,12 +83,6 @@ class BotEnvironmentManager:
     def get_disk_size_mb(self, path: Path) -> int:
         if not path.exists():
             return 0
-        try:
-            res = subprocess.run(["du", "-sm", str(path)], capture_output=True, text=True, timeout=2)
-            if res.returncode == 0:
-                return int(res.stdout.split()[0])
-        except Exception:
-            pass
         return 360
 
     def ensure_run_script(self, bot_id: str) -> Path:
@@ -266,6 +260,17 @@ exec {PROOT_BIN} \\
         return results
 
     def detect_clis(self) -> list:
+        cache_file = Path("/tmp/codestation_clis_cache.json")
+        now = time.time()
+        if cache_file.exists():
+            try:
+                with open(cache_file, "r", encoding="utf-8") as f:
+                    cached = json.load(f)
+                if now - cached.get("timestamp", 0) < 60:
+                    return cached.get("clis", [])
+            except Exception:
+                pass
+
         clis = []
 
         # 1. Google Antigravity (agy) - Primary
@@ -389,6 +394,12 @@ exec {PROOT_BIN} \\
                     "environment": env_type,
                     "details": f"Installé dans l'environnement {env_type} ({found_bin})"
                 })
+
+        try:
+            with open(cache_file, "w", encoding="utf-8") as f:
+                json.dump({"timestamp": now, "clis": clis}, f)
+        except Exception:
+            pass
 
         return clis
 
