@@ -90,10 +90,11 @@ fun BoxScope.DynamicIslandBar(
             else -> Color(0xFF1E1E1E)
         }
 
+        val islandShape = Capsule()
         Row(
             modifier = Modifier
-                .clip(Capsule())
-                .background(capsuleBackground)
+                .background(capsuleBackground, islandShape)
+                .clip(islandShape)
                 .clickable(
                     role = Role.Button,
                     onClick = {

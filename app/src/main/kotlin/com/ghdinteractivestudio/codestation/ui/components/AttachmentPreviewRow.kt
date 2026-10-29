@@ -58,12 +58,13 @@ fun AttachmentChip(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val chipShape = RoundedRectangle(12.dp)
     Row(
         modifier = modifier
             .widthIn(max = 220.dp)
-            .clip(RoundedRectangle(12.dp))
-            .background(Palette.glassSurface)
-            .border(1.dp, Palette.glassBorder, RoundedRectangle(12.dp))
+            .background(Palette.glassSurface, chipShape)
+            .border(0.5.dp, Palette.glassBorder, chipShape)
+            .clip(chipShape)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)

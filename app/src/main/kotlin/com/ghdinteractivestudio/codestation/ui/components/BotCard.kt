@@ -35,13 +35,14 @@ fun BotCard(
     modifier: Modifier = Modifier
 ) {
     val (source, pressed) = rememberPress()
+    val cardShape = RoundedRectangle(16.dp)
 
     Row(
         modifier = modifier
             .fillMaxWidth()
             .pressScale(pressed)
-            .clip(RoundedRectangle(16.dp))
-            .background(if (pressed) Palette.surface else Palette.background)
+            .background(if (pressed) Palette.surface else Palette.background, cardShape)
+            .clip(cardShape)
             .clickable(source, null, role = Role.Button, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,

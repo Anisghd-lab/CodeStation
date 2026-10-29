@@ -325,13 +325,16 @@ fun VoiceScreen(
                 )
             }
 
+            val circleShape = CircleShape
+            val circleBg = if (isListening) CodeStationDarkPrimary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant
+            val circleBorder = if (isListening) CodeStationDarkPrimary else MaterialTheme.colorScheme.outline
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .size(160.dp)
-                    .clip(CircleShape)
-                    .background(if (isListening) CodeStationDarkPrimary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
-                    .border(2.dp, if (isListening) CodeStationDarkPrimary else MaterialTheme.colorScheme.outline, CircleShape)
+                    .background(circleBg, circleShape)
+                    .border(2.dp, circleBorder, circleShape)
+                    .clip(circleShape)
             ) {
                 if (isListening) {
                     ThinkingOrb(size = 80.dp, color = Palette.accent)

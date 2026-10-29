@@ -160,13 +160,16 @@ fun <T> GlassTabBar(
             .glass(Capsule(), style = GlassStyle.Regular)
             .padding(4.dp)
     ) {
+        val pillShape = Capsule()
+        val pillBg = if (com.ghdinteractivestudio.codestation.ui.theme.LocalDark.current) Palette.emeraldAccent.copy(alpha = 0.16f) else Palette.text.copy(alpha = 0.08f)
+        val pillBorder = if (com.ghdinteractivestudio.codestation.ui.theme.LocalDark.current) Palette.emeraldAccent.copy(alpha = 0.35f) else Palette.glassBorder
         Box(
             Modifier
                 .offset(x = pill)
                 .size(TAB_WIDTH, 54.dp)
-                .clip(Capsule())
-                .background(if (com.ghdinteractivestudio.codestation.ui.theme.LocalDark.current) Palette.emeraldAccent.copy(alpha = 0.16f) else Palette.text.copy(alpha = 0.08f))
-                .border(0.5.dp, if (com.ghdinteractivestudio.codestation.ui.theme.LocalDark.current) Palette.emeraldAccent.copy(alpha = 0.35f) else Palette.glassBorder, Capsule())
+                .background(pillBg, pillShape)
+                .border(0.5.dp, pillBorder, pillShape)
+                .clip(pillShape)
         )
         Row {
             for (tab in tabs) {

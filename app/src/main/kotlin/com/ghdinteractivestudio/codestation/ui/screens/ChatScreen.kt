@@ -474,13 +474,14 @@ fun ChatScreen(
                     enter = fadeIn() + slideInVertically { it / 2 },
                     exit = fadeOut() + slideOutVertically { it / 2 }
                 ) {
+                    val errShape = RoundedRectangle(14.dp)
                     Row(
                         Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 6.dp)
-                            .clip(RoundedRectangle(14.dp))
-                            .background(Palette.danger.copy(alpha = 0.12f))
-                            .border(1.dp, Palette.danger.copy(alpha = 0.3f), RoundedRectangle(14.dp))
+                            .background(Palette.danger.copy(alpha = 0.12f), errShape)
+                            .border(0.5.dp, Palette.danger.copy(alpha = 0.3f), errShape)
+                            .clip(errShape)
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)

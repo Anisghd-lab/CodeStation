@@ -1,6 +1,7 @@
 package com.ghdinteractivestudio.codestation.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -119,10 +120,11 @@ fun Modifier.glass(
     } else {
         if (style == GlassStyle.Accent) Color(0x40438DFF) else Color(0x18000000)
     }
+    val bgCol = if (pressed) base.copy(alpha = 0.96f) else base
     return this
-        .clip(shape)
-        .background(if (pressed) base.copy(alpha = 0.96f) else base)
+        .background(bgCol, shape)
         .border(0.5.dp, borderCol, shape)
+        .clip(shape)
 }
 
 /**
@@ -136,14 +138,17 @@ fun GlassMenu(
     width: Dp = 250.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val menuShape = RoundedRectangle(18.dp)
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismissRequest,
+        shape = menuShape,
+        containerColor = Palette.glassSurface,
+        border = BorderStroke(0.5.dp, Palette.glassBorder),
+        shadowElevation = 8.dp,
+        tonalElevation = 0.dp,
         modifier = modifier
             .width(width)
-            .clip(RoundedRectangle(18.dp))
-            .background(Palette.glassSurface)
-            .border(0.5.dp, Palette.glassBorder, RoundedRectangle(18.dp))
             .padding(vertical = 4.dp),
         content = content
     )

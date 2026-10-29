@@ -222,16 +222,18 @@ fun BotEditorScreen(
                                 else -> "Prête" to Palette.emeraldAccent
                             }
 
+                            val itemShape = RoundedRectangle(10.dp)
+                            val radioShape = Capsule()
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedRectangle(10.dp))
-                                    .background(if (isSelected) Palette.bubbleUser.copy(alpha = 0.5f) else Color.Transparent)
+                                    .background(if (isSelected) Palette.bubbleUser.copy(alpha = 0.5f) else Color.Transparent, itemShape)
                                     .border(
                                         width = if (isSelected) 1.dp else 0.5.dp,
                                         color = if (isSelected) Palette.emeraldAccent.copy(alpha = 0.7f) else Palette.glassBorder,
-                                        shape = RoundedRectangle(10.dp)
+                                        shape = itemShape
                                     )
+                                    .clip(itemShape)
                                     .clickable { viewModel.onProviderChanged(provider) }
                                     .padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -241,12 +243,12 @@ fun BotEditorScreen(
                                 Box(
                                     modifier = Modifier
                                         .size(18.dp)
-                                        .clip(Capsule())
                                         .border(
                                             width = if (isSelected) 2.dp else 1.5.dp,
                                             color = if (isSelected) Palette.emeraldAccent else Palette.tertiary,
-                                            shape = Capsule()
-                                        ),
+                                            shape = radioShape
+                                        )
+                                        .clip(radioShape),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     if (isSelected) {
@@ -307,16 +309,18 @@ fun BotEditorScreen(
                                 else -> Palette.tertiary
                             }
 
+                            val itemShape = RoundedRectangle(10.dp)
+                            val radioShape = Capsule()
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedRectangle(10.dp))
-                                    .background(if (isSelected) Palette.bubbleUser.copy(alpha = 0.5f) else Color.Transparent)
+                                    .background(if (isSelected) Palette.bubbleUser.copy(alpha = 0.5f) else Color.Transparent, itemShape)
                                     .border(
                                         width = if (isSelected) 1.dp else 0.5.dp,
                                         color = if (isSelected) Palette.emeraldAccent.copy(alpha = 0.7f) else Palette.glassBorder,
-                                        shape = RoundedRectangle(10.dp)
+                                        shape = itemShape
                                     )
+                                    .clip(itemShape)
                                     .clickable { viewModel.onProviderChanged(provider) }
                                     .padding(horizontal = 12.dp, vertical = 7.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -325,12 +329,12 @@ fun BotEditorScreen(
                                 Box(
                                     modifier = Modifier
                                         .size(18.dp)
-                                        .clip(Capsule())
                                         .border(
                                             width = if (isSelected) 2.dp else 1.5.dp,
                                             color = if (isSelected) Palette.emeraldAccent else Palette.tertiary,
-                                            shape = Capsule()
-                                        ),
+                                            shape = radioShape
+                                        )
+                                        .clip(radioShape),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     if (isSelected) {
@@ -436,12 +440,13 @@ fun BotEditorScreen(
 
                         // Message d'erreur ou d'avertissement catalogue si applicable
                         if (state.provider == ProviderType.ANTIGRAVITY && antigravityCatalogState?.errorMessage != null) {
+                            val alertShape = RoundedRectangle(6.dp)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedRectangle(6.dp))
-                                    .background(Palette.warning.copy(alpha = 0.12f))
-                                    .border(0.5.dp, Palette.warning.copy(alpha = 0.4f), RoundedRectangle(6.dp))
+                                    .background(Palette.warning.copy(alpha = 0.12f), alertShape)
+                                    .border(0.5.dp, Palette.warning.copy(alpha = 0.4f), alertShape)
+                                    .clip(alertShape)
                                     .padding(horizontal = 8.dp, vertical = 5.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -457,12 +462,13 @@ fun BotEditorScreen(
 
                         // Alerte si le modèle courant n'est pas vérifié
                         if (state.provider == ProviderType.ANTIGRAVITY && !viewModel.isCurrentModelVerified()) {
+                            val unverifiedShape = RoundedRectangle(6.dp)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedRectangle(6.dp))
-                                    .background(Palette.warning.copy(alpha = 0.12f))
-                                    .border(0.5.dp, Palette.warning.copy(alpha = 0.5f), RoundedRectangle(6.dp))
+                                    .background(Palette.warning.copy(alpha = 0.12f), unverifiedShape)
+                                    .border(0.5.dp, Palette.warning.copy(alpha = 0.5f), unverifiedShape)
+                                    .clip(unverifiedShape)
                                     .padding(horizontal = 8.dp, vertical = 5.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -497,16 +503,16 @@ fun BotEditorScreen(
                         if (availableModels.isNotEmpty()) {
                             availableModels.forEach { modelInfo ->
                                 val isModelSelected = state.model == modelInfo.id
+                                val modelShape = RoundedRectangle(8.dp)
+                                val modelBg = if (isModelSelected) Palette.emeraldAccent.copy(alpha = 0.12f) else Palette.glassSurface
+                                val modelBorderWidth = if (isModelSelected) 1.dp else 0.5.dp
+                                val modelBorderColor = if (isModelSelected) Palette.emeraldAccent else Palette.glassBorder
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedRectangle(8.dp))
-                                        .background(if (isModelSelected) Palette.emeraldAccent.copy(alpha = 0.12f) else Palette.glassSurface)
-                                        .border(
-                                            width = if (isModelSelected) 1.dp else 0.5.dp,
-                                            color = if (isModelSelected) Palette.emeraldAccent else Palette.glassBorder,
-                                            shape = RoundedRectangle(8.dp)
-                                        )
+                                        .background(modelBg, modelShape)
+                                        .border(modelBorderWidth, modelBorderColor, modelShape)
+                                        .clip(modelShape)
                                         .clickable { viewModel.onModelChanged(modelInfo.id) }
                                         .padding(horizontal = 10.dp, vertical = 7.dp),
                                     verticalAlignment = Alignment.CenterVertically,

@@ -1,5 +1,6 @@
 package com.ghdinteractivestudio.codestation.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,14 +33,17 @@ fun AttachmentMenu(
     onPickDocument: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val menuShape = RoundedRectangle(18.dp)
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismissRequest,
+        shape = menuShape,
+        containerColor = Palette.glassSurface,
+        border = BorderStroke(0.5.dp, Palette.glassBorder),
+        shadowElevation = 8.dp,
+        tonalElevation = 0.dp,
         modifier = modifier
             .width(220.dp)
-            .clip(RoundedRectangle(18.dp))
-            .background(Palette.glassSurface)
-            .border(1.dp, Palette.glassBorder, RoundedRectangle(18.dp))
             .padding(vertical = 4.dp)
     ) {
         AttachmentMenuItem(

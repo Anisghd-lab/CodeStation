@@ -314,13 +314,14 @@ fun PairingScreen(
                                 Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                // RAM Card
+                                // Mémoire RAM Card
+                                val ramShape = RoundedRectangle(12.dp)
                                 Box(
                                     Modifier
                                         .weight(1f)
-                                        .clip(RoundedRectangle(12.dp))
-                                        .background(Palette.text.copy(alpha = 0.04f))
-                                        .border(0.5.dp, Palette.glassBorder, RoundedRectangle(12.dp))
+                                        .background(Palette.text.copy(alpha = 0.04f), ramShape)
+                                        .border(0.5.dp, Palette.glassBorder, ramShape)
+                                        .clip(ramShape)
                                         .padding(10.dp)
                                 ) {
                                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -345,12 +346,13 @@ fun PairingScreen(
                                 }
 
                                 // Stockage Disque Card
+                                val diskShape = RoundedRectangle(12.dp)
                                 Box(
                                     Modifier
                                         .weight(1f)
-                                        .clip(RoundedRectangle(12.dp))
-                                        .background(Palette.text.copy(alpha = 0.04f))
-                                        .border(0.5.dp, Palette.glassBorder, RoundedRectangle(12.dp))
+                                        .background(Palette.text.copy(alpha = 0.04f), diskShape)
+                                        .border(0.5.dp, Palette.glassBorder, diskShape)
+                                        .clip(diskShape)
                                         .padding(10.dp)
                                 ) {
                                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -539,12 +541,13 @@ private fun BotContainerCard(
         EnvironmentStatus.NOT_INSTALLED -> Palette.tertiary
     }
 
+    val envCardShape = RoundedRectangle(14.dp)
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedRectangle(14.dp))
-            .background(Palette.text.copy(alpha = 0.03f))
-            .border(0.5.dp, Palette.glassBorder, RoundedRectangle(14.dp))
+            .background(Palette.text.copy(alpha = 0.03f), envCardShape)
+            .border(0.5.dp, Palette.glassBorder, envCardShape)
+            .clip(envCardShape)
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -573,11 +576,12 @@ private fun BotContainerCard(
                 )
             }
 
+            val badgeShape = Capsule()
             Box(
                 Modifier
-                    .clip(Capsule())
-                    .background(statusColor.copy(alpha = 0.15f))
-                    .border(0.5.dp, statusColor.copy(alpha = 0.35f), Capsule())
+                    .background(statusColor.copy(alpha = 0.15f), badgeShape)
+                    .border(0.5.dp, statusColor.copy(alpha = 0.35f), badgeShape)
+                    .clip(badgeShape)
                     .padding(horizontal = 9.dp, vertical = 3.dp)
             ) {
                 Text(
@@ -707,11 +711,12 @@ private fun DetectedCliRow(cli: DetectedCli) {
                     color = Palette.text
                 )
                 if (cli.isPrimary) {
+                    val prioShape = Capsule()
                     Box(
                         Modifier
-                            .clip(Capsule())
-                            .background(Palette.electricBlueSoft)
-                            .border(0.5.dp, Palette.electricBlue.copy(alpha = 0.4f), Capsule())
+                            .background(Palette.electricBlueSoft, prioShape)
+                            .border(0.5.dp, Palette.electricBlue.copy(alpha = 0.4f), prioShape)
+                            .clip(prioShape)
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text("PRIORITAIRE", style = Type.system(9f).semibold, color = Palette.electricBlue)
@@ -719,10 +724,11 @@ private fun DetectedCliRow(cli: DetectedCli) {
                 }
             }
 
+            val cliBadgeShape = Capsule()
             Box(
                 Modifier
-                    .clip(Capsule())
-                    .background(statusColor.copy(alpha = 0.15f))
+                    .background(statusColor.copy(alpha = 0.15f), cliBadgeShape)
+                    .clip(cliBadgeShape)
                     .padding(horizontal = 7.dp, vertical = 2.dp)
             ) {
                 Text(
@@ -757,13 +763,14 @@ private fun CommandBlockRow(command: String) {
     val clipboard = context.getSystemService(ClipboardManager::class.java)
     val scope = rememberCoroutineScope()
     var isCopied by remember { mutableStateOf(false) }
+    val cmdShape = RoundedRectangle(10.dp)
 
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedRectangle(10.dp))
-            .background(Palette.codeBackground)
-            .border(0.5.dp, Palette.glassBorder, RoundedRectangle(10.dp))
+            .background(Palette.codeBackground, cmdShape)
+            .border(0.5.dp, Palette.glassBorder, cmdShape)
+            .clip(cmdShape)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)

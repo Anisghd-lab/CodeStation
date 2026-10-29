@@ -51,13 +51,13 @@ fun ThinkingTraceView(
 
     var isExpanded by remember { mutableStateOf(false) }
 
+    val traceShape = RoundedCornerShape(12.dp)
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+            .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), traceShape),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-        shape = RoundedCornerShape(12.dp)
+        shape = traceShape
     ) {
         Column(
             modifier = Modifier

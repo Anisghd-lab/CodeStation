@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -403,12 +404,15 @@ private fun <T> CompactDropdownMenu(
             )
         }
 
+        val menuShape = RoundedRectangle(12.dp)
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .background(Palette.surface)
-                .border(0.5.dp, Palette.glassBorder, RoundedRectangle(12.dp))
+            shape = menuShape,
+            containerColor = Palette.surface,
+            border = BorderStroke(0.5.dp, Palette.glassBorder),
+            shadowElevation = 8.dp,
+            tonalElevation = 0.dp
         ) {
             options.forEach { (key, label) ->
                 val isSelected = key == selection

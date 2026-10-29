@@ -199,12 +199,13 @@ private fun CodeBlockView(
     val scope = rememberCoroutineScope()
     var isCopied by remember { mutableStateOf(false) }
 
+    val blockShape = RoundedRectangle(12.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedRectangle(12.dp))
-            .background(Palette.codeBackground)
-            .border(0.5.dp, Palette.glassBorder, RoundedRectangle(12.dp))
+            .background(Palette.codeBackground, blockShape)
+            .border(0.5.dp, Palette.glassBorder, blockShape)
+            .clip(blockShape)
     ) {
         // Code Block Header
         Row(

@@ -159,13 +159,14 @@ private fun StyledButton(
     label: @Composable () -> Unit
 ) {
     val (source, pressed) = rememberPress()
+    val pillShape = Capsule()
     Box(
         modifier
             .pressScale(pressed)
             .graphicsLayer { alpha = if (enabled) (if (pressed) 0.85f else 1f) else 0.4f }
-            .clip(Capsule())
-            .background(fill)
-            .border(0.5.dp, Palette.glassBorder, Capsule())
+            .background(fill, pillShape)
+            .border(0.5.dp, Palette.glassBorder, pillShape)
+            .clip(pillShape)
             .clickable(source, null, enabled = enabled, role = Role.Button, onClick = action)
             .padding(horizontal = 18.dp, vertical = 11.dp),
         contentAlignment = Alignment.Center

@@ -78,9 +78,9 @@ fun ChatMessageItem(
             Box(
                 Modifier
                     .widthIn(max = maxBubbleWidth)
-                    .clip(bubbleShape)
-                    .background(bubbleColor)
+                    .background(bubbleColor, bubbleShape)
                     .border(0.5.dp, Palette.glassBorder, bubbleShape)
+                    .clip(bubbleShape)
                     .clickable { onQuoteReply(message) }
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
@@ -90,8 +90,8 @@ fun ChatMessageItem(
                         Row(
                             Modifier
                                 .fillMaxWidth()
+                                .background(Palette.text.copy(alpha = 0.08f), RoundedRectangle(6.dp))
                                 .clip(RoundedRectangle(6.dp))
-                                .background(Palette.text.copy(alpha = 0.08f))
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
@@ -124,8 +124,8 @@ fun ChatMessageItem(
                             Row(
                                 Modifier
                                     .fillMaxWidth()
+                                    .background(Palette.text.copy(alpha = 0.08f), RoundedRectangle(8.dp))
                                     .clip(RoundedRectangle(8.dp))
-                                    .background(Palette.text.copy(alpha = 0.08f))
                                     .padding(horizontal = 8.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)

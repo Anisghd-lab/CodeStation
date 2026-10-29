@@ -1,6 +1,7 @@
 package com.ghdinteractivestudio.codestation.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,12 +58,14 @@ fun ApprovalCardItem(
         ApprovalActionType.NETWORK_ACCESS -> "Wants to access the network"
     }
 
+    val cardShape = RoundedRectangle(22.dp)
     Column(
         modifier
             .padding(end = 40.dp)
             .widthIn(max = 420.dp)
-            .clip(RoundedRectangle(22.dp))
-            .background(Palette.bubbleAgent)
+            .background(Palette.bubbleAgent, cardShape)
+            .border(0.5.dp, Palette.glassBorder, cardShape)
+            .clip(cardShape)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
