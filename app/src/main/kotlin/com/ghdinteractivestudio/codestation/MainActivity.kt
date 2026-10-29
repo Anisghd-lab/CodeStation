@@ -23,6 +23,7 @@ import com.ghdinteractivestudio.codestation.notification.CodeStationNotification
 import com.ghdinteractivestudio.codestation.service.CodeStationTaskSyncService
 import com.ghdinteractivestudio.codestation.ui.navigation.Screen
 import com.ghdinteractivestudio.codestation.ui.navigation.CodeStationNavHost
+import com.ghdinteractivestudio.codestation.ui.components.DynamicIslandBar
 import com.ghdinteractivestudio.codestation.ui.theme.CodeStationTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -72,7 +73,16 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val navController = rememberNavController()
                     currentNavController = navController
-                    CodeStationNavHost(navController = navController)
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        CodeStationNavHost(navController = navController)
+                        DynamicIslandBar(
+                            botRepository = container.botRepository,
+                            approvalDao = container.approvalDao,
+                            onNavigateToBot = { botId: String ->
+                                navController.navigate(Screen.Chat.createRoute(botId))
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -82,6 +92,7 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         // Démarrage du service de synchronisation d'arrière-plan avec notification persistante
         CodeStationTaskSyncService.start(this)
+        com.ghdinteractivestudio.codestation.service.DynamicIslandOverlayService.start(this)
     }
 
     override fun onResume() {
@@ -91,6 +102,7 @@ class MainActivity : ComponentActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             container.botRepository.refreshBots()
             container.serverRepository.testConnection()
+            com.ghdinteractivestudio.codestation.widget.CodeStationWidgetManager.updateAllWidgets(this@MainActivity)
         }
     }
 

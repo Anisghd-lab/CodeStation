@@ -212,6 +212,7 @@ class CodeStationEventStreamClient(
                             }
                         }
                     }
+                    com.ghdinteractivestudio.codestation.widget.CodeStationWidgetManager.updateAllWidgets(context)
                 }
 
                 "entry" -> {
@@ -317,6 +318,7 @@ class CodeStationEventStreamClient(
                             isAlwaysApproved = false
                         )
                         approvalDao.insertApproval(approvalEntity)
+                        com.ghdinteractivestudio.codestation.widget.CodeStationWidgetManager.updateAllWidgets(context)
 
                         CodeStationNotificationManager.updateTaskNotification(
                             context = context,

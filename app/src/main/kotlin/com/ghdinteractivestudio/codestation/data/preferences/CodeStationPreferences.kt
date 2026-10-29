@@ -24,6 +24,7 @@ class PreferencesRepositoryImpl(
         val SHOW_THINKING_DETAILS = booleanPreferencesKey("show_thinking_details")
         val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+        val DYNAMIC_ISLAND_OVERLAY = booleanPreferencesKey("dynamic_island_overlay_enabled")
     }
 
     val serverUrlStream: Flow<String> = context.dataStore.data.map { preferences ->
@@ -48,6 +49,10 @@ class PreferencesRepositoryImpl(
 
     override val onboardingCompletedStream: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.ONBOARDING_COMPLETED] ?: false
+    }
+
+    override val dynamicIslandOverlayEnabledStream: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.DYNAMIC_ISLAND_OVERLAY] ?: false
     }
 
     suspend fun setServerUrl(url: String) {
@@ -87,6 +92,12 @@ class PreferencesRepositoryImpl(
     override suspend fun setOnboardingCompleted(completed: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.ONBOARDING_COMPLETED] = completed
+        }
+    }
+
+    override suspend fun setDynamicIslandOverlayEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DYNAMIC_ISLAND_OVERLAY] = enabled
         }
     }
 }

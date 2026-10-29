@@ -28,12 +28,17 @@ interface AppContainer {
     val preferencesRepository: PreferencesRepository
     val antigravityModelRepository: AntigravityModelRepository
     val eventStreamClient: com.ghdinteractivestudio.codestation.data.remote.CodeStationEventStreamClient
+    val approvalDao: com.ghdinteractivestudio.codestation.data.local.ApprovalDao
 }
 
 class CodeStationContainer(override val context: Context) : AppContainer {
 
     private val database: CodeStationDatabase by lazy {
         CodeStationDatabase.getDatabase(context)
+    }
+
+    override val approvalDao: com.ghdinteractivestudio.codestation.data.local.ApprovalDao by lazy {
+        database.approvalDao()
     }
 
     override val preferencesRepository: PreferencesRepositoryImpl by lazy {

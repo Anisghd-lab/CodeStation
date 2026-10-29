@@ -17,6 +17,7 @@ data class SettingsUiState(
     val themeMode: String = "SYSTEM",
     val showThinkingDetails: Boolean = true,
     val hapticFeedback: Boolean = true,
+    val dynamicIslandOverlayEnabled: Boolean = false,
     val appVersion: String = "1.0.0 (Build 1)"
 )
 
@@ -29,13 +30,15 @@ class SettingsViewModel(
         serverRepository.getServerConfigStream(),
         preferencesRepository.themeModeStream,
         preferencesRepository.showThinkingDetailsStream,
-        preferencesRepository.hapticFeedbackEnabledStream
-    ) { config, theme, showThinking, haptic ->
+        preferencesRepository.hapticFeedbackEnabledStream,
+        preferencesRepository.dynamicIslandOverlayEnabledStream
+    ) { config, theme, showThinking, haptic, overlay ->
         SettingsUiState(
             serverConfig = config,
             themeMode = theme,
             showThinkingDetails = showThinking,
-            hapticFeedback = haptic
+            hapticFeedback = haptic,
+            dynamicIslandOverlayEnabled = overlay
         )
     }.stateIn(
         scope = viewModelScope,
@@ -58,6 +61,12 @@ class SettingsViewModel(
     fun setHapticFeedback(enabled: Boolean) {
         viewModelScope.launch {
             preferencesRepository.setHapticFeedbackEnabled(enabled)
+        }
+    }
+
+    fun setDynamicIslandOverlay(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setDynamicIslandOverlayEnabled(enabled)
         }
     }
 

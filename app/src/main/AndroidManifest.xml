@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
@@ -69,6 +70,11 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <service
+            android:name=".service.DynamicIslandOverlayService"
+            android:enabled="true"
+            android:exported="false" />
+
         <receiver
             android:name=".notification.NotificationActionReceiver"
             android:exported="false">
@@ -77,6 +83,54 @@
                 <action android:name="com.ghdinteractivestudio.codestation.ACTION_APPROVE" />
                 <action android:name="com.ghdinteractivestudio.codestation.ACTION_REJECT" />
             </intent-filter>
+        </receiver>
+
+        <!-- Widget 1 : Usage (Consommation IA) -->
+        <receiver
+            android:name=".widget.UsageWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_usage_info" />
+        </receiver>
+
+        <!-- Widget 2 : Limites (Quotas & Santé Système) -->
+        <receiver
+            android:name=".widget.LimitsWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_limits_info" />
+        </receiver>
+
+        <!-- Widget 3 : Bots (Agents Actifs) -->
+        <receiver
+            android:name=".widget.BotsWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_bots_info" />
+        </receiver>
+
+        <!-- Widget 4 : Équipe (Roster synthétique) -->
+        <receiver
+            android:name=".widget.TeamWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_team_info" />
         </receiver>
     </application>
 

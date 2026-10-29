@@ -36,9 +36,11 @@ interface PreferencesRepository {
     val showThinkingDetailsStream: Flow<Boolean>
     val hapticFeedbackEnabledStream: Flow<Boolean>
     val onboardingCompletedStream: Flow<Boolean>
+    val dynamicIslandOverlayEnabledStream: Flow<Boolean>
 
     suspend fun setThemeMode(mode: String)
     suspend fun setShowThinkingDetails(show: Boolean)
     suspend fun setHapticFeedbackEnabled(enabled: Boolean)
     suspend fun setOnboardingCompleted(completed: Boolean)
+    suspend fun setDynamicIslandOverlayEnabled(enabled: Boolean)
 }

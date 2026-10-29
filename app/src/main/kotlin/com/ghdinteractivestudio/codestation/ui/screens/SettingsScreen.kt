@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ghdinteractivestudio.codestation.BuildConfig
 import com.ghdinteractivestudio.codestation.domain.model.ServerConnectionStatus
+import com.ghdinteractivestudio.codestation.util.OverlayPermissionHelper
 import com.ghdinteractivestudio.codestation.ui.components.CardForm
 import com.ghdinteractivestudio.codestation.ui.components.CardSection
 import com.ghdinteractivestudio.codestation.ui.components.CodyncSwitch
@@ -83,6 +84,8 @@ fun SettingsScreen(
     var shareAnalytics by rememberSaveable { mutableStateOf(false) }
     var appLanguage by rememberSaveable { mutableStateOf("system") }
     var confirmStartOver by remember { mutableStateOf(false) }
+    var showOverlayPermissionDialog by remember { mutableStateOf(false) }
+    val hasOverlayPermission = rememberOnResume { OverlayPermissionHelper.canDrawOverlays(context) }
 
     val androidVersionName = remember(context) {
         try {
@@ -254,6 +257,39 @@ fun SettingsScreen(
                 }
             }
 
+            // Section 3.5: Dynamic Island & Fenêtre Flottante
+            CardSection(
+                title = "Dynamic Island & Multitâche"
+            ) {
+                row {
+                    CodyncSwitch(
+                        checked = state.dynamicIslandOverlayEnabled && hasOverlayPermission,
+                        onChange = { enableRequested ->
+                            if (enableRequested) {
+                                if (OverlayPermissionHelper.canDrawOverlays(context)) {
+                                    viewModel.setDynamicIslandOverlay(true)
+                                } else {
+                                    showOverlayPermissionDialog = true
+                                }
+                            } else {
+                                viewModel.setDynamicIslandOverlay(false)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Dynamic Island Système (Flottante)", style = Type.body, color = Palette.text)
+                            Text(
+                                if (hasOverlayPermission) "Pastille active au-dessus des autres apps (Termux...)"
+                                else "Autorisation de superposition requise pour le suivi flottant",
+                                style = Type.caption,
+                                color = if (hasOverlayPermission) Palette.secondary else Palette.warning
+                            )
+                        }
+                    }
+                }
+            }
+
             // Section 4: Versions des composants & Réinitialisation (Deux lignes distinctes)
             CardSection(
                 title = "Versions des composants"
@@ -336,6 +372,37 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+    if (showOverlayPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showOverlayPermissionDialog = false },
+            title = { Text("Autorisation de superposition requise", style = Type.title3.bold, color = Palette.text) },
+            text = {
+                Text(
+                    "Pour afficher la Dynamic Island au-dessus de vos autres applications (comme Termux pendant qu'un agent travaille), Android requiert l'autorisation « Afficher sur d'autres applications ». Vous pourrez désactiver cette fonction à tout moment.",
+                    style = Type.body,
+                    color = Palette.secondary
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showOverlayPermissionDialog = false
+                        viewModel.setDynamicIslandOverlay(true)
+                        val intent = OverlayPermissionHelper.createRequestOverlayPermissionIntent(context)
+                        context.startActivity(intent)
+                    }
+                ) {
+                    Text("Ouvrir les Paramètres", color = Palette.electricBlue, style = Type.body.semibold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showOverlayPermissionDialog = false }) {
+                    Text("Annuler", color = Palette.secondary)
+                }
+            }
+        )
     }
 
     if (confirmStartOver) {
