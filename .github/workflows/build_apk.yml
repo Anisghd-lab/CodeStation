@@ -38,6 +38,14 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Configure AAPT2 for CI
+        run: |
+          AAPT2_PATH=$(find "$ANDROID_HOME/build-tools" -name aapt2 -type f | sort -V | tail -1)
+          if [ -n "$AAPT2_PATH" ]; then
+            sudo ln -sf "$AAPT2_PATH" /usr/local/bin/aapt2
+            echo "AAPT2 configured: /usr/local/bin/aapt2 -> $AAPT2_PATH"
+          fi
+
       - name: Run Unit Tests
         run: |
           ./gradlew testDebugUnitTest --continue --stacktrace || {
