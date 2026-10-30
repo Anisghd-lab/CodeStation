@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -132,6 +133,28 @@ fun ChatScreen(
     var activeContextMenuMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var messageForSelection by remember { mutableStateOf<ChatMessage?>(null) }
     var codeBlocksForDialog by remember { mutableStateOf<List<MarkdownCodeBlock>?>(null) }
+
+    // Réinitialisation des menus et du mode édition lors d'un changement de conversation
+    LaunchedEffect(state.bot?.id) {
+        activeContextMenuMessage = null
+        messageForSelection = null
+        codeBlocksForDialog = null
+        if (state.editingMessage != null) {
+            viewModel.cancelEditingMessage()
+        }
+    }
+
+    // Gestion du bouton Retour Android : fermeture prioritaire des menus et dialogues actifs
+    BackHandler(
+        enabled = activeContextMenuMessage != null || messageForSelection != null || codeBlocksForDialog != null || state.editingMessage != null
+    ) {
+        when {
+            activeContextMenuMessage != null -> activeContextMenuMessage = null
+            messageForSelection != null -> messageForSelection = null
+            codeBlocksForDialog != null -> codeBlocksForDialog = null
+            state.editingMessage != null -> viewModel.cancelEditingMessage()
+        }
+    }
 
     val voiceRecorder = remember { VoiceRecorder(context) }
     val transcriptionService = remember { VoiceTranscriptionService(context) }
