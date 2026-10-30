@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,25 +18,30 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.ghdinteractivestudio.codestation.domain.model.ExecutionStep
 import com.ghdinteractivestudio.codestation.domain.model.StepType
 import com.ghdinteractivestudio.codestation.ui.components.CardSection
 import com.ghdinteractivestudio.codestation.ui.components.CodeBox
 import com.ghdinteractivestudio.codestation.ui.components.Disclosure
+import com.ghdinteractivestudio.codestation.ui.components.IconButton
 import com.ghdinteractivestudio.codestation.ui.components.ModalHeader
 import com.ghdinteractivestudio.codestation.ui.components.Symbol
 import com.ghdinteractivestudio.codestation.ui.components.ThinkingOrb
-import com.ghdinteractivestudio.codestation.ui.components.tr
 import com.ghdinteractivestudio.codestation.ui.theme.Palette
 import com.ghdinteractivestudio.codestation.ui.theme.Type
 import com.ghdinteractivestudio.codestation.ui.theme.bold
 import com.ghdinteractivestudio.codestation.ui.theme.semibold
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun TraceScreen(
     steps: List<ExecutionStep>,
     onNavigateBack: () -> Unit,
+    onClear: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -47,8 +51,17 @@ fun TraceScreen(
             .statusBarsPadding()
     ) {
         ModalHeader(
-            title = "Full conversation",
-            onClose = onNavigateBack
+            title = "Traces d'exécution",
+            onClose = onNavigateBack,
+            trailing = {
+                if (steps.isNotEmpty() && onClear != null) {
+                    IconButton(
+                        title = "Effacer",
+                        systemImage = "trash",
+                        action = onClear
+                    )
+                }
+            }
         )
 
         LazyColumn(
@@ -58,18 +71,36 @@ fun TraceScreen(
         ) {
             if (steps.isEmpty()) {
                 item {
-                    Text(
-                        tr("Nothing yet."),
-                        style = Type.body,
-                        color = Palette.tertiary,
-                        modifier = Modifier.padding(top = 20.dp)
-                    )
+                    CardSection {
+                        row {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 36.dp, horizontal = 16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Symbol("doc.text", size = 32.dp, tint = Palette.tertiary)
+                                Text(
+                                    "Aucune trace enregistrée",
+                                    style = Type.body.semibold,
+                                    color = Palette.text
+                                )
+                                Text(
+                                    "Les étapes d'exécution, journaux système et raisonnements de l'agent s'afficheront ici en temps réel lors de vos échanges.",
+                                    style = Type.footnote,
+                                    color = Palette.tertiary,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
                 }
             } else {
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            "Turn execution steps (${steps.size})",
+                            "Étapes d'exécution & Raisonnement (${steps.size})",
                             Modifier.padding(start = 4.dp),
                             style = Type.subheadline.semibold,
                             color = Palette.text
@@ -92,50 +123,157 @@ fun TraceScreen(
 @Composable
 private fun TraceStepRow(step: ExecutionStep) {
     var expanded by remember { mutableStateOf(false) }
+    val timeStr = remember(step.timestamp) {
+        val sdf = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        sdf.format(Date(step.timestamp))
+    }
 
     when (step.type) {
-        StepType.THINKING -> {
+        StepType.THINKING, StepType.THOUGHT -> {
             Disclosure(
                 expanded = expanded,
                 onToggle = { expanded = !expanded },
                 label = {
-                    ThinkingOrb(size = 16.dp, color = Palette.secondary, animated = false)
-                    Text(tr("Thinking"), Modifier.padding(start = 8.dp), style = Type.subheadline, color = Palette.secondary)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f, fill = false)
+                        ) {
+                            ThinkingOrb(size = 16.dp, color = Palette.secondary, animated = false)
+                            Text(
+                                step.title.ifBlank { "Raisonnement de l'agent" },
+                                Modifier.padding(start = 8.dp),
+                                style = Type.subheadline.semibold,
+                                color = Palette.text
+                            )
+                        }
+                        Text(
+                            timeStr,
+                            style = Type.caption2,
+                            color = Palette.tertiary
+                        )
+                    }
                 }
             ) {
                 Text(
-                    step.description,
+                    step.content,
                     style = Type.footnote,
                     color = Palette.secondary,
-                    modifier = Modifier.padding(top = 4.dp)
+                    modifier = Modifier.padding(top = 6.dp)
                 )
             }
         }
-        StepType.TOOL_CALL -> {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        StepType.TOOL_CALL, StepType.TOOL_RESULT -> {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Symbol("terminal", size = 16.dp, tint = Palette.text)
-                    Text(step.title, style = Type.subheadline.semibold, color = Palette.text)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f, fill = false)
+                    ) {
+                        Symbol(
+                            if (step.isError) "exclamationmark.triangle" else "terminal",
+                            size = 16.dp,
+                            tint = if (step.isError) Palette.danger else Palette.emeraldAccent
+                        )
+                        Text(
+                            step.title,
+                            style = Type.subheadline.semibold,
+                            color = if (step.isError) Palette.danger else Palette.text
+                        )
+                    }
+                    Text(
+                        timeStr,
+                        style = Type.caption2,
+                        color = Palette.tertiary
+                    )
                 }
-                CodeBox(step.description)
+                if (step.content.isNotBlank()) {
+                    CodeBox(step.content)
+                }
             }
         }
         StepType.PLANNING -> {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Symbol("checklist", size = 16.dp, tint = Palette.text)
-                    Text(tr("Plan"), style = Type.subheadline.bold, color = Palette.text)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f, fill = false)
+                    ) {
+                        Symbol("checklist", size = 16.dp, tint = Palette.emeraldAccent)
+                        Text(
+                            step.title.ifBlank { "Planification" },
+                            style = Type.subheadline.bold,
+                            color = Palette.text
+                        )
+                    }
+                    Text(
+                        timeStr,
+                        style = Type.caption2,
+                        color = Palette.tertiary
+                    )
                 }
-                Text(step.description, style = Type.footnote, color = Palette.text)
+                Text(step.content, style = Type.footnote, color = Palette.secondary)
             }
         }
         else -> {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Symbol("doc.text", size = 16.dp, tint = Palette.secondary)
-                Text(step.description, style = Type.subheadline, color = Palette.text)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val iconName = if (step.isError) {
+                        "exclamationmark.circle"
+                    } else when {
+                        step.title.contains("Terminé", ignoreCase = true) || step.title.contains("validé", ignoreCase = true) -> "checkmark.circle"
+                        step.title.contains("Processus", ignoreCase = true) || step.title.contains("CLI", ignoreCase = true) -> "gearshape"
+                        step.title.contains("Agent", ignoreCase = true) -> "person"
+                        step.title.contains("Envoi", ignoreCase = true) || step.title.contains("Requête", ignoreCase = true) -> "paperplane"
+                        else -> "doc.text"
+                    }
+                    val iconColor = if (step.isError) Palette.danger else Palette.secondary
+
+                    Symbol(iconName, size = 16.dp, tint = iconColor)
+
+                    Column {
+                        Text(
+                            step.title,
+                            style = Type.subheadline.semibold,
+                            color = if (step.isError) Palette.danger else Palette.text
+                        )
+                        if (step.content.isNotBlank() && step.content != "Étape validée avec succès") {
+                            Text(
+                                step.content,
+                                style = Type.caption,
+                                color = Palette.secondary,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                    }
+                }
+                Text(
+                    timeStr,
+                    style = Type.caption2,
+                    color = Palette.tertiary
+                )
             }
         }
     }

@@ -132,6 +132,7 @@ impl Hub {
         crate::chat::memory::import_old_memory(self);
         self.routines.restore(&self.store)?;
         crate::market::turn_on_installed_once(&self.store)?;
+        let _ = self.ensure_default_bots();
         for row in self.store.bots()? {
             if row.deleted {
                 self.routines.disable_bot(&self.store, &row.config.id)?;
@@ -171,8 +172,83 @@ impl Hub {
 
     pub fn send_cmd(&self, bot_id: &str, cmd: Cmd) -> Result<()> {
         let bots = self.bots.locked();
-        let h = bots.get(bot_id).ok_or_else(|| anyhow!("unknown bot"))?;
+        let target_id = if bots.contains_key(bot_id) {
+            bot_id.to_string()
+        } else {
+            match self.store.resolve_bot(bot_id) {
+                Ok(Some(row)) => row.config.id,
+                _ => bot_id.to_string(),
+            }
+        };
+
+        let h = bots.get(&target_id).ok_or_else(|| anyhow!("unknown bot"))?;
         h.tx.send(cmd).map_err(|_| anyhow!("bot stopped"))
+    }
+
+    fn ensure_default_bots(&self) -> Result<()> {
+        let existing = self.store.bots()?;
+        let existing_ids: std::collections::HashSet<_> = existing.iter().filter(|b| !b.deleted).map(|b| b.config.id.as_str()).collect();
+
+        // 1. Google Antigravity
+        if !existing_ids.contains("bot-antigravity") {
+            let cfg: BotConfig = serde_json::from_value(serde_json::json!({
+                "id": "bot-antigravity",
+                "kind": "agent",
+                "name": "Google Antigravity",
+                "description": "Google Antigravity Agent en conteneur PRoot isolé",
+                "avatarColor": "#4285F4",
+                "avatarShape": "blob",
+                "backend": "agy",
+                "cwd": "/root/CodeStation",
+                "permission": "auto",
+                "fastMode": true,
+                "pinned": true,
+                "position": 4,
+            }))?;
+            let _ = self.store.save_bot(&cfg);
+        }
+
+        // 2. OpenCode GLM
+        if !existing_ids.contains("bot-opencode-glm") {
+            let cfg: BotConfig = serde_json::from_value(serde_json::json!({
+                "id": "bot-opencode-glm",
+                "kind": "agent",
+                "name": "OpenCode GLM",
+                "description": "Agent OpenCode propulsé par GLM-5.3-Flash Free",
+                "avatarColor": "#A855F7",
+                "avatarShape": "hex",
+                "backend": "opencode",
+                "cwd": "/root/CodeStation",
+                "permission": "auto",
+                "model": "opencode/glm-5.3-flash-free",
+                "fastMode": false,
+                "pinned": true,
+                "position": 1,
+            }))?;
+            let _ = self.store.save_bot(&cfg);
+        }
+
+        // 3. CodeBuddy Code
+        if !existing_ids.contains("bot-codebuddy") {
+            let cfg: BotConfig = serde_json::from_value(serde_json::json!({
+                "id": "bot-codebuddy",
+                "kind": "agent",
+                "name": "CodeBuddy Code",
+                "description": "Agent CodeBuddy Code propulsé par la CLI locale (Hy3 v2.178.1)",
+                "avatarColor": "#3B82F6",
+                "avatarShape": "circle",
+                "backend": "codebuddy",
+                "cwd": "/root/CodeStation",
+                "permission": "auto",
+                "model": "hy3",
+                "fastMode": true,
+                "pinned": true,
+                "position": 5,
+            }))?;
+            let _ = self.store.save_bot(&cfg);
+        }
+
+        Ok(())
     }
 
     // MARK: bots

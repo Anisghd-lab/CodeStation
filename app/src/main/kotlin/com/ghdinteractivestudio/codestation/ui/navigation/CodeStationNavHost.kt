@@ -161,7 +161,8 @@ fun CodeStationNavHost(
             val chatState by chatViewModel.uiState.collectAsState()
             TraceScreen(
                 steps = chatState.currentWorkingSteps,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onClear = { chatViewModel.clearTraceSteps() }
             )
         }
 

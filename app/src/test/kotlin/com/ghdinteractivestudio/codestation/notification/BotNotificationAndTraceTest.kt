@@ -2,13 +2,33 @@ package com.ghdinteractivestudio.codestation.notification
 
 import com.ghdinteractivestudio.codestation.domain.model.BotStatus
 import com.ghdinteractivestudio.codestation.util.RequestTracer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class BotNotificationAndTraceTest {
+
+    private val testDispatcher = StandardTestDispatcher()
+
+    @Before
+    fun setUp() {
+        Dispatchers.setMain(testDispatcher)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
 
     @Test
     fun `test stable notification ID per bot`() {
@@ -129,5 +149,57 @@ class BotNotificationAndTraceTest {
         assertEquals("OpenCode CLI", CodeStationNotificationManager.formatBackendDisplayName("opencode"))
         assertEquals("Codex Termux", CodeStationNotificationManager.formatBackendDisplayName("codex"))
         assertEquals("Protocole ACP", CodeStationNotificationManager.formatBackendDisplayName("acp"))
+    }
+
+    @Test
+    fun `test execution step tracking and reasoning streaming`() {
+        val testBot = "bot-test-tracer"
+        RequestTracer.clearSteps(testBot)
+
+        // 1. Initial empty state
+        assertTrue(RequestTracer.getSteps(testBot).isEmpty())
+
+        // 2. Add lifecycle event
+        val eventStep = RequestTracer.eventToExecutionStep(
+            com.ghdinteractivestudio.codestation.util.TraceEvent(
+                requestId = "req-1",
+                event = RequestTracer.EVENT_PROCESS_STARTED,
+                botId = testBot,
+                details = mapOf("engine" to "agy", "model" to "gemini-2.5-pro")
+            )
+        )
+        RequestTracer.addStep(testBot, eventStep)
+        assertEquals(1, RequestTracer.getSteps(testBot).size)
+        assertEquals("Processus agent démarré", RequestTracer.getSteps(testBot).first().title)
+
+        // 3. Add reasoning/thinking step
+        val thoughtStep1 = com.ghdinteractivestudio.codestation.domain.model.ExecutionStep(
+            id = "thought-stream-1",
+            type = com.ghdinteractivestudio.codestation.domain.model.StepType.THINKING,
+            title = "Raisonnement de l'agent",
+            content = "Analyse initiale du problème..."
+        )
+        RequestTracer.addStep(testBot, thoughtStep1)
+        assertEquals(2, RequestTracer.getSteps(testBot).size)
+
+        // 4. Stream update for the same reasoning step (in-place replacement)
+        val thoughtStep2 = thoughtStep1.copy(content = "Analyse initiale du problème... Planification de la solution terminée.")
+        RequestTracer.addStep(testBot, thoughtStep2)
+        assertEquals(2, RequestTracer.getSteps(testBot).size)
+        assertEquals("Analyse initiale du problème... Planification de la solution terminée.", RequestTracer.getSteps(testBot).last().content)
+
+        // 5. Add tool execution step
+        val toolStep = com.ghdinteractivestudio.codestation.domain.model.ExecutionStep(
+            id = "tool-run-1",
+            type = com.ghdinteractivestudio.codestation.domain.model.StepType.TOOL_CALL,
+            title = "run_command (completed)",
+            content = "Statut: completed\nSortie: Build success"
+        )
+        RequestTracer.addStep(testBot, toolStep)
+        assertEquals(3, RequestTracer.getSteps(testBot).size)
+
+        // 6. Clear steps
+        RequestTracer.clearSteps(testBot)
+        assertTrue(RequestTracer.getSteps(testBot).isEmpty())
     }
 }

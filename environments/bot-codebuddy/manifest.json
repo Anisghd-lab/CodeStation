@@ -1,0 +1,9 @@
+{
+  "status": "READY",
+  "updated_at": 1793262068553,
+  "bot_id": "bot-codebuddy",
+  "engine": "codebuddy",
+  "model": "hy3",
+  "rootfs": "/root/CodeStation/environments/bot-codebuddy/rootfs",
+  "run_script": "/root/CodeStation/environments/bot-codebuddy/run.sh"
+}

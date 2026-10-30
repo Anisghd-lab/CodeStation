@@ -9,10 +9,13 @@ import com.ghdinteractivestudio.codestation.data.local.MessageDao
 import com.ghdinteractivestudio.codestation.domain.model.ApprovalActionType
 import com.ghdinteractivestudio.codestation.domain.model.ApprovalStatus
 import com.ghdinteractivestudio.codestation.domain.model.BotStatus
+import com.ghdinteractivestudio.codestation.domain.model.ExecutionStep
 import com.ghdinteractivestudio.codestation.domain.model.MessageAuthorType
+import com.ghdinteractivestudio.codestation.domain.model.StepType
 import com.ghdinteractivestudio.codestation.domain.repository.ServerRepository
 import com.ghdinteractivestudio.codestation.notification.CodeStationNotificationManager
 import com.ghdinteractivestudio.codestation.notification.TaskNotificationPhase
+import com.ghdinteractivestudio.codestation.util.RequestTracer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -271,6 +274,79 @@ class CodeStationEventStreamClient(
                     val isAgent = (kind == "agent" || kind == "assistant")
                     val isUser = (kind == "user")
                     val isNotice = (kind == "notice")
+                    val isThought = (kind == "thought" || kind == "thinking")
+                    val isTool = (kind == "tool" || kind == "tool_call")
+                    val isPlan = (kind == "plan" || kind == "planning")
+
+                    // Traçage d'exécution : étapes de raisonnement (Thought / Thinking)
+                    if (isThought) {
+                        val thoughtText = dataObj["text"]?.jsonPrimitive?.content ?: text
+                        if (thoughtText.isNotBlank()) {
+                            val step = ExecutionStep(
+                                id = entryId.ifBlank { "thought-${System.currentTimeMillis()}" },
+                                type = StepType.THINKING,
+                                title = "Raisonnement de l'agent",
+                                content = thoughtText,
+                                isError = false,
+                                timestamp = createdAt
+                            )
+                            RequestTracer.addStep(botId, step)
+                            android.util.Log.d(TAG, "Recorded thought trace step for botId=$botId (len=${thoughtText.length})")
+                        }
+                    }
+
+                    // Traçage d'exécution : appels d'outils et commandes CLI
+                    if (isTool) {
+                        val toolTitle = dataObj["title"]?.jsonPrimitive?.content ?: "Appel d'outil"
+                        val toolStatus = dataObj["status"]?.jsonPrimitive?.content ?: "pending"
+                        val toolKind = dataObj["toolKind"]?.jsonPrimitive?.content ?: dataObj["kind"]?.jsonPrimitive?.content ?: ""
+                        val toolOutput = dataObj["output"]?.jsonPrimitive?.content ?: ""
+                        val toolLocations = dataObj["locations"]?.toString() ?: ""
+                        val toolDiffs = dataObj["diffs"]?.toString() ?: ""
+
+                        val toolContent = buildString {
+                            if (toolKind.isNotBlank() && toolKind != "other") append("Type: $toolKind\n")
+                            append("Statut: $toolStatus")
+                            if (toolOutput.isNotBlank()) {
+                                append("\n\nSortie:\n$toolOutput")
+                            }
+                            if (toolLocations.isNotBlank() && toolLocations != "null" && toolLocations != "[]") {
+                                append("\n\nEmplacements: $toolLocations")
+                            }
+                            if (toolDiffs.isNotBlank() && toolDiffs != "null" && toolDiffs != "[]") {
+                                append("\n\nDiffs:\n$toolDiffs")
+                            }
+                        }
+
+                        val step = ExecutionStep(
+                            id = entryId.ifBlank { "tool-${System.currentTimeMillis()}" },
+                            type = StepType.TOOL_CALL,
+                            title = "$toolTitle ($toolStatus)",
+                            content = toolContent.ifBlank { "Appel d'outil sans détails supplémentaires" },
+                            isError = (toolStatus == "error" || toolStatus == "failed"),
+                            timestamp = createdAt
+                        )
+                        RequestTracer.addStep(botId, step)
+                        android.util.Log.d(TAG, "Recorded tool trace step for botId=$botId: $toolTitle ($toolStatus)")
+                    }
+
+                    // Traçage d'exécution : plan d'action
+                    if (isPlan) {
+                        val planTitle = dataObj["title"]?.jsonPrimitive?.content ?: "Plan d'action"
+                        val planText = dataObj["text"]?.jsonPrimitive?.content ?: dataObj["plan"]?.toString() ?: text
+                        if (planText.isNotBlank()) {
+                            val step = ExecutionStep(
+                                id = entryId.ifBlank { "plan-${System.currentTimeMillis()}" },
+                                type = StepType.PLANNING,
+                                title = planTitle,
+                                content = planText,
+                                isError = false,
+                                timestamp = createdAt
+                            )
+                            RequestTracer.addStep(botId, step)
+                            android.util.Log.d(TAG, "Recorded plan trace step for botId=$botId: $planTitle")
+                        }
+                    }
 
                     // Mise à jour de l'historique dans Room (inclut "agent", "assistant", "notice", "user")
                     // On filtre les messages de complétion silencieuse interne comme "(pass)"
@@ -308,9 +384,10 @@ class CodeStationEventStreamClient(
                         val formattedBotName = CodeStationNotificationManager.formatAgentDisplayName(botId, botName)
 
                         if (isAgent && isFinal) {
-                            com.ghdinteractivestudio.codestation.util.RequestTracer.logEvent(
+                            RequestTracer.logEvent(
                                 requestId = entryId,
-                                event = com.ghdinteractivestudio.codestation.util.RequestTracer.EVENT_RESPONSE_COMPLETED,
+                                event = RequestTracer.EVENT_RESPONSE_COMPLETED,
+                                botId = botId,
                                 details = mapOf("botId" to botId, "textLength" to text.length)
                             )
                             botDao.updateStatus(botId, BotStatus.IDLE.name)
@@ -324,9 +401,10 @@ class CodeStationEventStreamClient(
                                 summary = "Réponse terminée avec succès"
                             )
                         } else if (isAgent) {
-                            com.ghdinteractivestudio.codestation.util.RequestTracer.logEvent(
+                            RequestTracer.logEvent(
                                 requestId = entryId,
-                                event = com.ghdinteractivestudio.codestation.util.RequestTracer.EVENT_FIRST_OUTPUT_RECEIVED,
+                                event = RequestTracer.EVENT_FIRST_OUTPUT_RECEIVED,
+                                botId = botId,
                                 details = mapOf("botId" to botId, "chunkLength" to text.length)
                             )
                             botDao.updateStatus(botId, BotStatus.WORKING.name)

@@ -150,7 +150,7 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
         // One chunk of a file for a later `send` (`attachments`); base64 `data` at `offset`.
         "upload" => {
             use base64::Engine as _;
-            let row = hub.store.bot(str_arg(&b, "botId")?)?.filter(|r| !r.deleted);
+            let row = hub.store.resolve_bot(str_arg(&b, "botId")?)?;
             let root = crate::chat::uploads::root(&row.ok_or_else(|| anyhow!("unknown bot"))?.config);
             let (id, name) = (str_arg(&b, "uploadId")?.to_owned(), str_arg(&b, "name")?.to_owned());
             let data =
@@ -165,7 +165,7 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
         // A sent file, back in chunks (chat previews on other devices).
         "readUpload" => {
             use base64::Engine as _;
-            let row = hub.store.bot(str_arg(&b, "botId")?)?.filter(|r| !r.deleted);
+            let row = hub.store.resolve_bot(str_arg(&b, "botId")?)?;
             let root = crate::chat::uploads::root(&row.ok_or_else(|| anyhow!("unknown bot"))?.config);
             let id = str_arg(&b, "uploadId")?.to_owned();
             let offset = b["offset"].as_u64().unwrap_or(0);
@@ -175,20 +175,21 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
             json!({"data": base64::engine::general_purpose::STANDARD.encode(data), "size": size})
         }
         "send" => {
-            let bot = str_arg(&b, "botId")?;
+            let bot_raw = str_arg(&b, "botId")?;
             let text = b["text"].as_str().unwrap_or_default().trim();
             let uploads: Vec<&str> =
                 b["attachments"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
             if text.is_empty() && uploads.is_empty() {
                 bail!("empty message");
             }
+            let row = hub.store.resolve_bot(bot_raw)?.ok_or_else(|| anyhow!("unknown bot"))?;
+            let bot = &row.config.id;
             let nonce = b["clientNonce"].as_str().unwrap_or_default();
             if !nonce.is_empty()
                 && let Some(e) = hub.store.find_by_nonce(bot, nonce)
             {
                 return Ok(ControlFlow::Break(json!({"entry": e})));
             }
-            let row = hub.store.bot(bot)?.filter(|r| !r.deleted).ok_or_else(|| anyhow!("unknown bot"))?;
             // `replyTo`: the message of this chat it answers (`chat::replies`).
             let reply = match b["replyTo"].as_str().filter(|id| !id.is_empty()) {
                 Some(id) => Some(crate::chat::replies::quote(&hub.store, bot, id)?),
@@ -232,8 +233,9 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
         }
         // A finished voice call from an app older than `endCall`, as a line in the chat ("Voice chat · 0:16").
         "logCall" => {
-            let bot = str_arg(&b, "botId")?;
-            hub.store.bot(bot)?.filter(|r| !r.deleted).ok_or_else(|| anyhow!("unknown bot"))?;
+            let bot_raw = str_arg(&b, "botId")?;
+            let row = hub.store.resolve_bot(bot_raw)?.filter(|r| !r.deleted).ok_or_else(|| anyhow!("unknown bot"))?;
+            let bot = &row.config.id;
             let seconds = b["seconds"].as_u64().unwrap_or(0);
             let data = json!({"text": crate::chat::calls::UNTITLED, "callSeconds": seconds});
             let e = hub.add_entry(&Lane::main(bot), EntryKind::Notice, hub.store.max_turn(bot), &data);
@@ -254,18 +256,23 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
         }
         // What a call carried, for its conversation: the chat an app holds may not reach back that far.
         "callEntries" => {
-            let bot = str_arg(&b, "botId")?;
+            let bot_raw = str_arg(&b, "botId")?;
+            let bot = hub.store.resolve_bot(bot_raw)?.map(|r| r.config.id).unwrap_or_else(|| bot_raw.to_string());
             let call = crate::chat::calls::checked(str_arg(&b, "callId")?)?;
-            json!({"entries": hub.store.call_entries(bot, call, crate::chat::calls::CALL_ENTRIES)?})
+            json!({"entries": hub.store.call_entries(&bot, call, crate::chat::calls::CALL_ENTRIES)?})
         }
         "endCall" => {
+            let bot_raw = str_arg(&b, "botId")?;
+            let bot = hub.store.resolve_bot(bot_raw)?.map(|r| r.config.id).unwrap_or_else(|| bot_raw.to_string());
             let call = crate::chat::calls::checked(str_arg(&b, "callId")?)?;
             let seconds = b["seconds"].as_u64().unwrap_or(0);
-            json!({"entry": crate::chat::calls::end(hub, str_arg(&b, "botId")?, call, seconds, &b["lines"])?})
+            json!({"entry": crate::chat::calls::end(hub, &bot, call, seconds, &b["lines"])?})
         }
         "stop" => {
-            let bot = str_arg(&b, "botId")?;
-            match hub.store.bot(bot)? {
+            let bot_raw = str_arg(&b, "botId")?;
+            let resolved = hub.store.resolve_bot(bot_raw)?;
+            let bot = resolved.as_ref().map(|r| r.config.id.as_str()).unwrap_or(bot_raw);
+            match &resolved {
                 Some(row) if row.config.is_group() => hub.groups.stop(hub, bot),
                 _ => hub.send_cmd(bot, Cmd::Stop)?,
             }

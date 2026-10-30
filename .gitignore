@@ -26,5 +26,6 @@ __pycache__/
 *.pyc
 *.zip
 build_output/
+output_artifacts/
 .kotlin/
 

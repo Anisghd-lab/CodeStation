@@ -193,6 +193,13 @@ class ChatViewModel(
     )
 
     init {
+        _workingSteps.value = RequestTracer.getSteps(botId)
+        viewModelScope.launch {
+            RequestTracer.getStepsFlow(botId).collect { steps ->
+                _workingSteps.value = steps
+            }
+        }
+
         viewModelScope.launch {
             chatRepository.markChatRead(botId)
         }
@@ -525,7 +532,14 @@ class ChatViewModel(
     fun clearHistory() {
         viewModelScope.launch {
             chatRepository.clearHistory(botId)
+            RequestTracer.clearSteps(botId)
+            _workingSteps.value = emptyList()
         }
+    }
+
+    fun clearTraceSteps() {
+        RequestTracer.clearSteps(botId)
+        _workingSteps.value = emptyList()
     }
 
     fun deleteMessage(messageId: String) {

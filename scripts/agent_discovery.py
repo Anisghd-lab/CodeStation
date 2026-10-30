@@ -31,6 +31,14 @@ CANDIDATES = [
         "doc_hint": "Install Codex CLI and run codex login."
     },
     {
+        "id": "codebuddy",
+        "name": "CodeBuddy Code",
+        "bins": ["codebuddy", "cbc"],
+        "custom_paths": ["/usr/local/bin/codebuddy", "/root/.local/bin/codebuddy"],
+        "integration": "Agent Client Protocol (acp) stdio / Print (-p)",
+        "doc_hint": "Install CodeBuddy Code and run codebuddy login."
+    },
+    {
         "id": "claude",
         "name": "Claude Code",
         "bins": ["claude"],
@@ -81,6 +89,9 @@ def check_agent(candidate):
 
         # Determine authentication & operational readiness without leaking secrets
         if candidate["id"] == "antigravity":
+            available = True
+            authenticated = True
+        elif candidate["id"] == "codebuddy":
             available = True
             authenticated = True
         elif candidate["id"] == "opencode":

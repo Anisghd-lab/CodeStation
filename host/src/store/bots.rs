@@ -41,6 +41,34 @@ impl Store {
         Ok(row.and_then(parse_bot))
     }
 
+    /// Resolves a bot by technical ID, normalized alias, or case-insensitive display name.
+    pub fn resolve_bot(&self, id: &str) -> Result<Option<BotRow>> {
+        if let Some(row) = self.bot(id)? {
+            if !row.deleted {
+                return Ok(Some(row));
+            }
+        }
+        // Prefix normalization (e.g. "codebuddy" <-> "bot-codebuddy")
+        let alt_id = if let Some(stripped) = id.strip_prefix("bot-") {
+            stripped.to_string()
+        } else {
+            format!("bot-{id}")
+        };
+        if let Some(row) = self.bot(&alt_id)? {
+            if !row.deleted {
+                return Ok(Some(row));
+            }
+        }
+        // Name or backend fallback (case-insensitive)
+        let all = self.bots()?;
+        for row in all {
+            if !row.deleted && (row.config.name.eq_ignore_ascii_case(id) || row.config.backend.eq_ignore_ascii_case(id)) {
+                return Ok(Some(row));
+            }
+        }
+        Ok(None)
+    }
+
     pub fn save_bot(&self, cfg: &BotConfig) -> Result<i64> {
         let c = self.db.locked();
         let rev = next_rev(&c)?;

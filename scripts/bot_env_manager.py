@@ -428,7 +428,7 @@ exec {PROOT_BIN} \\
                 "version": version,
                 "status": "READY",
                 "is_primary": True,
-                "environment": "ubuntu",
+                "environment": "bot-codebuddy",
                 "details": f"CLI CodeBuddy {version} prêt avec modèle {model_info}{port_info}"
             })
         else:
@@ -440,7 +440,7 @@ exec {PROOT_BIN} \\
                 "version": None,
                 "status": "NOT_DETECTED",
                 "is_primary": True,
-                "environment": "ubuntu",
+                "environment": "bot-codebuddy",
                 "details": "Binaire codebuddy introuvable dans /usr/local/bin"
             })
 
