@@ -36,6 +36,7 @@ data class ChatUiState(
     val isBotWorking: Boolean = false,
     val currentWorkingSteps: List<ExecutionStep> = emptyList(),
     val inputDraft: String = "",
+    val editingMessage: ChatMessage? = null,
     val quotedReply: QuotedReply? = null,
     val attachments: List<PendingAttachment> = emptyList(),
     val isVoiceRecording: Boolean = false,
@@ -52,6 +53,7 @@ class ChatViewModel(
 ) : ViewModel() {
 
     private val _inputDraft = MutableStateFlow("")
+    private val _editingMessage = MutableStateFlow<ChatMessage?>(null)
     private val _quotedReply = MutableStateFlow<QuotedReply?>(null)
     private val _isBotWorking = MutableStateFlow(false)
     private val _workingSteps = MutableStateFlow<List<ExecutionStep>>(emptyList())
@@ -119,6 +121,7 @@ class ChatViewModel(
 
     private data class InputState(
         val draft: String,
+        val editing: ChatMessage?,
         val reply: QuotedReply?,
         val working: Boolean,
         val steps: List<ExecutionStep>,
@@ -139,6 +142,7 @@ class ChatViewModel(
 
     private val _uiInputFlow = combine(
         _inputDraft,
+        _editingMessage,
         _quotedReply,
         _isBotWorking,
         _workingSteps,
@@ -151,14 +155,15 @@ class ChatViewModel(
         @Suppress("UNCHECKED_CAST")
         InputState(
             draft = args[0] as String,
-            reply = args[1] as QuotedReply?,
-            working = args[2] as Boolean,
-            steps = args[3] as List<ExecutionStep>,
-            attachments = args[4] as List<PendingAttachment>,
-            isVoiceRecording = args[5] as Boolean,
-            voiceDurationSeconds = args[6] as Int,
-            isTranscribing = args[7] as Boolean,
-            error = args[8] as String?
+            editing = args[1] as ChatMessage?,
+            reply = args[2] as QuotedReply?,
+            working = args[3] as Boolean,
+            steps = args[4] as List<ExecutionStep>,
+            attachments = args[5] as List<PendingAttachment>,
+            isVoiceRecording = args[6] as Boolean,
+            voiceDurationSeconds = args[7] as Int,
+            isTranscribing = args[8] as Boolean,
+            error = args[9] as String?
         )
     }
 
@@ -173,6 +178,7 @@ class ChatViewModel(
             isBotWorking = input.working || bot?.status == BotStatus.WORKING,
             currentWorkingSteps = input.steps,
             inputDraft = input.draft,
+            editingMessage = input.editing,
             quotedReply = input.reply,
             attachments = input.attachments,
             isVoiceRecording = input.isVoiceRecording,
@@ -275,6 +281,24 @@ class ChatViewModel(
         _quotedReply.value = null
     }
 
+    fun startEditingMessage(message: ChatMessage) {
+        _editingMessage.value = message
+        _inputDraft.value = message.text
+    }
+
+    fun cancelEditingMessage() {
+        _editingMessage.value = null
+        _inputDraft.value = ""
+    }
+
+    fun confirmEditAndSend(newText: String) {
+        val trimmed = newText.trim()
+        if (trimmed.isBlank() && _attachments.value.isEmpty()) return
+        _editingMessage.value = null
+        _inputDraft.value = trimmed
+        sendMessage()
+    }
+
     fun sendMessage() {
         if (isSending) return
         val text = _inputDraft.value.trim()
@@ -289,6 +313,7 @@ class ChatViewModel(
         lastSentMessageId = clientMsgId
         turnStartTimeMs = System.currentTimeMillis()
         _inputDraft.value = ""
+        _editingMessage.value = null
         _quotedReply.value = null
         _attachments.value = emptyList()
         _errorMessage.value = null
@@ -424,16 +449,31 @@ class ChatViewModel(
     }
 
     fun regenerateResponse(botMessageId: String) {
+        if (_isBotWorking.value) return
         val currentMessages = uiState.value.messages
         val botIndex = currentMessages.indexOfFirst { it.id == botMessageId }
-        val userPrompt = if (botIndex > 0) {
-            currentMessages.subList(0, botIndex).lastOrNull { it.author.type == MessageAuthorType.USER }?.text
+        val userMsg = if (botIndex >= 0) {
+            currentMessages.subList(0, botIndex).lastOrNull { it.author.type == MessageAuthorType.USER }
         } else null
 
-        deleteMessage(botMessageId)
-
-        if (!userPrompt.isNullOrBlank()) {
-            _inputDraft.value = userPrompt
+        if (userMsg != null && userMsg.text.isNotBlank()) {
+            _errorMessage.value = null
+            _inputDraft.value = userMsg.text
+            if (userMsg.attachments.isNotEmpty()) {
+                val pending = userMsg.attachments.map { att ->
+                    PendingAttachment(
+                        id = java.util.UUID.randomUUID().toString(),
+                        uri = android.net.Uri.parse(att.localUri ?: ""),
+                        name = att.name,
+                        mimeType = att.mimeType,
+                        sizeBytes = att.sizeBytes,
+                        isImage = att.mimeType.startsWith("image/"),
+                        isVideo = att.mimeType.startsWith("video/"),
+                        isAudio = att.mimeType.startsWith("audio/")
+                    )
+                }
+                _attachments.value = pending
+            }
             sendMessage()
         } else {
             retryLastMessage()

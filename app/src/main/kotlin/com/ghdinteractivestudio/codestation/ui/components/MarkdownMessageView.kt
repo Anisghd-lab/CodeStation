@@ -69,6 +69,11 @@ data class QuotaGaugeItem(
     val resetText: String? = null
 )
 
+data class MarkdownCodeBlock(
+    val language: String?,
+    val code: String
+)
+
 internal sealed class MarkdownBlock {
     data class CodeBlock(val language: String?, val code: String) : MarkdownBlock()
     data class Header(val level: Int, val text: String) : MarkdownBlock()
@@ -77,6 +82,15 @@ internal sealed class MarkdownBlock {
     data class Blockquote(val text: String) : MarkdownBlock()
     data class Paragraph(val text: String) : MarkdownBlock()
     data class QuotaCard(val title: String, val items: List<QuotaGaugeItem>) : MarkdownBlock()
+}
+
+/**
+ * Extracts all code blocks from a markdown text string.
+ */
+fun extractMarkdownCodeBlocks(rawText: String): List<MarkdownCodeBlock> {
+    return parseMarkdownBlocks(rawText)
+        .filterIsInstance<MarkdownBlock.CodeBlock>()
+        .map { MarkdownCodeBlock(it.language?.takeIf { l -> l.isNotBlank() }, it.code) }
 }
 
 /**

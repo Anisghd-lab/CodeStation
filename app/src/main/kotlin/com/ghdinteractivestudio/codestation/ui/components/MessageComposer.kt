@@ -66,6 +66,8 @@ fun MessageComposer(
     isWorking: Boolean = false,
     replyTo: QuotedReply? = null,
     onCancelReply: () -> Unit = {},
+    editingMessage: com.ghdinteractivestudio.codestation.domain.model.ChatMessage? = null,
+    onCancelEdit: () -> Unit = {},
     attachments: List<PendingAttachment> = emptyList(),
     onRemoveAttachment: (String) -> Unit = {},
     onPickPhoto: () -> Unit = {},
@@ -86,6 +88,13 @@ fun MessageComposer(
     val focusRequester = remember { FocusRequester() }
     var isAttachmentMenuOpen by remember { androidx.compose.runtime.mutableStateOf(false) }
 
+    LaunchedEffect(editingMessage?.id) {
+        if (editingMessage != null) {
+            textState.edit { replace(0, length, editingMessage.text) }
+            try { focusRequester.requestFocus() } catch (_: Exception) {}
+        }
+    }
+
     val rawText = textState.text.toString()
     val canSend = rawText.isNotBlank() || attachments.isNotEmpty()
     val trailing = when {
@@ -95,6 +104,7 @@ fun MessageComposer(
     }
 
     val placeholder = when {
+        editingMessage != null -> "Modifier votre message…"
         replyTo != null -> tr("Reply…")
         isWorking -> tr("Queue a message for {name}").replace("{name}", botName)
         else -> tr("Ask {name}").replace("{name}", botName)
@@ -231,7 +241,40 @@ fun MessageComposer(
                         )
                     }
                 } else {
-                    if (replyTo != null) {
+                    if (editingMessage != null) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(start = 18.dp, end = 6.dp, top = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Symbol("pencil", size = 14.dp, tint = Palette.electricBlue)
+                                Column {
+                                    Text(
+                                        "Modifier le message",
+                                        style = Type.caption2.semibold,
+                                        color = Palette.electricBlue
+                                    )
+                                    Text(
+                                        editingMessage.text,
+                                        style = Type.footnote,
+                                        color = Palette.secondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                            IconButton("Annuler", "xmark", action = {
+                                textState.edit { replace(0, length, "") }
+                                onCancelEdit()
+                            })
+                        }
+                    } else if (replyTo != null) {
                         Row(
                             Modifier.padding(start = 18.dp, end = 6.dp, top = 8.dp),
                             verticalAlignment = Alignment.CenterVertically

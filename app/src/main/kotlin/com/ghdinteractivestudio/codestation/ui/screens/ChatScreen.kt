@@ -82,20 +82,25 @@ import java.util.UUID
 import com.ghdinteractivestudio.codestation.ui.components.ApprovalCardItem
 import com.ghdinteractivestudio.codestation.ui.components.BotAvatar
 import com.ghdinteractivestudio.codestation.ui.components.ChatMessageItem
+import com.ghdinteractivestudio.codestation.ui.components.ChatMessageItem
 import com.ghdinteractivestudio.codestation.ui.components.GlassAlertDialog
+import com.ghdinteractivestudio.codestation.ui.components.GlassCodeBlocksDialog
 import com.ghdinteractivestudio.codestation.ui.components.GlassMenu
-import com.ghdinteractivestudio.codestation.ui.components.GlassAlertDialog
 import com.ghdinteractivestudio.codestation.ui.components.GlassMenuDivider
-import com.ghdinteractivestudio.codestation.ui.components.GlassAlertDialog
 import com.ghdinteractivestudio.codestation.ui.components.GlassMenuItem
 import com.ghdinteractivestudio.codestation.ui.components.GlassStage
+import com.ghdinteractivestudio.codestation.ui.components.GlassTextSelectionDialog
 import com.ghdinteractivestudio.codestation.ui.components.IconButton
+import com.ghdinteractivestudio.codestation.ui.components.MarkdownCodeBlock
 import com.ghdinteractivestudio.codestation.ui.components.MessageComposer
+import com.ghdinteractivestudio.codestation.ui.components.MessageContextMenu
 import com.ghdinteractivestudio.codestation.ui.components.ScrollEdge
 import com.ghdinteractivestudio.codestation.ui.components.Edge
 import com.ghdinteractivestudio.codestation.ui.components.Spinner
 import com.ghdinteractivestudio.codestation.ui.components.Symbol
 import com.ghdinteractivestudio.codestation.ui.components.ThinkingOrb
+import com.ghdinteractivestudio.codestation.ui.components.copyToClipboard
+import com.ghdinteractivestudio.codestation.ui.components.extractMarkdownCodeBlocks
 import com.ghdinteractivestudio.codestation.ui.components.glass
 import com.ghdinteractivestudio.codestation.ui.components.rememberPress
 import com.ghdinteractivestudio.codestation.ui.components.pressScale
@@ -125,6 +130,8 @@ fun ChatScreen(
     var isMenuOpen by remember { mutableStateOf(false) }
     var activeQuotedReply by remember { mutableStateOf<QuotedReply?>(null) }
     var activeContextMenuMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    var messageForSelection by remember { mutableStateOf<ChatMessage?>(null) }
+    var codeBlocksForDialog by remember { mutableStateOf<List<MarkdownCodeBlock>?>(null) }
 
     val voiceRecorder = remember { VoiceRecorder(context) }
     val transcriptionService = remember { VoiceTranscriptionService(context) }
@@ -529,6 +536,8 @@ fun ChatScreen(
                     isWorking = state.isBotWorking,
                     replyTo = activeQuotedReply,
                     onCancelReply = { activeQuotedReply = null },
+                    editingMessage = state.editingMessage,
+                    onCancelEdit = { viewModel.cancelEditingMessage() },
                     attachments = state.attachments,
                     onRemoveAttachment = { viewModel.removeAttachment(it) },
                     onPickPhoto = {
@@ -610,65 +619,52 @@ fun ChatScreen(
                         }
                     )
 
-                    GlassMenu(
+                    val codeBlocks = remember(msg.text) { extractMarkdownCodeBlocks(msg.text) }
+
+                    MessageContextMenu(
+                        message = msg,
                         expanded = activeContextMenuMessage?.id == msg.id,
+                        isBotWorking = state.isBotWorking,
+                        codeBlocksCount = codeBlocks.size,
                         onDismissRequest = { activeContextMenuMessage = null },
-                        width = 220.dp
-                    ) {
-                        // Copier (Tous les messages)
-                        GlassMenuItem(
-                            title = "Copier",
-                            icon = "doc.on.doc",
-                            tint = Palette.text,
-                            onClick = {
-                                val clipboard = ContextCompat.getSystemService(context, ClipboardManager::class.java)
-                                val clip = ClipData.newPlainText("Message CodeStation", msg.text)
-                                clipboard?.setPrimaryClip(clip)
-                                activeContextMenuMessage = null
-                            }
-                        )
-
-                        // Modifier (Uniquement pour les messages utilisateur)
-                        if (isUserMsg) {
-                            GlassMenuDivider()
-                            GlassMenuItem(
-                                title = "Modifier",
-                                icon = "pencil",
-                                tint = Palette.electricBlue,
-                                onClick = {
-                                    viewModel.onInputChanged(msg.text)
-                                    viewModel.deleteMessage(msg.id)
-                                    activeContextMenuMessage = null
-                                }
+                        onCopy = {
+                            copyToClipboard(
+                                context = context,
+                                text = msg.text,
+                                label = if (isUserMsg) "Message CodeStation" else "Réponse CodeStation",
+                                successMessage = if (isUserMsg) "Message copié dans le presse-papiers" else "Réponse copiée dans le presse-papiers"
                             )
-                        }
-
-                        // Régénérer (Uniquement pour les messages IA / Bot)
-                        if (!isUserMsg) {
-                            GlassMenuDivider()
-                            GlassMenuItem(
-                                title = "Régénérer",
-                                icon = "arrow.clockwise",
-                                tint = Palette.electricBlue,
-                                onClick = {
-                                    viewModel.regenerateResponse(msg.id)
-                                    activeContextMenuMessage = null
-                                }
-                            )
-                        }
-
-                        // Supprimer (Tous les messages)
-                        GlassMenuDivider()
-                        GlassMenuItem(
-                            title = "Supprimer",
-                            icon = "trash",
-                            destructive = true,
-                            onClick = {
-                                messagePendingDelete = msg
-                                activeContextMenuMessage = null
+                        },
+                        onEdit = {
+                            viewModel.startEditingMessage(msg)
+                        },
+                        onRegenerate = {
+                            if (state.isBotWorking) {
+                                android.widget.Toast.makeText(context, "Une génération est déjà en cours…", android.widget.Toast.LENGTH_SHORT).show()
+                            } else {
+                                viewModel.regenerateResponse(msg.id)
                             }
-                        )
-                    }
+                        },
+                        onCopyCode = {
+                            if (codeBlocks.size == 1) {
+                                val block = codeBlocks.first()
+                                copyToClipboard(
+                                    context = context,
+                                    text = block.code,
+                                    label = "Code",
+                                    successMessage = "Bloc de code (${block.language ?: "code"}) copié !"
+                                )
+                            } else if (codeBlocks.size > 1) {
+                                codeBlocksForDialog = codeBlocks
+                            }
+                        },
+                        onSelectText = {
+                            messageForSelection = msg
+                        },
+                        onDelete = {
+                            messagePendingDelete = msg
+                        }
+                    )
                 }
             }
 
@@ -730,6 +726,41 @@ fun ChatScreen(
                     ) {
                         Text("Annuler", style = Type.caption.semibold, color = Palette.text)
                     }
+                }
+            )
+        }
+
+        // Dialogue de sélection de texte précise sans conflit de geste
+        if (messageForSelection != null) {
+            val selMsg = messageForSelection!!
+            GlassTextSelectionDialog(
+                text = selMsg.text,
+                title = if (selMsg.author.type == MessageAuthorType.USER) "Sélectionner le message" else "Sélectionner la réponse",
+                onDismissRequest = { messageForSelection = null }
+            )
+        }
+
+        // Dialogue de sélection des blocs de code pour une réponse IA
+        if (codeBlocksForDialog != null) {
+            GlassCodeBlocksDialog(
+                codeBlocks = codeBlocksForDialog!!,
+                onDismissRequest = { codeBlocksForDialog = null },
+                onCopyBlock = { block ->
+                    copyToClipboard(
+                        context = context,
+                        text = block.code,
+                        label = "Code CodeStation",
+                        successMessage = "Bloc (${block.language ?: "code"}) copié !"
+                    )
+                },
+                onCopyAll = {
+                    val all = codeBlocksForDialog?.joinToString("\n\n") { it.code } ?: ""
+                    copyToClipboard(
+                        context = context,
+                        text = all,
+                        label = "Code complet",
+                        successMessage = "Tous les blocs de code (${codeBlocksForDialog?.size}) ont été copiés !"
+                    )
                 }
             )
         }

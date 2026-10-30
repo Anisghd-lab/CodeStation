@@ -416,3 +416,55 @@ sequenceDiagram
   - Trace Logcat temps réel Android :
     `CodeStationTrace: event=first_output_received | bot=bot-opencode-glm`
     `CodeStationTrace: event=response_completed | details={botId=bot-opencode-glm, textLength=137}`
+
+---
+
+## Mission — Actions Contextuelles des Messages & Menu Glassmorphism (30 Octobre 2026)
+
+### 1. Objectifs Réalisés
+Implémentation complète et native des actions contextuelles sur les messages de discussion dans CodeStation (Android Jetpack Compose + CodeStation Host API locale) :
+- **Appui long sur message utilisateur** :
+  - **Copier** : Copie l'intégralité du texte dans le presse-papiers Android avec feedback Toast discret.
+  - **Modifier** : Ouvre l'éditeur de message en mode édition avec préremplissage automatique, bandeau visuel Glassmorphism « Modifier le message », bouton « Annuler » et envoi sans suppression préalable de l'historique d'origine.
+  - **Sélectionner** : Ouvre une boîte de dialogue Frosted Liquid Glass avec `SelectionContainer`, permettant la sélection précise de tout extrait sans conflit de défilement ou d'appui long.
+- **Appui long sur réponse IA / Bot** :
+  - **Copier** : Copie la réponse intégrale en préservant le Markdown et les retours à la ligne, avec feedback Toast.
+  - **Régénérer** : Retrouve le prompt utilisateur d'origine dans la session, vérifie l'absence de génération concurrente en cours, et sollicite une nouvelle génération via l'API réelle (`sendMessage` -> CodeStation Host) en conservant l'historique complet.
+  - **Copier le code** : Analyse intelligente des blocs Markdown. Si 1 bloc : copie immédiate avec Toast. Si plusieurs blocs : dialogue Glass listant chaque bloc par langage avec boutons de copie individuels et « Tout copier ».
+  - **Sélectionner** : Sélection de fragment de texte dédiée via dialogue Glass.
+- **Menu Contextuel Glassmorphism** :
+  - Respect scrupuleux des tokens visuels (`Palette.glassSurface`, `Palette.glassBorder`, `Palette.electricBlue`, `Palette.text`, `Capsule`, `RoundedRectangle(18.dp/22.dp)`).
+  - Icônes SF Symbols / vectorielles cohérentes (`doc.on.doc`, `pencil`, `arrow.clockwise`, `terminal`, `text.cursor`, `trash`).
+  - Fermeture automatique sur tap extérieur, touche retour ou navigation.
+
+### 2. Fichiers Modifiés & Ajoutés
+1. `app/src/main/kotlin/com/ghdinteractivestudio/codestation/ui/components/ChatMessageContextMenu.kt` (Nouveau) :
+   - `copyToClipboard(context, text, label, successMessage)`
+   - `MessageContextMenu(...)`
+   - `GlassTextSelectionDialog(...)`
+   - `GlassCodeBlocksDialog(...)`
+2. `app/src/main/kotlin/com/ghdinteractivestudio/codestation/ui/components/MarkdownMessageView.kt` :
+   - Ajout de `extractMarkdownCodeBlocks(rawText)` et de la classe de données `MarkdownCodeBlock`.
+3. `app/src/main/kotlin/com/ghdinteractivestudio/codestation/ui/components/Symbols.kt` :
+   - Ajout des alias `"pencil"`, `"text.alignleft"`, `"text.cursor"`.
+4. `app/src/main/kotlin/com/ghdinteractivestudio/codestation/ui/components/MessageComposer.kt` :
+   - Support des paramètres `editingMessage` et `onCancelEdit`.
+   - Affichage du bandeau supérieur d'édition avec libellé et bouton Annuler.
+   - Synchronisation réactive du texte dans `textState` et focus automatique.
+5. `app/src/main/kotlin/com/ghdinteractivestudio/codestation/viewmodel/ChatViewModel.kt` :
+   - Exposition de `editingMessage: ChatMessage?` dans `ChatUiState`.
+   - Ajout de `startEditingMessage`, `cancelEditingMessage`, `confirmEditAndSend`.
+   - Sécurisation de `regenerateResponse` : verrouillage contre les régénérations simultanées (`_isBotWorking`), conservation des messages antérieurs dans la timeline, transmission du prompt et des pièces jointes associées.
+6. `app/src/main/kotlin/com/ghdinteractivestudio/codestation/ui/screens/ChatScreen.kt` :
+   - Intégration de `MessageContextMenu`, `GlassTextSelectionDialog`, `GlassCodeBlocksDialog` et liaison du mode édition avec `MessageComposer`.
+7. `app/src/test/kotlin/com/ghdinteractivestudio/codestation/viewmodel/ChatViewModelTest.kt` :
+   - Tests unitaires complets pour le mode édition et la régénération sans suppression trompeuse.
+
+### 3. Preuves de Validation
+- **Tests unitaires Gradle** :
+  `./gradlew testDebugUnitTest` -> **BUILD SUCCESSFUL** (8/8 tests passés dans `ChatViewModelTest`).
+- **Compilation APK Debug** :
+  `./gradlew assembleDebug` -> **BUILD SUCCESSFUL** (`app-debug.apk`).
+- **Déploiement ADB** :
+  Connexion à `192.168.1.23:45915` et installation `adb install -r app-debug.apk` -> **Success**.
+

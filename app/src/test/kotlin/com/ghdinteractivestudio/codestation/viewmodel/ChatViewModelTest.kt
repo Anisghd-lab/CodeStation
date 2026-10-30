@@ -109,4 +109,77 @@ class ChatViewModelTest {
 
         coVerify { chatRepository.deleteMessage("msg-1") }
     }
+
+    @Test
+    fun `test startEditingMessage updates state with message text and reference`() = runTest(testDispatcher) {
+        val viewModel = ChatViewModel("bot-1", botRepository, chatRepository)
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect() }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val msg = testMessages.first()
+        viewModel.startEditingMessage(msg)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("Bonjour", state.inputDraft)
+        assertEquals(msg.id, state.editingMessage?.id)
+    }
+
+    @Test
+    fun `test cancelEditingMessage resets editing state and input draft`() = runTest(testDispatcher) {
+        val viewModel = ChatViewModel("bot-1", botRepository, chatRepository)
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect() }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val msg = testMessages.first()
+        viewModel.startEditingMessage(msg)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.cancelEditingMessage()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("", state.inputDraft)
+        assertEquals(null, state.editingMessage)
+    }
+
+    @Test
+    fun `test confirmEditAndSend sends updated text and clears editing message`() = runTest(testDispatcher) {
+        val viewModel = ChatViewModel("bot-1", botRepository, chatRepository)
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect() }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val msg = testMessages.first()
+        viewModel.startEditingMessage(msg)
+        viewModel.confirmEditAndSend("Bonjour modifié")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify { chatRepository.sendMessage("bot-1", "Bonjour modifié", null, any()) }
+        assertEquals(null, viewModel.uiState.value.editingMessage)
+        assertEquals("", viewModel.uiState.value.inputDraft)
+    }
+
+    @Test
+    fun `test regenerateResponse finds preceding user prompt and triggers generation without deleting old message`() = runTest(testDispatcher) {
+        val botReply = ChatMessage(
+            id = "bot-msg-1",
+            botId = "bot-1",
+            author = MessageAuthor(MessageAuthorType.BOT, "bot-1", "Test Bot"),
+            text = "Voici la réponse originale",
+            isFinal = true
+        )
+        every { chatRepository.getMessagesStream("bot-1") } returns flowOf(listOf(testMessages.first(), botReply))
+
+        val viewModel = ChatViewModel("bot-1", botRepository, chatRepository)
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect() }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.regenerateResponse("bot-msg-1")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Verifies the user prompt was retrieved and re-sent
+        coVerify { chatRepository.sendMessage("bot-1", "Bonjour", null, any()) }
+        // Verify deleteMessage was NOT called (preserving history)
+        coVerify(exactly = 0) { chatRepository.deleteMessage("bot-msg-1") }
+    }
 }

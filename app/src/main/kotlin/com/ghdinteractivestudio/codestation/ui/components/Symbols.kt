@@ -87,6 +87,8 @@ fun symbolRes(name: String): Int? = when (name) {
     "mic.fill" -> R.drawable.sf_mic_fill
     "mic.slash" -> R.drawable.sf_mic_slash
     "network" -> R.drawable.sf_network
+    "pause.fill" -> R.drawable.sf_pause_fill
+    "pencil" -> R.drawable.sf_pencil
     "person" -> R.drawable.sf_person_fill
     "person.2" -> R.drawable.sf_person_2
     "person.fill" -> R.drawable.sf_person_fill
@@ -115,7 +117,9 @@ fun symbolRes(name: String): Int? = when (name) {
     "star.fill" -> R.drawable.sf_star_fill
     "stop.fill" -> R.drawable.sf_stop_fill
     "terminal" -> R.drawable.sf_terminal
+    "text.alignleft" -> R.drawable.sf_note_text
     "text.bubble" -> R.drawable.sf_text_bubble
+    "text.cursor" -> R.drawable.sf_note_text
     "trash" -> R.drawable.sf_trash
     "waveform" -> R.drawable.sf_waveform
     "wifi" -> R.drawable.sf_wifi
