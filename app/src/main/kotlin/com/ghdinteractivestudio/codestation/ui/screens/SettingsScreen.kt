@@ -19,11 +19,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.ghdinteractivestudio.codestation.ui.components.GlassAlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -375,7 +375,7 @@ fun SettingsScreen(
     }
 
     if (showOverlayPermissionDialog) {
-        AlertDialog(
+        GlassAlertDialog(
             onDismissRequest = { showOverlayPermissionDialog = false },
             title = { Text("Autorisation de superposition requise", style = Type.title3.bold, color = Palette.text) },
             text = {
@@ -406,7 +406,7 @@ fun SettingsScreen(
     }
 
     if (confirmStartOver) {
-        AlertDialog(
+        GlassAlertDialog(
             onDismissRequest = { confirmStartOver = false },
             title = { Text("Réinitialiser les sessions ?", style = Type.title3.bold, color = Palette.text) },
             text = {
@@ -430,8 +430,7 @@ fun SettingsScreen(
                 TextButton(onClick = { confirmStartOver = false }) {
                     Text("Annuler", color = Palette.secondary)
                 }
-            },
-            containerColor = Palette.surface
+            }
         )
     }
 }

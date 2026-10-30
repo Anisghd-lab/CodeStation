@@ -8,8 +8,14 @@ import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -27,14 +33,17 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.semantics.Role
@@ -60,6 +69,7 @@ import com.ghdinteractivestudio.codestation.ui.components.CharacterAvatar
 import com.ghdinteractivestudio.codestation.ui.components.IslandPhase
 import com.ghdinteractivestudio.codestation.ui.components.Symbol
 import com.ghdinteractivestudio.codestation.ui.components.formatIslandElapsed
+import com.ghdinteractivestudio.codestation.ui.components.frostedLiquidGlass
 import com.ghdinteractivestudio.codestation.ui.theme.Capsule
 import com.ghdinteractivestudio.codestation.ui.theme.CodeStationTheme
 import com.ghdinteractivestudio.codestation.ui.theme.Motion
@@ -98,8 +108,10 @@ class DynamicIslandOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
 
     private var windowManager: WindowManager? = null
     private var overlayView: ComposeView? = null
+    private var currentLayoutParams: WindowManager.LayoutParams? = null
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var observerJob: Job? = null
+    private val isOverlayExpanded = androidx.compose.runtime.mutableStateOf(false)
 
     companion object {
         fun start(context: Context) {
@@ -156,6 +168,40 @@ class DynamicIslandOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
         }
     }
 
+    fun updateOverlayExpansion(expanded: Boolean) {
+        val view = overlayView ?: return
+        val params = currentLayoutParams ?: return
+        val density = resources.displayMetrics.density
+        isOverlayExpanded.value = expanded
+
+        if (expanded) {
+            params.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            params.x = 0
+            params.y = (10 * density).toInt()
+            params.width = (340 * density).toInt()
+            params.height = WindowManager.LayoutParams.WRAP_CONTENT
+            params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+        } else {
+            // Positionné dans la zone libérée à gauche des icônes Wi-Fi et réseau
+            // (entre la découpe caméra x=574px et l'icône Wi-Fi x=773px)
+            params.gravity = Gravity.TOP or Gravity.END
+            params.x = (106 * density).toInt()
+            params.y = (9 * density).toInt()
+            params.width = WindowManager.LayoutParams.WRAP_CONTENT
+            params.height = WindowManager.LayoutParams.WRAP_CONTENT
+            params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+        }
+
+        try {
+            windowManager?.updateViewLayout(view, params)
+        } catch (_: Exception) {}
+    }
+
     private fun showOverlay(activeBot: Bot?, activeApproval: ApprovalEntity?) {
         if (overlayView != null) {
             // Vue déjà attachée, Compose se recompose automatiquement grâce aux flows
@@ -164,6 +210,7 @@ class DynamicIslandOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
 
         val app = application as? CodeStationApplication ?: return
         val container = app.container
+        val density = resources.displayMetrics.density
 
         val layoutParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -175,26 +222,62 @@ class DynamicIslandOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
                 WindowManager.LayoutParams.TYPE_PHONE
             },
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            y = 12
+            gravity = Gravity.TOP or Gravity.END
+            x = (106 * density).toInt()
+            y = (9 * density).toInt()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
             }
         }
+        currentLayoutParams = layoutParams
 
         val composeView = ComposeView(this).apply {
             setViewTreeLifecycleOwner(this@DynamicIslandOverlayService)
             setViewTreeViewModelStoreOwner(this@DynamicIslandOverlayService)
             setViewTreeSavedStateRegistryOwner(this@DynamicIslandOverlayService)
 
+            var downTime = 0L
+            var downX = 0f
+            var downY = 0f
+            setOnTouchListener { _, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_OUTSIDE -> {
+                        if (isOverlayExpanded.value) {
+                            updateOverlayExpansion(false)
+                        }
+                        true
+                    }
+                    MotionEvent.ACTION_DOWN -> {
+                        downTime = System.currentTimeMillis()
+                        downX = event.rawX
+                        downY = event.rawY
+                        false
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        val elapsed = System.currentTimeMillis() - downTime
+                        val dx = Math.abs(event.rawX - downX)
+                        val dy = Math.abs(event.rawY - downY)
+                        if (elapsed < 350 && dx < 25 * density && dy < 25 * density) {
+                            if (!isOverlayExpanded.value) {
+                                updateOverlayExpansion(true)
+                            }
+                        }
+                        false
+                    }
+                    else -> false
+                }
+            }
+
             setContent {
                 CodeStationTheme(darkTheme = true) {
                     OverlayIslandContent(
                         container = container,
+                        isExpandedState = isOverlayExpanded,
                         onOpenBot = { botId ->
                             val intent = Intent(this@DynamicIslandOverlayService, MainActivity::class.java).apply {
                                 action = Intent.ACTION_VIEW
@@ -203,6 +286,9 @@ class DynamicIslandOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                             }
                             startActivity(intent)
+                        },
+                        onToggleExpand = { expanded ->
+                            updateOverlayExpansion(expanded)
                         }
                     )
                 }
@@ -243,7 +329,9 @@ class DynamicIslandOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
 @Composable
 private fun OverlayIslandContent(
     container: com.ghdinteractivestudio.codestation.AppContainer,
-    onOpenBot: (String) -> Unit
+    isExpandedState: androidx.compose.runtime.MutableState<Boolean>,
+    onOpenBot: (String) -> Unit,
+    onToggleExpand: (Boolean) -> Unit = {}
 ) {
     val bots by container.botRepository.getBotsStream().collectAsState(initial = emptyList())
     val approvals by container.approvalDao.getAllPendingApprovalsStream().collectAsState(initial = emptyList())
@@ -251,7 +339,20 @@ private fun OverlayIslandContent(
     val activeApproval = approvals.firstOrNull()
     val activeBot = bots.firstOrNull { it.status == BotStatus.WORKING || it.status == BotStatus.BUSY }
 
-    var isExpanded by remember { mutableStateOf(false) }
+    val isExpanded = isExpandedState.value
+    var startedAt by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
+    var previousWorkingBotId by remember { mutableStateOf<String?>(null) }
+
+    androidx.compose.runtime.LaunchedEffect(activeBot?.id, activeBot?.status) {
+        if (activeBot != null && (activeBot.status == BotStatus.WORKING || activeBot.status == BotStatus.BUSY)) {
+            if (previousWorkingBotId != activeBot.id) {
+                startedAt = System.currentTimeMillis()
+                previousWorkingBotId = activeBot.id
+            }
+        } else if (activeBot == null) {
+            previousWorkingBotId = null
+        }
+    }
 
     val phase = when {
         activeApproval != null -> IslandPhase.NEEDS_APPROVAL
@@ -262,10 +363,19 @@ private fun OverlayIslandContent(
     val botId = activeApproval?.botId ?: activeBot?.id ?: ""
     val botName = activeApproval?.botName ?: activeBot?.name ?: "Agent CodeStation"
 
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "PulseScale"
+    )
+
     Box(
-        modifier = Modifier
-            .wrapContentSize()
-            .padding(top = 10.dp, start = 8.dp, end = 8.dp)
+        modifier = Modifier.wrapContentSize()
     ) {
         AnimatedContent(
             targetState = isExpanded,
@@ -273,15 +383,16 @@ private fun OverlayIslandContent(
             label = "OverlayContent"
         ) { expanded ->
             if (expanded) {
-                // Expanded Overlay Card
+                // Expanded Overlay Card with Frosted Liquid Glass
                 val cardShape = RoundedRectangle(22.dp)
                 Column(
                     modifier = Modifier
                         .widthIn(max = 340.dp)
-                        .background(Color(0xF50B0D12), cardShape)
-                        .border(0.5.dp, Palette.glassBorder, cardShape)
-                        .clip(cardShape)
-                        .padding(12.dp),
+                        .frostedLiquidGlass(
+                            shape = cardShape,
+                            isUser = (phase == IslandPhase.NEEDS_APPROVAL)
+                        )
+                        .padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Row(
@@ -299,13 +410,15 @@ private fun OverlayIslandContent(
 
                         Box(
                             modifier = Modifier
-                                .size(24.dp)
+                                .size(26.dp)
                                 .background(Color.White.copy(alpha = 0.1f), Capsule())
                                 .clip(Capsule())
-                                .clickable { isExpanded = false },
+                                .clickable {
+                                    onToggleExpand(false)
+                                },
                             contentAlignment = Alignment.Center
                         ) {
-                            Symbol("chevron.up", size = 11.dp, tint = Color.White)
+                            Symbol("chevron.up", size = 12.dp, tint = Color.White)
                         }
                     }
 
@@ -318,7 +431,7 @@ private fun OverlayIslandContent(
                             overflow = TextOverflow.Ellipsis
                         )
                     } else {
-                        val activityText = activeBot?.lastMessage ?: activeBot?.description?.takeIf { it.isNotBlank() } ?: "Traitement en arrière-plan..."
+                        val activityText = activeBot?.lastMessage ?: activeBot?.description?.takeIf { it.isNotBlank() } ?: "Traitement en cours..."
                         Text(
                             text = activityText,
                             style = Type.caption,
@@ -334,41 +447,45 @@ private fun OverlayIslandContent(
                             .background(Palette.electricBlue, Capsule())
                             .clip(Capsule())
                             .clickable {
-                                isExpanded = false
+                                onToggleExpand(false)
                                 if (botId.isNotEmpty()) onOpenBot(botId)
                             }
-                            .padding(vertical = 7.dp),
+                            .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text("Accéder à l'Agent", style = Type.caption.bold, color = Color.White)
                     }
                 }
             } else {
-                // Collapsed Overlay Pill
-                val pillShape = Capsule()
+                // Collapsed Overlay Pill dans la barre d'état avec les icônes devant l'horloge
+                // Conforme au design compact "Preview / Simple task" (StateScreen.kt:764)
+                val pillBg = when (phase) {
+                    IslandPhase.NEEDS_APPROVAL -> Color(0xFF8A5A00)
+                    IslandPhase.ERROR -> Color(0xFF8B251E)
+                    else -> Color(0xFF2C2C2C)
+                }
                 Row(
                     modifier = Modifier
-                        .background(Color(0xF00B0D12), pillShape)
-                        .border(0.5.dp, Palette.glassBorder, pillShape)
-                        .clip(pillShape)
-                        .clickable { isExpanded = true }
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                        .clip(Capsule())
+                        .background(pillBg)
+                        .clickable(role = Role.Button) {
+                            onToggleExpand(true)
+                        }
+                        .padding(start = 7.dp, end = 8.dp, top = 2.5.dp, bottom = 2.5.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.5.dp)
                 ) {
-                    val dotColor = if (phase == IslandPhase.NEEDS_APPROVAL) Palette.warning else Palette.emeraldAccent
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(Capsule())
-                            .background(dotColor)
-                    )
+                    Symbol("sparkles", size = 11.dp, tint = Color.White)
                     Text(
-                        text = if (phase == IslandPhase.NEEDS_APPROVAL) "Action requise" else botName,
-                        style = Type.caption.semibold,
+                        text = when (phase) {
+                            IslandPhase.WORKING -> formatIslandElapsed(startedAt)
+                            IslandPhase.NEEDS_APPROVAL -> "Needs you"
+                            IslandPhase.COMPLETED -> "Done"
+                            IslandPhase.ERROR -> "Failed"
+                        },
+                        style = Type.system(10.5f).semibold.monospacedDigit,
                         color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        maxLines = 1
                     )
                 }
             }

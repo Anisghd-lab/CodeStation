@@ -84,6 +84,13 @@ case "$ACTION" in
             exit 1
         fi
         PROMPT="$*"
+        if [ "$PROMPT" = "/quota" ] || [ "$PROMPT" = "/usage" ]; then
+            if command -v agy >/dev/null 2>&1; then
+                exec agy -p "/quota" --dangerously-skip-permissions
+            elif [ -x "/root/.local/bin/agy" ]; then
+                exec /root/.local/bin/agy -p "/quota" --dangerously-skip-permissions
+            fi
+        fi
         if [ -z "$PROMPT" ]; then
             exec "$OPENCODE_BIN" run -m "opencode/glm-5.3-flash-free" --format default
         else

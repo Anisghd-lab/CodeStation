@@ -155,6 +155,27 @@ class BotRepositoryImpl(
                     )
                 )
             }
+            if (botDao.getBotById("bot-codebuddy") == null) {
+                botDao.insertBot(
+                    BotEntity.fromDomain(
+                        Bot(
+                            id = "bot-codebuddy",
+                            name = "CodeBuddy Code",
+                            description = "Agent CodeBuddy Code propulsé par la CLI locale (Hy3 v2.178.1)",
+                            avatarGlyph = "circle",
+                            avatarColorHex = "#3B82F6",
+                            provider = ProviderType.CODEBUDDY,
+                            model = "Hy3",
+                            isFastMode = true,
+                            isLead = false,
+                            isPinned = true,
+                            status = BotStatus.IDLE,
+                            lastMessage = "Prêt. CodeBuddy Code CLI (v2.178.1) opérationnel.",
+                            instructions = "Tu es un agent de codage CodeBuddy Code expert."
+                        )
+                    )
+                )
+            }
             if (botDao.getBotCount() == 0) {
                 seedInitialBots()
             }
@@ -210,6 +231,21 @@ class BotRepositoryImpl(
                 status = BotStatus.IDLE,
                 lastMessage = "Prêt. Modèle gratuit GLM-5.3-Flash actif via OpenCode CLI.",
                 instructions = "Tu es un agent de codage propulsé par OpenCode et le modèle gratuit GLM-5.3-Flash."
+            ),
+            Bot(
+                id = "bot-codebuddy",
+                name = "CodeBuddy Code",
+                description = "Agent CodeBuddy Code propulsé par la CLI locale (Hy3 v2.178.1)",
+                avatarGlyph = "circle",
+                avatarColorHex = "#3B82F6",
+                provider = ProviderType.CODEBUDDY,
+                model = "Hy3",
+                isFastMode = true,
+                isLead = false,
+                isPinned = true,
+                status = BotStatus.IDLE,
+                lastMessage = "Prêt. CodeBuddy Code CLI (v2.178.1) opérationnel.",
+                instructions = "Tu es un agent de codage CodeBuddy Code expert."
             ),
             Bot(
                 id = "bot-codex-terminal",

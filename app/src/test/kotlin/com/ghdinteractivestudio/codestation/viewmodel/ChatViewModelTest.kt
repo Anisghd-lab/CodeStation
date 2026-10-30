@@ -98,4 +98,15 @@ class ChatViewModelTest {
 
         coVerify { chatRepository.respondApproval("app-123", ApprovalStatus.APPROVED, true) }
     }
+
+    @Test
+    fun `test delete message invokes repository`() = runTest(testDispatcher) {
+        val viewModel = ChatViewModel("bot-1", botRepository, chatRepository)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.deleteMessage("msg-1")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify { chatRepository.deleteMessage("msg-1") }
+    }
 }

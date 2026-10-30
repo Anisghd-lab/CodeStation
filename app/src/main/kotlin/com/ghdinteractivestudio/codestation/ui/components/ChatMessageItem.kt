@@ -1,8 +1,8 @@
 package com.ghdinteractivestudio.codestation.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,34 +30,36 @@ import com.ghdinteractivestudio.codestation.ui.theme.Type
 import com.ghdinteractivestudio.codestation.ui.theme.bold
 import com.ghdinteractivestudio.codestation.ui.theme.semibold
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChatMessageItem(
     message: ChatMessage,
     onQuoteReply: (ChatMessage) -> Unit = {},
+    onLongClick: (ChatMessage) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isUser = message.author.type == MessageAuthorType.USER
     val alignment = if (isUser) Alignment.End else Alignment.Start
-    val bubbleColor = if (isUser) Palette.bubbleUser else Palette.bubbleAgent
 
     val bubbleShape = if (isUser) {
-        RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 4.dp)
+        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 6.dp)
     } else {
-        RoundedCornerShape(topStart = 4.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 18.dp)
+        RoundedCornerShape(topStart = 6.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 20.dp)
     }
 
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .padding(horizontal = 4.dp, vertical = 3.dp)
     ) {
-        val maxBubbleWidth = if (isUser) maxWidth * 0.86f else maxWidth * 0.96f
+        // Largeur maximale : ~80% pour l'utilisateur, ~90% pour l'assistant
+        val maxBubbleWidth = if (isUser) maxWidth * 0.80f else maxWidth * 0.90f
 
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = alignment
         ) {
-            // Agent Identity Header
+            // Agent Identity Header (au-dessus de la bulle pour l'assistant)
             if (!isUser && message.author.type == MessageAuthorType.BOT) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -65,7 +69,7 @@ fun ChatMessageItem(
                     CharacterAvatar(
                         shape = message.author.avatarGlyph?.takeIf { it.isNotEmpty() } ?: "diamond",
                         color = "blue",
-                        size = 22.dp
+                        size = 20.dp
                     )
                     Text(
                         message.author.displayName,
@@ -76,20 +80,25 @@ fun ChatMessageItem(
             }
 
             Box(
-                Modifier
-                    .widthIn(max = maxBubbleWidth)
-                    .background(bubbleColor, bubbleShape)
-                    .border(0.5.dp, Palette.glassBorder, bubbleShape)
-                    .clip(bubbleShape)
-                    .clickable { onQuoteReply(message) }
+                modifier = Modifier
+                    .wrapContentWidth(align = alignment)
+                    .widthIn(min = 36.dp, max = maxBubbleWidth)
+                    .frostedLiquidGlass(shape = bubbleShape, isUser = isUser)
+                    .combinedClickable(
+                        onClick = { onQuoteReply(message) },
+                        onLongClick = { onLongClick(message) }
+                    )
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(
+                    modifier = Modifier.wrapContentSize(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     // Quoted Reply Preview
                     if (message.replyTo != null) {
                         Row(
                             Modifier
-                                .fillMaxWidth()
+                                .wrapContentWidth()
                                 .background(Palette.text.copy(alpha = 0.08f), RoundedRectangle(6.dp))
                                 .clip(RoundedRectangle(6.dp))
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -101,7 +110,7 @@ fun ChatMessageItem(
                                     .clip(RoundedRectangle(1.dp))
                                     .background(Palette.electricBlue)
                             )
-                            Column {
+                            Column(Modifier.wrapContentWidth()) {
                                 Text(
                                     message.replyTo.authorName,
                                     style = Type.caption2.bold,
@@ -123,7 +132,7 @@ fun ChatMessageItem(
                         message.attachments.forEach { att ->
                             Row(
                                 Modifier
-                                    .fillMaxWidth()
+                                    .wrapContentWidth()
                                     .background(Palette.text.copy(alpha = 0.08f), RoundedRectangle(8.dp))
                                     .clip(RoundedRectangle(8.dp))
                                     .padding(horizontal = 8.dp, vertical = 6.dp),
@@ -136,7 +145,7 @@ fun ChatMessageItem(
                                     else -> "doc"
                                 }
                                 Symbol(icon, size = 16.dp, tint = Palette.electricBlue)
-                                Column(Modifier.weight(1f)) {
+                                Column(Modifier.wrapContentWidth()) {
                                     Text(
                                         att.name,
                                         style = Type.caption2.semibold,

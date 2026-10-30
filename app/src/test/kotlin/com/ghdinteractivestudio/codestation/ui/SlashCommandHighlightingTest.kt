@@ -75,4 +75,60 @@ class SlashCommandHighlightingTest {
         // Raw text content preserved
         assertTrue(richText.text.contains("/quota"))
     }
+
+    @Test
+    fun `test quota command output parsed into QuotaCard block with gauges data`() {
+        val rawQuotaOutput = """
+            Quota:
+            Gemini Models          Weekly Limit Remaining     70%   2026-11-05 12:52 UTC
+            Gemini Models          Five Hour Limit Remaining  83%   2026-10-30 03:52 UTC
+            Claude and GPT models  Weekly Limit Remaining     100%  2026-11-05 23:51 UTC
+            Claude and GPT models  Five Hour Limit Remaining  100%  2026-10-30 04:51 UTC
+        """.trimIndent()
+
+        val blocks = com.ghdinteractivestudio.codestation.ui.components.parseMarkdownBlocks(rawQuotaOutput)
+        assertEquals(1, blocks.size)
+        assertTrue(blocks[0] is com.ghdinteractivestudio.codestation.ui.components.MarkdownBlock.QuotaCard)
+
+        val card = blocks[0] as com.ghdinteractivestudio.codestation.ui.components.MarkdownBlock.QuotaCard
+        assertEquals(4, card.items.size)
+
+        // Item 1: Gemini Weekly
+        assertEquals("Gemini Models", card.items[0].group)
+        assertEquals("Weekly Limit Remaining", card.items[0].limitType)
+        assertEquals(70.0, card.items[0].remainingPercent, 0.01)
+        assertEquals("2026-11-05 12:52 UTC", card.items[0].resetText)
+
+        // Item 2: Gemini 5-hour
+        assertEquals("Gemini Models", card.items[1].group)
+        assertEquals("Five Hour Limit Remaining", card.items[1].limitType)
+        assertEquals(83.0, card.items[1].remainingPercent, 0.01)
+        assertEquals("2026-10-30 03:52 UTC", card.items[1].resetText)
+
+        // Item 3: Claude Weekly
+        assertEquals("Claude and GPT models", card.items[2].group)
+        assertEquals(100.0, card.items[2].remainingPercent, 0.01)
+
+        // Item 4: Claude 5-hour
+        assertEquals("Claude and GPT models", card.items[3].group)
+        assertEquals(100.0, card.items[3].remainingPercent, 0.01)
+
+        // Tab-delimited format (piped / non-interactive agy)
+        val tabbedOutput = "Gemini Models\tWeekly Limit Remaining\t69%\t2026-11-05T12:52:22Z\nClaude and GPT models\tFive Hour Limit Remaining\t100%\t2026-10-30T05:04:23Z"
+        val tabBlocks = com.ghdinteractivestudio.codestation.ui.components.parseMarkdownBlocks(tabbedOutput)
+        assertEquals(1, tabBlocks.size)
+        assertTrue(tabBlocks[0] is com.ghdinteractivestudio.codestation.ui.components.MarkdownBlock.QuotaCard)
+        val tabCard = tabBlocks[0] as com.ghdinteractivestudio.codestation.ui.components.MarkdownBlock.QuotaCard
+        assertEquals(2, tabCard.items.size)
+        assertEquals(69.0, tabCard.items[0].remainingPercent, 0.01)
+    }
+
+    @Test
+    fun `test formatLimitLabel transforms standard raw limits into clean French`() {
+        val weekly = com.ghdinteractivestudio.codestation.ui.components.formatLimitLabel("Weekly Limit Remaining")
+        assertEquals("Limite Hebdomadaire (7j)", weekly)
+
+        val fiveHour = com.ghdinteractivestudio.codestation.ui.components.formatLimitLabel("Five Hour Limit Remaining")
+        assertEquals("Session 5 Heures", fiveHour)
+    }
 }

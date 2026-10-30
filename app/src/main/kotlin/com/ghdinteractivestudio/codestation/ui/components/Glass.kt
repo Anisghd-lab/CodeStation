@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -80,21 +81,38 @@ enum class Edge { Top, Bottom }
 fun ScrollEdge(edge: Edge, height: Dp, modifier: Modifier = Modifier) {
     val ground = Palette.background
     val top = edge == Edge.Top
-    val wash = listOf(
-        ground.copy(alpha = 0.95f),
-        ground.copy(alpha = 0.65f),
-        ground.copy(alpha = 0f)
-    )
+    val wash = if (top) {
+        arrayOf(
+            0.0f to ground,
+            0.60f to ground,
+            0.85f to ground.copy(alpha = 0.7f),
+            1.0f to ground.copy(alpha = 0f)
+        )
+    } else {
+        arrayOf(
+            0.0f to ground.copy(alpha = 0f),
+            0.15f to ground.copy(alpha = 0.7f),
+            0.40f to ground,
+            1.0f to ground
+        )
+    }
     Box(
         modifier
             .fillMaxWidth()
             .height(height)
-            .background(Brush.verticalGradient(if (top) wash else wash.reversed()))
+            .background(Brush.verticalGradient(colorStops = wash))
     )
 }
 
 enum class GlassStyle { Regular, Clear, Menu, Card, Accent }
 
+/**
+ * Frosted Liquid Glassmorphism (Inspired by Social Media UI Cards Frosted Liquid Glass Effect).
+ * Features:
+ * - Specular gradient border (bright rim on top/corners, soft ambient on bottom)
+ * - Frosted translucent fill with subtle liquid specular reflection sheen
+ * - Clean curvature and clipping without cutting shadows or content
+ */
 @Composable
 fun Modifier.glass(
     shape: Shape = Capsule(),
@@ -108,22 +126,147 @@ fun Modifier.glass(
         tint
     } else {
         when (style) {
-            GlassStyle.Regular -> if (dark) Color(0x38171B24) else Color(0xD9FFFFFF)
-            GlassStyle.Clear -> if (dark) Color(0x2412151C) else Color(0xB3FFFFFF)
+            GlassStyle.Regular -> if (dark) Color(0x28171B24) else Color(0xD9FFFFFF)
+            GlassStyle.Clear -> if (dark) Color(0x1812151C) else Color(0xB3FFFFFF)
             GlassStyle.Menu -> if (dark) Color(0xE6171B24) else Color(0xF2FFFFFF)
-            GlassStyle.Card -> if (dark) Color(0xB3171B24) else Color(0xEEFFFFFF)
+            GlassStyle.Card -> if (dark) Color(0x401A202C) else Color(0xEEFFFFFF)
             GlassStyle.Accent -> if (dark) Color(0x33438DFF) else Color(0x26438DFF)
         }
     }
-    val borderCol = if (dark) {
-        if (style == GlassStyle.Accent) Color(0x66438DFF) else Color(0x33FFFFFF)
+
+    val rimBrush = if (dark) {
+        if (style == GlassStyle.Accent) {
+            Brush.verticalGradient(
+                listOf(
+                    Color(0xFF6BA6FF),
+                    Color(0x80438DFF),
+                    Color(0x33438DFF)
+                )
+            )
+        } else {
+            Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = if (style == GlassStyle.Menu) 0.55f else 0.75f),
+                    Color.White.copy(alpha = 0.25f),
+                    Color.White.copy(alpha = 0.10f)
+                )
+            )
+        }
     } else {
-        if (style == GlassStyle.Accent) Color(0x40438DFF) else Color(0x18000000)
+        Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.95f),
+                Color.Black.copy(alpha = 0.06f),
+                Color.Black.copy(alpha = 0.14f)
+            )
+        )
     }
-    val bgCol = if (pressed) base.copy(alpha = 0.96f) else base
+
+    val bgBrush = if (dark) {
+        Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = if (pressed) 0.18f else 0.10f),
+                base.copy(alpha = if (pressed) 0.85f else 0.55f),
+                base.copy(alpha = if (pressed) 0.95f else 0.70f)
+            )
+        )
+    } else {
+        Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.95f),
+                base.copy(alpha = 0.80f),
+                base.copy(alpha = 0.90f)
+            )
+        )
+    }
+
     return this
-        .background(bgCol, shape)
-        .border(0.5.dp, borderCol, shape)
+        .background(bgBrush, shape)
+        .border(BorderStroke(1.dp, rimBrush), shape)
+        .clip(shape)
+}
+
+/**
+ * Direct Frosted Liquid Glass modifier for custom shapes and tints.
+ */
+@Composable
+fun Modifier.frostedLiquidGlass(
+    shape: Shape,
+    tint: Color = Color.Unspecified,
+    isUser: Boolean = false,
+    pressed: Boolean = false
+): Modifier {
+    val dark = LocalDark.current
+    val rimBrush = if (dark) {
+        if (isUser) {
+            Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.75f),
+                    Color(0x66438DFF),
+                    Color.White.copy(alpha = 0.15f)
+                )
+            )
+        } else {
+            Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.70f),
+                    Color.White.copy(alpha = 0.22f),
+                    Color.White.copy(alpha = 0.08f)
+                )
+            )
+        }
+    } else {
+        Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.95f),
+                Color.Black.copy(alpha = 0.06f),
+                Color.Black.copy(alpha = 0.14f)
+            )
+        )
+    }
+
+    val bgBrush = if (dark) {
+        if (isUser) {
+            Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.16f),
+                    Color(0x38438DFF),
+                    Color(0x35242A38),
+                    Color(0x401E2533)
+                )
+            )
+        } else {
+            Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.12f),
+                    Color(0x55171B24),
+                    Color(0x7511151D)
+                )
+            )
+        }
+    } else {
+        if (isUser) {
+            Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.95f),
+                    Color(0xCCE2E8F0),
+                    Color(0xD9CBD5E1)
+                )
+            )
+        } else {
+            Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.95f),
+                    Color(0xCCF3F4F6),
+                    Color(0xD9E5E7EB)
+                )
+            )
+        }
+    }
+
+    return this
+        .background(bgBrush, shape)
+        .border(BorderStroke(1.dp, rimBrush), shape)
         .clip(shape)
 }
 
@@ -209,5 +352,34 @@ fun GlassMenuDivider() {
             .height(0.5.dp)
             .padding(horizontal = 14.dp)
             .background(Palette.glassDivider)
+    )
+}
+
+/**
+ * Frosted Liquid Glass AlertDialog conforming to CodeStation theme,
+ * perfectly adapting to Light and Dark modes.
+ */
+@Composable
+fun GlassAlertDialog(
+    onDismissRequest: () -> Unit,
+    confirmButton: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    dismissButton: (@Composable () -> Unit)? = null,
+    title: (@Composable () -> Unit)? = null,
+    text: (@Composable () -> Unit)? = null,
+    shape: Shape = RoundedRectangle(24.dp)
+) {
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        confirmButton = confirmButton,
+        modifier = modifier.frostedLiquidGlass(shape = shape),
+        dismissButton = dismissButton,
+        title = title,
+        text = text,
+        shape = shape,
+        containerColor = Palette.glassSurface,
+        titleContentColor = Palette.text,
+        textContentColor = Palette.secondary,
+        tonalElevation = 0.dp
     )
 }

@@ -18,4 +18,5 @@ interface ChatRepository {
     suspend fun respondApproval(approvalId: String, status: ApprovalStatus, alwaysApprove: Boolean = false): Result<Unit>
     suspend fun clearHistory(botId: String): Result<Unit>
     suspend fun markChatRead(botId: String): Result<Unit>
+    suspend fun deleteMessage(messageId: String): Result<Unit>
 }

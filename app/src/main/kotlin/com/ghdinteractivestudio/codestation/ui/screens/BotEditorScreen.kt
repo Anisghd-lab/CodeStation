@@ -210,15 +210,16 @@ fun BotEditorScreen(
                             color = Palette.accent
                         )
 
-                        val primaryProviders = listOf(ProviderType.ANTIGRAVITY, ProviderType.OPENCODE)
+                        val primaryProviders = listOf(ProviderType.ANTIGRAVITY, ProviderType.OPENCODE, ProviderType.CODEBUDDY)
                         val otherProviders = ProviderType.entries.filter { it !in primaryProviders }
 
-                        // Section 1: Agents Prioritaires (Antigravity & OpenCode GLM)
+                        // Section 1: Agents Prioritaires (Antigravity, OpenCode GLM & CodeBuddy Code)
                         primaryProviders.forEach { provider ->
                             val isSelected = state.provider == provider
                             val (badgeText, badgeColor) = when (provider) {
                                 ProviderType.ANTIGRAVITY -> "Prête (agy v1.4.9)" to Palette.emeraldAccent
                                 ProviderType.OPENCODE -> "Prête (GLM-5.3-Flash)" to Palette.emeraldAccent
+                                ProviderType.CODEBUDDY -> "Prête (Hy3 v2.178.1)" to Palette.emeraldAccent
                                 else -> "Prête" to Palette.emeraldAccent
                             }
 

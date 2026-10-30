@@ -73,15 +73,21 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val navController = rememberNavController()
                     currentNavController = navController
+                    val overlayEnabled by container.preferencesRepository.dynamicIslandOverlayEnabledStream.collectAsState(initial = false)
+                    val hasOverlayPermission = com.ghdinteractivestudio.codestation.util.OverlayPermissionHelper.canDrawOverlays(this@MainActivity)
+                    val isSystemOverlayActive = overlayEnabled && hasOverlayPermission
+
                     Box(modifier = Modifier.fillMaxSize()) {
                         CodeStationNavHost(navController = navController)
-                        DynamicIslandBar(
-                            botRepository = container.botRepository,
-                            approvalDao = container.approvalDao,
-                            onNavigateToBot = { botId: String ->
-                                navController.navigate(Screen.Chat.createRoute(botId))
-                            }
-                        )
+                        if (!isSystemOverlayActive) {
+                            DynamicIslandBar(
+                                botRepository = container.botRepository,
+                                approvalDao = container.approvalDao,
+                                onNavigateToBot = { botId: String ->
+                                    navController.navigate(Screen.Chat.createRoute(botId))
+                                }
+                            )
+                        }
                     }
                 }
             }

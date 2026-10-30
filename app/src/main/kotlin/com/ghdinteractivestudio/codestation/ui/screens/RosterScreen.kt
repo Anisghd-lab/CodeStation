@@ -20,7 +20,17 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.ui.graphics.Color
+import com.ghdinteractivestudio.codestation.domain.model.Bot
+import com.ghdinteractivestudio.codestation.ui.theme.RoundedRectangle
+import com.ghdinteractivestudio.codestation.ui.theme.bold
+import com.ghdinteractivestudio.codestation.ui.theme.semibold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,8 +49,11 @@ import com.ghdinteractivestudio.codestation.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.codestation.ui.components.BotCard
 import com.ghdinteractivestudio.codestation.ui.components.CharacterAvatar
 import com.ghdinteractivestudio.codestation.ui.components.Edge
+import com.ghdinteractivestudio.codestation.ui.components.GlassAlertDialog
 import com.ghdinteractivestudio.codestation.ui.components.GlassMenu
+import com.ghdinteractivestudio.codestation.ui.components.GlassAlertDialog
 import com.ghdinteractivestudio.codestation.ui.components.GlassMenuDivider
+import com.ghdinteractivestudio.codestation.ui.components.GlassAlertDialog
 import com.ghdinteractivestudio.codestation.ui.components.GlassMenuItem
 import com.ghdinteractivestudio.codestation.ui.components.GlassStage
 import com.ghdinteractivestudio.codestation.ui.components.GlassTabBar
@@ -72,6 +85,7 @@ fun RosterScreen(
     var isNewMenuOpen by remember { mutableStateOf(false) }
     var isComputerMenuOpen by remember { mutableStateOf(false) }
     var selectedTab by rememberSaveable { mutableStateOf("bots") }
+    var botPendingDelete by remember { mutableStateOf<Bot?>(null) }
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val isConnected = state.serverConfig.status == ServerConnectionStatus.CONNECTED
@@ -302,14 +316,111 @@ fun RosterScreen(
                     }
                 } else {
                     items(allBots, key = { it.id }) { bot ->
-                        BotCard(
+                        SwipeToDismissBotItem(
                             bot = bot,
-                            bots = allBots,
-                            onClick = { onBotClick(bot.id) }
+                            allBots = allBots,
+                            onBotClick = { onBotClick(bot.id) },
+                            onRequestDelete = { botPendingDelete = it }
                         )
                     }
                 }
             }
         }
+
+        // Boîte de dialogue de confirmation de suppression en Frosted Liquid Glass
+        if (botPendingDelete != null) {
+            val target = botPendingDelete!!
+            GlassAlertDialog(
+                onDismissRequest = { botPendingDelete = null },
+                title = {
+                    Text("Supprimer « ${target.name} »", style = Type.title3.semibold, color = Palette.text)
+                },
+                text = {
+                    Text(
+                        "Voulez-vous vraiment supprimer cet agent ? Ses messages et sa configuration locale seront effacés.",
+                        style = Type.subheadline,
+                        color = Palette.secondary
+                    )
+                },
+                confirmButton = {
+                    Box(
+                        Modifier
+                            .clip(Capsule())
+                            .background(Palette.danger)
+                            .clickable {
+                                viewModel.deleteBot(target.id)
+                                botPendingDelete = null
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text("Supprimer", style = Type.caption.bold, color = Color.White)
+                    }
+                },
+                dismissButton = {
+                    Box(
+                        Modifier
+                            .clip(Capsule())
+                            .background(Palette.text.copy(alpha = 0.1f))
+                            .clickable { botPendingDelete = null }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text("Annuler", style = Type.caption.semibold, color = Palette.text)
+                    }
+                }
+            )
+        }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeToDismissBotItem(
+    bot: Bot,
+    allBots: List<Bot>,
+    onBotClick: () -> Unit,
+    onRequestDelete: (Bot) -> Unit
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                onRequestDelete(bot)
+                false // Garde la carte visible en attendant la confirmation
+            } else false
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            val isSwiping = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart ||
+                dismissState.targetValue == SwipeToDismissBoxValue.EndToStart
+            if (isSwiping) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedRectangle(16.dp))
+                        .background(Palette.danger.copy(alpha = 0.85f))
+                        .padding(end = 20.dp),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Symbol("trash.fill", size = 20.dp, tint = Color.White)
+                        Text("Supprimer", style = Type.caption.bold, color = Color.White)
+                    }
+                }
+            }
+        },
+        content = {
+            BotCard(
+                bot = bot,
+                bots = allBots,
+                onClick = onBotClick
+            )
+        }
+    )
 }

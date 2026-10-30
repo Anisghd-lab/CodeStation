@@ -40,24 +40,38 @@ class CodeStationEventStreamClient(
     private val approvalDao: ApprovalDao,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 ) {
-    private val json = Json { ignoreUnknownKeys = true }
+    companion object {
+        private const val TAG = "CodeStationSSE"
+    }
+
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        coerceInputValues = true
+        encodeDefaults = true
+    }
     private var streamJob: Job? = null
     private var lastRev: Long = 0
+    private var initialSyncCompleted = false
     private val botPreviousStatus = ConcurrentHashMap<String, String>()
 
     private val client = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS) // SSE stream illimité
         .connectTimeout(10, TimeUnit.SECONDS)
+        .pingInterval(15, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .build()
 
     fun start() {
         if (streamJob?.isActive == true) return
+        android.util.Log.i(TAG, "Starting CodeStationEventStreamClient SSE loop (since=$lastRev)")
         streamJob = scope.launch {
             runEventLoop()
         }
     }
 
     fun stop() {
+        android.util.Log.i(TAG, "Stopping CodeStationEventStreamClient SSE loop")
         streamJob?.cancel()
         streamJob = null
     }
@@ -71,42 +85,55 @@ class CodeStationEventStreamClient(
                 val token = config.token
 
                 if (token.isNullOrBlank()) {
+                    android.util.Log.w(TAG, "Token is missing in server config, waiting 3s...")
                     delay(3000)
                     continue
                 }
 
+                android.util.Log.i(TAG, "Connecting SSE to $baseUrl/events?since=$lastRev")
                 val request = Request.Builder()
                     .url("$baseUrl/events?since=$lastRev")
                     .addHeader("Authorization", "Bearer $token")
                     .addHeader("Accept", "text/event-stream")
+                    .addHeader("Cache-Control", "no-cache")
+                    .addHeader("Accept-Encoding", "identity")
                     .build()
 
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
+                        android.util.Log.e(TAG, "SSE connection failed with HTTP ${response.code}, retrying in ${backoffMs}ms")
                         delay(backoffMs)
                         backoffMs = (backoffMs * 2).coerceAtMost(15000L)
                         return@use
                     }
 
-                    // Connexion établie, réinitialisation du backoff
+                    android.util.Log.i(TAG, "SSE connection established successfully to $baseUrl/events")
                     backoffMs = 1000L
                     val source = response.body?.source() ?: return@use
-                    val reader = BufferedReader(source.inputStream().reader())
+                    val payloadBuilder = StringBuilder()
 
-                    var line: String? = ""
-                    while (scope.isActive && reader.readLine().also { line = it } != null) {
-                        val currentLine = line?.trim() ?: continue
-                        if (currentLine.startsWith("data:")) {
-                            val dataPayload = currentLine.removePrefix("data:").trim()
-                            if (dataPayload.isNotEmpty()) {
-                                handleServerEvent(dataPayload)
+                    while (scope.isActive && !source.exhausted()) {
+                        val line = source.readUtf8Line() ?: break
+                        val trimmed = line.trim()
+
+                        if (trimmed.startsWith("data:")) {
+                            val dataChunk = trimmed.removePrefix("data:").trim()
+                            if (payloadBuilder.isNotEmpty()) {
+                                payloadBuilder.append("\n")
                             }
+                            payloadBuilder.append(dataChunk)
+                        } else if (trimmed.isEmpty() && payloadBuilder.isNotEmpty()) {
+                            val fullPayload = payloadBuilder.toString()
+                            payloadBuilder.clear()
+                            handleServerEvent(fullPayload)
                         }
                     }
                 }
             } catch (e: CancellationException) {
+                android.util.Log.i(TAG, "SSE loop cancelled")
                 break
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "SSE loop network error (${e.javaClass.simpleName}: ${e.message}), retrying in ${backoffMs}ms")
                 delay(backoffMs)
                 backoffMs = (backoffMs * 2).coerceAtMost(15000L)
             }
@@ -118,11 +145,16 @@ class CodeStationEventStreamClient(
             val root = json.parseToJsonElement(payload).jsonObject
             val type = root["type"]?.jsonPrimitive?.content ?: return
 
-            root["rev"]?.jsonPrimitive?.longOrNull?.let { rev ->
-                if (rev > lastRev) lastRev = rev
+            val rev = root["rev"]?.jsonPrimitive?.longOrNull
+            if (rev != null && type != "hello" && rev > lastRev) {
+                lastRev = rev
             }
 
             when (type) {
+                "hello" -> {
+                    android.util.Log.i(TAG, "Handshake hello received: rev=$rev")
+                    initialSyncCompleted = true
+                }
                 "bot" -> {
                     val botObj = root["bot"]?.jsonObject ?: return
                     val botId = botObj["id"]?.jsonPrimitive?.content ?: return
@@ -264,6 +296,7 @@ class CodeStationEventStreamClient(
                             messageDao.insertMessage(entity)
                         }
                         botDao.updateLastMessage(botId, displayText, entity.timestamp)
+                        android.util.Log.i(TAG, "Saved chat message id=$entryId botId=$botId isFinal=$isFinal author=$authorType textLen=${text.length}")
 
                         val formattedBotName = CodeStationNotificationManager.formatAgentDisplayName(botId, botName)
 
@@ -332,8 +365,8 @@ class CodeStationEventStreamClient(
                     }
                 }
             }
-        } catch (_: Exception) {
-            // Ignorer les fragments malformés sans casser le flux
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Failed to parse/process event payload: ${e.message}", e)
         }
     }
 }

@@ -1,6 +1,8 @@
 package com.ghdinteractivestudio.codestation.ui.screens
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -37,7 +39,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.ui.graphics.Color
+import com.ghdinteractivestudio.codestation.ui.theme.bold
+import com.ghdinteractivestudio.codestation.ui.theme.semibold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -60,6 +70,7 @@ import com.ghdinteractivestudio.codestation.domain.model.ApprovalStatus
 import com.ghdinteractivestudio.codestation.domain.model.Bot
 import com.ghdinteractivestudio.codestation.domain.model.BotStatus
 import com.ghdinteractivestudio.codestation.domain.model.ChatMessage
+import com.ghdinteractivestudio.codestation.domain.model.MessageAuthorType
 import com.ghdinteractivestudio.codestation.domain.model.PendingAttachment
 import com.ghdinteractivestudio.codestation.domain.model.QuotedReply
 import com.ghdinteractivestudio.codestation.util.TranscriptionResult
@@ -71,8 +82,11 @@ import java.util.UUID
 import com.ghdinteractivestudio.codestation.ui.components.ApprovalCardItem
 import com.ghdinteractivestudio.codestation.ui.components.BotAvatar
 import com.ghdinteractivestudio.codestation.ui.components.ChatMessageItem
+import com.ghdinteractivestudio.codestation.ui.components.GlassAlertDialog
 import com.ghdinteractivestudio.codestation.ui.components.GlassMenu
+import com.ghdinteractivestudio.codestation.ui.components.GlassAlertDialog
 import com.ghdinteractivestudio.codestation.ui.components.GlassMenuDivider
+import com.ghdinteractivestudio.codestation.ui.components.GlassAlertDialog
 import com.ghdinteractivestudio.codestation.ui.components.GlassMenuItem
 import com.ghdinteractivestudio.codestation.ui.components.GlassStage
 import com.ghdinteractivestudio.codestation.ui.components.IconButton
@@ -110,6 +124,7 @@ fun ChatScreen(
     val coroutineScope = rememberCoroutineScope()
     var isMenuOpen by remember { mutableStateOf(false) }
     var activeQuotedReply by remember { mutableStateOf<QuotedReply?>(null) }
+    var activeContextMenuMessage by remember { mutableStateOf<ChatMessage?>(null) }
 
     val voiceRecorder = remember { VoiceRecorder(context) }
     val transcriptionService = remember { VoiceTranscriptionService(context) }
@@ -288,6 +303,7 @@ fun ChatScreen(
     val bottomInset = if (imeBottom > navBottom) imeBottom else navBottom
 
     var userJustSentMessage by remember { mutableStateOf(false) }
+    var messagePendingDelete by remember { mutableStateOf<ChatMessage?>(null) }
     var initialScrolledBotId by remember { mutableStateOf<String?>(null) }
 
     // 6.1 — Ouverture d'un bot : positionnement automatique et instantané sur le dernier message
@@ -571,18 +587,89 @@ fun ChatScreen(
                 )
             }
 
-            // Chat Messages
+            // Chat Messages (Bulle adaptative, menu contextuel en glassmorphism par appui long)
             items(state.messages, key = { it.id }) { msg ->
-                ChatMessageItem(
-                    message = msg,
-                    onQuoteReply = {
-                        activeQuotedReply = QuotedReply(
-                            messageId = it.id,
-                            authorName = it.author.displayName,
-                            textExcerpt = it.text.take(60)
+                val isUserMsg = msg.author.type == MessageAuthorType.USER
+                val alignment = if (isUserMsg) Alignment.CenterEnd else Alignment.CenterStart
+
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = alignment
+                ) {
+                    ChatMessageItem(
+                        message = msg,
+                        onQuoteReply = {
+                            activeQuotedReply = QuotedReply(
+                                messageId = it.id,
+                                authorName = it.author.displayName,
+                                textExcerpt = it.text.take(60)
+                            )
+                        },
+                        onLongClick = {
+                            activeContextMenuMessage = it
+                        }
+                    )
+
+                    GlassMenu(
+                        expanded = activeContextMenuMessage?.id == msg.id,
+                        onDismissRequest = { activeContextMenuMessage = null },
+                        width = 220.dp
+                    ) {
+                        // Copier (Tous les messages)
+                        GlassMenuItem(
+                            title = "Copier",
+                            icon = "doc.on.doc",
+                            tint = Palette.text,
+                            onClick = {
+                                val clipboard = ContextCompat.getSystemService(context, ClipboardManager::class.java)
+                                val clip = ClipData.newPlainText("Message CodeStation", msg.text)
+                                clipboard?.setPrimaryClip(clip)
+                                activeContextMenuMessage = null
+                            }
+                        )
+
+                        // Modifier (Uniquement pour les messages utilisateur)
+                        if (isUserMsg) {
+                            GlassMenuDivider()
+                            GlassMenuItem(
+                                title = "Modifier",
+                                icon = "pencil",
+                                tint = Palette.electricBlue,
+                                onClick = {
+                                    viewModel.onInputChanged(msg.text)
+                                    viewModel.deleteMessage(msg.id)
+                                    activeContextMenuMessage = null
+                                }
+                            )
+                        }
+
+                        // Régénérer (Uniquement pour les messages IA / Bot)
+                        if (!isUserMsg) {
+                            GlassMenuDivider()
+                            GlassMenuItem(
+                                title = "Régénérer",
+                                icon = "arrow.clockwise",
+                                tint = Palette.electricBlue,
+                                onClick = {
+                                    viewModel.regenerateResponse(msg.id)
+                                    activeContextMenuMessage = null
+                                }
+                            )
+                        }
+
+                        // Supprimer (Tous les messages)
+                        GlassMenuDivider()
+                        GlassMenuItem(
+                            title = "Supprimer",
+                            icon = "trash",
+                            destructive = true,
+                            onClick = {
+                                messagePendingDelete = msg
+                                activeContextMenuMessage = null
+                            }
                         )
                     }
-                )
+                }
             }
 
             // Live reasoning thinking orb indicator
@@ -602,6 +689,49 @@ fun ChatScreen(
                     }
                 }
             }
+        }
+
+        // Boîte de dialogue de confirmation de suppression de message en Frosted Liquid Glass
+        if (messagePendingDelete != null) {
+            val target = messagePendingDelete!!
+            GlassAlertDialog(
+                onDismissRequest = { messagePendingDelete = null },
+                title = {
+                    Text("Supprimer le message", style = Type.title3.semibold, color = Palette.text)
+                },
+                text = {
+                    Text(
+                        "Voulez-vous supprimer ce message de la discussion ? Cette action est irréversible.",
+                        style = Type.subheadline,
+                        color = Palette.secondary
+                    )
+                },
+                confirmButton = {
+                    Box(
+                        Modifier
+                            .clip(Capsule())
+                            .background(Palette.danger)
+                            .clickable {
+                                viewModel.deleteMessage(target.id)
+                                messagePendingDelete = null
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text("Supprimer", style = Type.caption.bold, color = Color.White)
+                    }
+                },
+                dismissButton = {
+                    Box(
+                        Modifier
+                            .clip(Capsule())
+                            .background(Palette.text.copy(alpha = 0.1f))
+                            .clickable { messagePendingDelete = null }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text("Annuler", style = Type.caption.semibold, color = Palette.text)
+                    }
+                }
+            )
         }
     }
 }

@@ -16,9 +16,18 @@ active_proc = None
 active_proc_lock = threading.Lock()
 current_selected_model = "gemini-3.8-flash-medium"
 
-_models_cache = None
-_models_cache_time = 0
-CACHE_TTL_SECONDS = 300  # 5 minutes cache
+DEFAULT_AGY_MODELS = [
+    {"value": "gemini-3.8-flash-high", "name": "Gemini 3.8 Flash (High)"},
+    {"value": "gemini-3.8-flash-medium", "name": "Gemini 3.8 Flash (Medium)"},
+    {"value": "gemini-3.8-flash-low", "name": "Gemini 3.8 Flash (Low)"},
+    {"value": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6 (Thinking)"},
+    {"value": "claude-opus-4-6-thinking", "name": "Claude Opus 4.6 (Thinking)"},
+    {"value": "gpt-oss-120b-medium", "name": "GPT-OSS 120B (Medium)"}
+]
+
+_models_cache = DEFAULT_AGY_MODELS
+_models_cache_time = time.time()
+CACHE_TTL_SECONDS = 600
 
 LOG_FILE_PATH = "/tmp/codestation-agy-bridge.log"
 
@@ -33,16 +42,12 @@ def log(msg):
     except Exception:
         pass
 
-def fetch_agy_models(force_refresh=False):
+def _background_refresh_models():
     global _models_cache, _models_cache_time
-    now = time.time()
-    if not force_refresh and _models_cache and (now - _models_cache_time < CACHE_TTL_SECONDS):
-        return _models_cache
-
     try:
         env = os.environ.copy()
         env["PATH"] = "/root/.gemini/antigravity-cli/bin:/root/.local/bin:/usr/local/bin:/usr/bin:/bin:" + env.get("PATH", "")
-        out = subprocess.check_output(["agy", "models"], text=True, timeout=12, env=env)
+        out = subprocess.check_output(["agy", "models"], text=True, timeout=8, env=env)
         models = []
         for line in out.splitlines():
             line = line.strip()
@@ -58,21 +63,16 @@ def fetch_agy_models(force_refresh=False):
                 })
         if models:
             _models_cache = models
-            _models_cache_time = now
-            return models
+            _models_cache_time = time.time()
     except Exception as e:
-        log(f"Failed to discover agy models dynamically: {e}")
+        log(f"Background models refresh skipped: {e}")
 
-    # Fallback to verified models for agy CLI 1.4.10 if CLI query fails
-    fallback = [
-        {"value": "gemini-3.8-flash-high", "name": "Gemini 3.8 Flash (High)"},
-        {"value": "gemini-3.8-flash-medium", "name": "Gemini 3.8 Flash (Medium)"},
-        {"value": "gemini-3.8-flash-low", "name": "Gemini 3.8 Flash (Low)"},
-        {"value": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6 (Thinking)"},
-        {"value": "claude-opus-4-6-thinking", "name": "Claude Opus 4.6 (Thinking)"},
-        {"value": "gpt-oss-120b-medium", "name": "GPT-OSS 120B (Medium)"}
-    ]
-    return fallback
+def fetch_agy_models(force_refresh=False):
+    global _models_cache, _models_cache_time
+    now = time.time()
+    if force_refresh or (now - _models_cache_time > CACHE_TTL_SECONDS):
+        threading.Thread(target=_background_refresh_models, daemon=True).start()
+    return _models_cache
 
 def send_response(req_id, result=None, error=None):
     resp = {"jsonrpc": "2.0", "id": req_id}
@@ -100,8 +100,12 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
             model_id = "gemini-3.8-flash-medium"
             log(f"Falling back to default model: {model_id}")
 
-        cmd = ["agy", "-p", prompt_text, "--dangerously-skip-permissions", "--model", model_id]
-        log(f"Executing: {' '.join(cmd)} (cwd={cwd})")
+        if prompt_text.strip().lower() in ["/quota", "/usage", "quota", "usage"]:
+            cmd = ["agy", "-p", "/quota", "--dangerously-skip-permissions"]
+            log(f"Executing quota query directly: {' '.join(cmd)}")
+        else:
+            cmd = ["agy", "-p", prompt_text, "--dangerously-skip-permissions", "--model", model_id]
+            log(f"Executing: {' '.join(cmd)} (cwd={cwd})")
 
         with active_proc_lock:
             active_proc = subprocess.Popen(

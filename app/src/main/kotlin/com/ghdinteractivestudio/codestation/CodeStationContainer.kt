@@ -47,9 +47,11 @@ class CodeStationContainer(override val context: Context) : AppContainer {
 
     private val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(5, TimeUnit.SECONDS)
-            .readTimeout(10, TimeUnit.SECONDS)
-            .writeTimeout(10, TimeUnit.SECONDS)
+            .connectionPool(okhttp3.ConnectionPool(8, 5, TimeUnit.MINUTES))
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
             .build()
     }
 
@@ -60,15 +62,21 @@ class CodeStationContainer(override val context: Context) : AppContainer {
         coerceInputValues = true
     }
 
+    private val apiServiceCache = java.util.concurrent.ConcurrentHashMap<String, CodeStationApiService>()
+
     private fun createApiService(baseUrl: String): CodeStationApiService? {
+        val normalized = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        apiServiceCache[normalized]?.let { return it }
         return try {
             val contentType = "application/json".toMediaType()
-            Retrofit.Builder()
-                .baseUrl(if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/")
+            val service = Retrofit.Builder()
+                .baseUrl(normalized)
                 .client(okHttpClient)
                 .addConverterFactory(json.asConverterFactory(contentType))
                 .build()
                 .create(CodeStationApiService::class.java)
+            apiServiceCache[normalized] = service
+            service
         } catch (_: Exception) {
             null
         }

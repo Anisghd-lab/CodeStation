@@ -13,11 +13,20 @@ enum class ProviderType(val displayName: String, val defaultModel: String, val b
     GEMINI_CLI("Google Gemini CLI", "gemini-2.0-flash", "gemini"),
     ANTIGRAVITY("Google Antigravity", "gemini-4-argon-medium", "antigravity"),
     OPENCODE("OpenCode", "opencode/glm-5.3-flash-free", "opencode"),
+    CODEBUDDY("CodeBuddy Code", "Hy3", "codebuddy"),
     ACP_LOCAL("ACP Local Agent", "local-qwen-2.5", "acp"),
     CUSTOM("Custom Agent", "default", "custom");
 
     fun getAvailableModels(): List<ModelInfo> {
         return when (this) {
+            CODEBUDDY -> listOf(
+                ModelInfo("Hy3", "Hy3", isFree = true, isDefault = true, isVerified = true),
+                ModelInfo("hy4-preview", "Hy4 Preview", isFree = false, isVerified = true),
+                ModelInfo("deepseek-v4.1-flash", "DeepSeek V4.1 Flash", isFree = true, isVerified = true),
+                ModelInfo("gpt-6.1-sol", "GPT-6.1 Sol", isFree = false, isVerified = true),
+                ModelInfo("gemini-3.8-flash", "Gemini 3.8 Flash", isFree = false, isVerified = true),
+                ModelInfo("glm-5.3-flash", "GLM-5.3 Flash", isFree = true, isVerified = true)
+            )
             OPENCODE -> listOf(
                 ModelInfo("opencode/glm-5.3-flash-free", "GLM-5.3-Flash Free", isFree = true, isDefault = true),
                 ModelInfo("opencode/deepseek-v4.1-flash-free", "DeepSeek V4.1 Flash Free", isFree = true),

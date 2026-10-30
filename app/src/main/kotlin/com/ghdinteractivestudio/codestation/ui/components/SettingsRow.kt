@@ -1,5 +1,6 @@
 package com.ghdinteractivestudio.codestation.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -21,11 +21,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ghdinteractivestudio.codestation.ui.theme.Capsule
 import com.ghdinteractivestudio.codestation.ui.theme.CodeStationDarkError
+import com.ghdinteractivestudio.codestation.ui.theme.Palette
+import com.ghdinteractivestudio.codestation.ui.theme.Type
+import com.ghdinteractivestudio.codestation.ui.theme.bold
+import com.ghdinteractivestudio.codestation.ui.theme.semibold
 
 @Composable
 fun SettingsRow(
@@ -103,32 +109,41 @@ fun ConfirmationDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    GlassAlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(text = title, fontWeight = FontWeight.Bold)
+            Text(text = title, fontWeight = FontWeight.Bold, color = Palette.text)
         },
         text = {
-            Text(text = message)
+            Text(text = message, color = Palette.secondary)
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    onConfirm()
-                    onDismiss()
-                },
-                colors = if (isDestructive) {
-                    ButtonDefaults.buttonColors(containerColor = CodeStationDarkError)
-                } else {
-                    ButtonDefaults.buttonColors()
-                }
+            androidx.compose.foundation.layout.Box(
+                Modifier
+                    .clip(Capsule())
+                    .background(if (isDestructive) Palette.danger else Palette.accent)
+                    .clickable {
+                        onConfirm()
+                        onDismiss()
+                    }
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                Text(confirmLabel)
+                Text(
+                    confirmLabel,
+                    style = Type.caption.bold,
+                    color = if (isDestructive) androidx.compose.ui.graphics.Color.White else Palette.onAccent
+                )
             }
         },
         dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
-                Text(cancelLabel)
+            androidx.compose.foundation.layout.Box(
+                Modifier
+                    .clip(Capsule())
+                    .background(Palette.text.copy(alpha = 0.1f))
+                    .clickable { onDismiss() }
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(cancelLabel, style = Type.caption.semibold, color = Palette.text)
             }
         }
     )

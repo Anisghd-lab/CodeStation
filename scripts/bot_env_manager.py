@@ -189,6 +189,31 @@ exec {PROOT_BIN} \\
             with open(env_file, "w", encoding="utf-8") as f:
                 f.write("export PATH=/usr/local/bin:/usr/bin:/bin:$PATH\n")
 
+        elif engine in ["codebuddy", "cbc"]:
+            src_cb = Path("/usr/local/bin/codebuddy")
+            dst_cb = rootfs / "usr" / "local" / "bin" / "codebuddy"
+            if src_cb.exists():
+                shutil.copy2(src_cb, dst_cb)
+                os.chmod(dst_cb, 0o755)
+
+            # Copy config & credentials (~/.codebuddy)
+            src_cfg = Path("/root/.codebuddy")
+            if src_cfg.exists():
+                dst_cfg = rootfs / "root" / ".codebuddy"
+                dst_cfg.mkdir(parents=True, exist_ok=True)
+                for f in src_cfg.glob("*.json*"):
+                    try:
+                        shutil.copy2(f, dst_cfg / f.name)
+                    except Exception:
+                        pass
+
+            env_file = rootfs / "root" / ".bashrc"
+            with open(env_file, "w", encoding="utf-8") as f:
+                f.write("export PATH=/usr/local/bin:/usr/bin:/bin:$PATH\n")
+
+            if not model:
+                model = "Hy3"
+
         # 4. Create run.sh wrapper for PRoot
         run_script = env_dir / "run.sh"
         with open(run_script, "w", encoding="utf-8") as f:
@@ -357,7 +382,69 @@ exec {PROOT_BIN} \\
                 "details": "Binaire opencode introuvable dans l'environnement"
             })
 
-        # 3. Autres CLI détectées
+        # 3. CodeBuddy Code CLI (codebuddy) - Primary
+        cb_paths = ["/usr/local/bin/codebuddy", "/root/.local/bin/codebuddy", "/usr/bin/codebuddy"]
+        cb_bin = None
+        for p in cb_paths:
+            if os.path.isfile(p) and os.access(p, os.X_OK):
+                cb_bin = p
+                break
+        if not cb_bin:
+            cb_bin = shutil.which("codebuddy") or shutil.which("cbc")
+
+        if cb_bin:
+            version = "v2.178.1"
+            try:
+                res = subprocess.run([cb_bin, "--version"], capture_output=True, text=True, timeout=3)
+                if res.returncode == 0 and res.stdout.strip():
+                    raw_ver = res.stdout.strip().splitlines()[0]
+                    version = f"v{raw_ver}" if not raw_ver.startswith("v") else raw_ver
+            except Exception:
+                pass
+
+            model_info = "Hy3"
+            port_info = ""
+            try:
+                settings_p = Path("/root/.codebuddy/settings.json")
+                if settings_p.exists():
+                    with open(settings_p, "r", encoding="utf-8") as f:
+                        s_data = json.load(f)
+                        if "model" in s_data:
+                            model_info = s_data["model"].capitalize()
+                port_p = Path("/root/.codebuddy/web-ui-port.json")
+                if port_p.exists():
+                    with open(port_p, "r", encoding="utf-8") as f:
+                        p_data = json.load(f)
+                        if "port" in p_data:
+                            port_info = f" (serveur local http://127.0.0.1:{p_data['port']})"
+            except Exception:
+                pass
+
+            clis.append({
+                "id": "codebuddy",
+                "name": "CodeBuddy Code",
+                "binary": "codebuddy",
+                "path": cb_bin,
+                "version": version,
+                "status": "READY",
+                "is_primary": True,
+                "environment": "ubuntu",
+                "details": f"CLI CodeBuddy {version} prêt avec modèle {model_info}{port_info}"
+            })
+        else:
+            clis.append({
+                "id": "codebuddy",
+                "name": "CodeBuddy Code",
+                "binary": "codebuddy",
+                "path": None,
+                "version": None,
+                "status": "NOT_DETECTED",
+                "is_primary": True,
+                "environment": "ubuntu",
+                "details": "Binaire codebuddy introuvable dans /usr/local/bin"
+            })
+
+        # 4. Autres CLI détectées
         other_candidates = [
             ("codex", "OpenAI Codex", ["/data/data/com.termux/files/usr/bin/codex", "/usr/local/bin/codex"]),
             ("claude", "Claude Code", ["/usr/local/bin/claude", "/root/.local/bin/claude"]),

@@ -41,10 +41,9 @@ fun BotCard(
         modifier = modifier
             .fillMaxWidth()
             .pressScale(pressed)
-            .background(if (pressed) Palette.surface else Palette.background, cardShape)
-            .clip(cardShape)
+            .glass(shape = cardShape, style = GlassStyle.Card, pressed = pressed)
             .clickable(source, null, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {

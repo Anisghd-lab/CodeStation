@@ -273,4 +273,10 @@ class ChatRepositoryImpl(
             approval
         }
     }
+
+    override suspend fun deleteMessage(messageId: String): Result<Unit> {
+        return runCatching {
+            messageDao.deleteMessageById(messageId)
+        }
+    }
 }

@@ -9,6 +9,7 @@ import com.ghdinteractivestudio.codestation.domain.model.ApprovalStatus
 import com.ghdinteractivestudio.codestation.domain.model.Bot
 import com.ghdinteractivestudio.codestation.domain.model.BotStatus
 import com.ghdinteractivestudio.codestation.domain.model.ChatMessage
+import com.ghdinteractivestudio.codestation.domain.model.MessageAuthorType
 import com.ghdinteractivestudio.codestation.domain.model.ExecutionStep
 import com.ghdinteractivestudio.codestation.domain.model.FileAttachment
 import com.ghdinteractivestudio.codestation.domain.model.PendingAttachment
@@ -416,6 +417,23 @@ class ChatViewModel(
         sendMessage()
     }
 
+    fun regenerateResponse(botMessageId: String) {
+        val currentMessages = uiState.value.messages
+        val botIndex = currentMessages.indexOfFirst { it.id == botMessageId }
+        val userPrompt = if (botIndex > 0) {
+            currentMessages.subList(0, botIndex).lastOrNull { it.author.type == MessageAuthorType.USER }?.text
+        } else null
+
+        deleteMessage(botMessageId)
+
+        if (!userPrompt.isNullOrBlank()) {
+            _inputDraft.value = userPrompt
+            sendMessage()
+        } else {
+            retryLastMessage()
+        }
+    }
+
     fun dismissError() {
         _errorMessage.value = null
     }
@@ -461,6 +479,12 @@ class ChatViewModel(
     fun clearHistory() {
         viewModelScope.launch {
             chatRepository.clearHistory(botId)
+        }
+    }
+
+    fun deleteMessage(messageId: String) {
+        viewModelScope.launch {
+            chatRepository.deleteMessage(messageId)
         }
     }
 
