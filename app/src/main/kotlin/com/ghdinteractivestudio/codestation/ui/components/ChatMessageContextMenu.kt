@@ -75,7 +75,7 @@ fun MessageContextMenu(
     onRegenerate: () -> Unit,
     onCopyCode: () -> Unit,
     onSelectText: () -> Unit,
-    onDelete: () -> Unit,
+    onDelete: () -> Unit = {},
     codeBlocksCount: Int = 0,
     width: Dp = 230.dp
 ) {
@@ -117,7 +117,7 @@ fun MessageContextMenu(
             GlassMenuDivider()
             GlassMenuItem(
                 title = "Régénérer",
-                subtitle = if (isBotWorking) "Génération déjà en cours…" else "Nouvelle génération de l'agent",
+                subtitle = if (isBotWorking) "Génération déjà en cours..." else "Nouvelle génération de l'agent",
                 icon = "arrow.clockwise",
                 tint = if (isBotWorking) Palette.secondary else Palette.electricBlue,
                 onClick = {
@@ -142,7 +142,7 @@ fun MessageContextMenu(
             )
         }
 
-        // 5. Sélectionner du texte (évite les conflits d'appui long et de défilement)
+        // 5. Sélectionner du texte (sélection libre)
         GlassMenuDivider()
         GlassMenuItem(
             title = "Sélectionner du texte",
@@ -152,19 +152,6 @@ fun MessageContextMenu(
             onClick = {
                 onDismissRequest()
                 onSelectText()
-            }
-        )
-
-        // 6. Supprimer le message
-        GlassMenuDivider()
-        GlassMenuItem(
-            title = "Supprimer",
-            subtitle = "Effacer de la discussion locale",
-            icon = "trash",
-            destructive = true,
-            onClick = {
-                onDismissRequest()
-                onDelete()
             }
         )
     }

@@ -683,9 +683,6 @@ fun ChatScreen(
                         },
                         onSelectText = {
                             messageForSelection = msg
-                        },
-                        onDelete = {
-                            messagePendingDelete = msg
                         }
                     )
                 }

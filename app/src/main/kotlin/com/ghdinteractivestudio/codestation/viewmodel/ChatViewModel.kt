@@ -113,7 +113,7 @@ class ChatViewModel(
                 }
                 (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.insertNotice(
                     botId = botId,
-                    text = "⏱️ $reason Vérifiez que Termux et le CLI du bot sont actifs, puis appuyez sur Réessayer."
+                    text = "$reason Vérifiez que Termux et le CLI du bot sont actifs, puis appuyez sur Réessayer."
                 )
             }
         }
@@ -517,7 +517,7 @@ class ChatViewModel(
             botRepository.stopBotTurn(botId)
             (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.insertNotice(
                 botId = botId,
-                text = "⏹️ Génération interrompue par l'utilisateur."
+                text = "Génération interrompue par l'utilisateur."
             )
         }
     }

@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -213,20 +212,13 @@ private fun RichTextRenderer(
     isUser: Boolean,
     textColor: Color
 ) {
-    val uriHandler = LocalUriHandler.current
     val annotated = remember(text, isUser, textColor) {
         buildRichText(text, isUser, textColor)
     }
 
-    ClickableText(
+    Text(
         text = annotated,
-        style = Type.body.copy(color = textColor),
-        onClick = { offset ->
-            annotated.getStringAnnotations(tag = "URL", start = offset, end = offset)
-                .firstOrNull()?.let { annotation ->
-                    runCatching { uriHandler.openUri(annotation.item) }
-                }
-        }
+        style = Type.body.copy(color = textColor)
     )
 }
 

@@ -1,6 +1,8 @@
 package com.ghdinteractivestudio.codestation.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -84,10 +86,12 @@ fun ChatMessageItem(
                     .wrapContentWidth(align = alignment)
                     .widthIn(min = 36.dp, max = maxBubbleWidth)
                     .frostedLiquidGlass(shape = bubbleShape, isUser = isUser)
-                    .combinedClickable(
-                        onClick = { onQuoteReply(message) },
-                        onLongClick = { onLongClick(message) }
-                    )
+                    .pointerInput(message.id) {
+                        detectTapGestures(
+                            onTap = { onQuoteReply(message) },
+                            onLongPress = { onLongClick(message) }
+                        )
+                    }
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 Column(
