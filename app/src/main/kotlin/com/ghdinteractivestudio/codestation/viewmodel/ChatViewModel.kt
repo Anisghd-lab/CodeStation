@@ -75,6 +75,12 @@ class ChatViewModel(
         turnTimeoutJob = viewModelScope.launch {
             delay(timeoutMs)
             if (_isBotWorking.value) {
+                val currentBot = botRepository.getBotById(botId)
+                if (currentBot?.status == BotStatus.WORKING || currentBot?.status == BotStatus.BUSY) {
+                    android.util.Log.i("ChatViewModel", "Bot $botId is still reported as ${currentBot.status} on host, extending watchdog by 60s")
+                    resetTurnTimeout(60000L, isStreaming = isStreaming)
+                    return@launch
+                }
                 _isBotWorking.value = false
                 botRepository.updateBotStatus(botId, BotStatus.IDLE)
                 val timeoutSec = timeoutMs / 1000
@@ -200,19 +206,19 @@ class ChatViewModel(
         // Pendant le streaming actif (chunks), prolonger dynamiquement le délai d'inactivité.
         viewModelScope.launch {
             chatRepository.getMessagesStream(botId).collect { msgs ->
-                val lastMsg = msgs.lastOrNull()
-                if (lastMsg != null && lastMsg.author.type == com.ghdinteractivestudio.codestation.domain.model.MessageAuthorType.BOT) {
-                    if (lastMsg.isFinal) {
+                val lastBotMsg = msgs.filter { it.author.type == com.ghdinteractivestudio.codestation.domain.model.MessageAuthorType.BOT }.lastOrNull()
+                if (lastBotMsg != null) {
+                    if (lastBotMsg.isFinal) {
                         turnTimeoutJob?.cancel()
                         turnTimeoutJob = null
                         _isBotWorking.value = false
                         lastBotMsgId = null
                         lastBotMsgLength = 0
                     } else if (_isBotWorking.value) {
-                        if (lastMsg.id != lastBotMsgId || lastMsg.text.length != lastBotMsgLength) {
-                            lastBotMsgId = lastMsg.id
-                            lastBotMsgLength = lastMsg.text.length
-                            resetTurnTimeout(60000L, isStreaming = true)
+                        if (lastBotMsg.id != lastBotMsgId || lastBotMsg.text.length != lastBotMsgLength) {
+                            lastBotMsgId = lastBotMsg.id
+                            lastBotMsgLength = lastBotMsg.text.length
+                            resetTurnTimeout(180000L, isStreaming = true)
                         }
                     }
                 }
@@ -356,8 +362,8 @@ class ChatViewModel(
                     details = mapOf("hasAttachments" to currentAttachments.isNotEmpty())
                 )
 
-                // Démarrer un délai d'attente adaptatif (120s pour la phase initiale de démarrage/réflexion)
-                resetTurnTimeout(120000L, isStreaming = false)
+                // Démarrer un délai d'attente adaptatif (300s pour la phase initiale de démarrage/réflexion)
+                resetTurnTimeout(300000L, isStreaming = false)
 
                 val domainAttachments = currentAttachments.map {
                     FileAttachment(

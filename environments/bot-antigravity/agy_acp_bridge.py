@@ -104,8 +104,8 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
             cmd = ["agy", "-p", "/quota", "--dangerously-skip-permissions"]
             log(f"Executing quota query directly: {' '.join(cmd)}")
         else:
-            cmd = ["agy", "-p", prompt_text, "--dangerously-skip-permissions", "--model", model_id]
-            log(f"Executing: {' '.join(cmd)} (cwd={cwd})")
+            cmd = ["agy", "-p", prompt_text, "--dangerously-skip-permissions", "--model", model_id, "--output-format", "stream-json"]
+            log(f"Executing: {' '.join(cmd[:3])} ... --model {model_id} --output-format stream-json (cwd={cwd})")
 
         with active_proc_lock:
             active_proc = subprocess.Popen(
@@ -121,8 +121,10 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
         
         output_chunks = []
         stderr_chunks = []
+        last_stream_time = time.time()
+        heartbeat_stop = threading.Event()
 
-        # Stream stdout chunks
+        # Stream stderr chunks
         def read_stderr():
             for sline in active_proc.stderr:
                 stderr_chunks.append(sline)
@@ -131,17 +133,95 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
         stderr_thread = threading.Thread(target=read_stderr, daemon=True)
         stderr_thread.start()
 
-        for line in active_proc.stdout:
-            output_chunks.append(line)
-            # Use ACP standard snake_case "agent_message_chunk"
-            send_notification("session/update", {
-                "sessionId": session_id,
-                "update": {
-                    "sessionUpdate": "agent_message_chunk",
-                    "content": {"type": "text", "text": line}
-                }
-            })
+        # Heartbeat to keep connection alive during lengthy thinking or tool execution
+        def heartbeat_worker():
+            while not heartbeat_stop.wait(8.0):
+                with active_proc_lock:
+                    proc_alive = (active_proc is not None and active_proc.poll() is None)
+                if proc_alive and (time.time() - last_stream_time >= 8.0):
+                    send_notification("session/update", {
+                        "sessionId": session_id,
+                        "update": {
+                            "sessionUpdate": "agent_thought_chunk",
+                            "content": {"type": "text", "text": " "}
+                        }
+                    })
+
+        heartbeat_thread = threading.Thread(target=heartbeat_worker, daemon=True)
+        heartbeat_thread.start()
+
+        for raw_line in active_proc.stdout:
+            last_stream_time = time.time()
+            line = raw_line.strip()
+            if not line:
+                continue
+
+            parsed = None
+            if line.startswith("{") and line.endswith("}"):
+                try:
+                    parsed = json.loads(line)
+                except Exception:
+                    parsed = None
+
+            if parsed and isinstance(parsed, dict) and "event" in parsed:
+                event = parsed.get("event")
+                if event == "step_update":
+                    step = parsed.get("step_update", {})
+                    step_type = step.get("step_type")
+                    text_delta = step.get("text_delta")
+                    if text_delta:
+                        output_chunks.append(text_delta)
+                        send_notification("session/update", {
+                            "sessionId": session_id,
+                            "update": {
+                                "sessionUpdate": "agent_message_chunk",
+                                "content": {"type": "text", "text": text_delta}
+                            }
+                        })
+                    elif step_type == "tool":
+                        tool_name = step.get("tool_name", "tool")
+                        state = step.get("state", "ACTIVE")
+                        if state == "ACTIVE":
+                            send_notification("session/update", {
+                                "sessionId": session_id,
+                                "update": {
+                                    "sessionUpdate": "agent_thought_chunk",
+                                    "content": {"type": "text", "text": f"[{tool_name}] "}
+                                }
+                            })
+                    elif step_type in ("thought", "agent_response"):
+                        send_notification("session/update", {
+                            "sessionId": session_id,
+                            "update": {
+                                "sessionUpdate": "agent_thought_chunk",
+                                "content": {"type": "text", "text": " "}
+                            }
+                        })
+                elif event == "result":
+                    res_obj = parsed.get("result", {})
+                    resp_text = res_obj.get("response", "")
+                    if resp_text and not output_chunks:
+                        output_chunks.append(resp_text)
+                        send_notification("session/update", {
+                            "sessionId": session_id,
+                            "update": {
+                                "sessionUpdate": "agent_message_chunk",
+                                "content": {"type": "text", "text": resp_text}
+                            }
+                        })
+            else:
+                # Plain text line
+                output_chunks.append(raw_line)
+                send_notification("session/update", {
+                    "sessionId": session_id,
+                    "update": {
+                        "sessionUpdate": "agent_message_chunk",
+                        "content": {"type": "text", "text": raw_line}
+                    }
+                })
             
+        heartbeat_stop.set()
+        heartbeat_thread.join(timeout=1.0)
         active_proc.wait()
         stderr_thread.join(timeout=2.0)
         

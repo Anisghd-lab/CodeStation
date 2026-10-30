@@ -125,7 +125,10 @@ class CodeStationEventStreamClient(
                         } else if (trimmed.isEmpty() && payloadBuilder.isNotEmpty()) {
                             val fullPayload = payloadBuilder.toString()
                             payloadBuilder.clear()
-                            handleServerEvent(fullPayload)
+                            val shouldContinue = handleServerEvent(fullPayload)
+                            if (!shouldContinue) {
+                                break
+                            }
                         }
                     }
                 }
@@ -140,10 +143,10 @@ class CodeStationEventStreamClient(
         }
     }
 
-    private suspend fun handleServerEvent(payload: String) {
+    private suspend fun handleServerEvent(payload: String): Boolean {
         try {
             val root = json.parseToJsonElement(payload).jsonObject
-            val type = root["type"]?.jsonPrimitive?.content ?: return
+            val type = root["type"]?.jsonPrimitive?.content ?: return true
 
             val rev = root["rev"]?.jsonPrimitive?.longOrNull
             if (rev != null && type != "hello" && rev > lastRev) {
@@ -151,13 +154,17 @@ class CodeStationEventStreamClient(
             }
 
             when (type) {
+                "resync" -> {
+                    android.util.Log.w(TAG, "Server requested resync (SSE lagged). Reconnecting from since=$lastRev")
+                    return false
+                }
                 "hello" -> {
                     android.util.Log.i(TAG, "Handshake hello received: rev=$rev")
                     initialSyncCompleted = true
                 }
                 "bot" -> {
-                    val botObj = root["bot"]?.jsonObject ?: return
-                    val botId = botObj["id"]?.jsonPrimitive?.content ?: return
+                    val botObj = root["bot"]?.jsonObject ?: return true
+                    val botId = botObj["id"]?.jsonPrimitive?.content ?: return true
                     val name = botObj["name"]?.jsonPrimitive?.content ?: "Bot"
                     val backend = botObj["backend"]?.jsonPrimitive?.content ?: "agy"
                     val rawStatus = botObj["status"]?.jsonPrimitive?.content ?: "idle"
@@ -248,13 +255,13 @@ class CodeStationEventStreamClient(
                 }
 
                 "entry" -> {
-                    val entryObj = root["entry"]?.jsonObject ?: return
-                    val entryId = entryObj["id"]?.jsonPrimitive?.content ?: return
+                    val entryObj = root["entry"]?.jsonObject ?: return true
+                    val entryId = entryObj["id"]?.jsonPrimitive?.content ?: return true
                     val botId = entryObj["botId"]?.jsonPrimitive?.content
                         ?: entryObj["bot_id"]?.jsonPrimitive?.content
-                        ?: return
-                    val kind = entryObj["kind"]?.jsonPrimitive?.content ?: return
-                    val dataObj = entryObj["data"]?.jsonObject ?: return
+                        ?: return true
+                    val kind = entryObj["kind"]?.jsonPrimitive?.content ?: return true
+                    val dataObj = entryObj["data"]?.jsonObject ?: return true
                     val text = dataObj["text"]?.jsonPrimitive?.content ?: ""
                     val isFinal = dataObj["final"]?.jsonPrimitive?.booleanOrNull ?: false
                     val createdAt = entryObj["createdAt"]?.jsonPrimitive?.longOrNull
@@ -322,6 +329,8 @@ class CodeStationEventStreamClient(
                                 event = com.ghdinteractivestudio.codestation.util.RequestTracer.EVENT_FIRST_OUTPUT_RECEIVED,
                                 details = mapOf("botId" to botId, "chunkLength" to text.length)
                             )
+                            botDao.updateStatus(botId, BotStatus.WORKING.name)
+                            botPreviousStatus[botId] = "working"
                             // Mise à jour de la notification persistante avec l'extrait de streaming
                             CodeStationNotificationManager.updateTaskNotification(
                                 context = context,
@@ -365,8 +374,10 @@ class CodeStationEventStreamClient(
                     }
                 }
             }
+            return true
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Failed to parse/process event payload: ${e.message}", e)
+            return true
         }
     }
 }
