@@ -187,7 +187,145 @@ interface CodeStationApiService {
         @Body request: UploadChunkRequest,
         @Header("Authorization") authHeader: String? = null
     ): Response<UploadChunkResponse>
+
+    /** `POST /api/memoryStatus`, get memory engine status. */
+    @POST("api/memoryStatus")
+    suspend fun getMemoryStatus(
+        @Body empty: Map<String, String> = emptyMap(),
+        @Header("Authorization") authHeader: String? = null
+    ): Response<MemoryStatusDto>
+
+    /** `POST /api/memoryExperiences`, get experiences list. */
+    @POST("api/memoryExperiences")
+    suspend fun getMemoryExperiences(
+        @Body request: MemoryPaginationRequest = MemoryPaginationRequest(),
+        @Header("Authorization") authHeader: String? = null
+    ): Response<MemoryExperiencesResponse>
+
+    /** `POST /api/memoryKnowledge`, get knowledge list. */
+    @POST("api/memoryKnowledge")
+    suspend fun getMemoryKnowledge(
+        @Body request: MemoryPaginationRequest = MemoryPaginationRequest(),
+        @Header("Authorization") authHeader: String? = null
+    ): Response<MemoryKnowledgeResponse>
+
+    /** `POST /api/memorySearch`, search memory. */
+    @POST("api/memorySearch")
+    suspend fun searchMemory(
+        @Body request: MemorySearchRequest,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<MemorySearchResponse>
+
+    /** `POST /api/memorySync`, trigger git sync with GitHub. */
+    @POST("api/memorySync")
+    suspend fun syncMemory(
+        @Body empty: Map<String, String> = emptyMap(),
+        @Header("Authorization") authHeader: String? = null
+    ): Response<MemorySyncResponse>
 }
+
+@Serializable
+data class MemoryStatusDto(
+    @SerialName("sync_status") val syncStatus: String = "not_initialized",
+    @SerialName("last_sync_at") val lastSyncAt: String? = null,
+    @SerialName("experiences_count") val experiencesCount: Int = 0,
+    @SerialName("knowledge_count") val knowledgeCount: Int = 0,
+    @SerialName("agents_count") val agentsCount: Int = 0,
+    @SerialName("relations_count") val relationsCount: Int = 0,
+    @SerialName("github_repo") val repoUrl: String = "",
+    @SerialName("local_cache_path") val localCachePath: String? = null,
+    @SerialName("error_message") val errorMessage: String? = null
+)
+
+@Serializable
+data class MemoryPaginationRequest(
+    @SerialName("limit") val limit: Int = 50,
+    @SerialName("offset") val offset: Int = 0
+)
+
+@Serializable
+data class MemoryExperienceDto(
+    @SerialName("id") val id: String = "",
+    @SerialName("title") val title: String = "",
+    @SerialName("project_id") val projectId: String = "",
+    @SerialName("author_agent") val authorAgent: String = "",
+    @SerialName("created_at") val createdAt: String = "",
+    @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("problem") val problem: String = "",
+    @SerialName("context") val context: String = "",
+    @SerialName("attempts") val attempts: List<String> = emptyList(),
+    @SerialName("observed_results") val observedResults: List<String> = emptyList(),
+    @SerialName("errors_encountered") val errorsEncountered: List<String> = emptyList(),
+    @SerialName("solution_proposed") val solutionProposed: String? = null,
+    @SerialName("validation_status") val validationStatus: String = "experimental",
+    @SerialName("tags") val tags: List<String> = emptyList(),
+    @SerialName("relations") val relations: List<String> = emptyList()
+)
+
+@Serializable
+data class MemoryExperiencesResponse(
+    @SerialName("experiences") val experiences: List<MemoryExperienceDto> = emptyList(),
+    @SerialName("count") val count: Int = 0
+)
+
+@Serializable
+data class MemoryKnowledgeDto(
+    @SerialName("id") val id: String = "",
+    @SerialName("type") val type: String = "solution",
+    @SerialName("title") val title: String = "",
+    @SerialName("content") val content: String = "",
+    @SerialName("project_id") val projectId: String = "",
+    @SerialName("source") val source: String = "",
+    @SerialName("author") val author: String = "",
+    @SerialName("created_at") val createdAt: String = "",
+    @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("tags") val tags: List<String> = emptyList(),
+    @SerialName("confidence") val confidence: Double = 0.8,
+    @SerialName("validation_status") val validationStatus: String = "draft",
+    @SerialName("relations") val relations: List<String> = emptyList(),
+    @SerialName("version") val version: Int = 1
+)
+
+@Serializable
+data class MemoryKnowledgeResponse(
+    @SerialName("knowledge") val knowledge: List<MemoryKnowledgeDto> = emptyList(),
+    @SerialName("count") val count: Int = 0
+)
+
+@Serializable
+data class MemorySearchRequest(
+    @SerialName("query") val query: String = "",
+    @SerialName("project") val project: String? = null,
+    @SerialName("agent") val agent: String? = null,
+    @SerialName("type") val type: String? = null,
+    @SerialName("status") val status: String? = null,
+    @SerialName("limit") val limit: Int = 30
+)
+
+@Serializable
+data class MemorySearchResultDto(
+    @SerialName("id") val id: String = "",
+    @SerialName("item_type") val itemType: String = "",
+    @SerialName("title") val title: String = "",
+    @SerialName("snippet") val snippet: String = "",
+    @SerialName("validation_status") val validationStatus: String = "",
+    @SerialName("tags") val tags: List<String> = emptyList(),
+    @SerialName("author") val author: String? = null,
+    @SerialName("score") val score: Float = 1.0f
+)
+
+@Serializable
+data class MemorySearchResponse(
+    @SerialName("results") val results: List<MemorySearchResultDto> = emptyList(),
+    @SerialName("count") val count: Int = 0
+)
+
+@Serializable
+data class MemorySyncResponse(
+    @SerialName("success") val success: Boolean = false,
+    @SerialName("message") val message: String = "",
+    @SerialName("status") val status: MemoryStatusDto? = null
+)
 
 @Serializable
 data class UploadChunkRequest(

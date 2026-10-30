@@ -4,6 +4,7 @@ import android.content.Context
 import com.ghdinteractivestudio.codestation.data.local.AntigravityModelRepositoryImpl
 import com.ghdinteractivestudio.codestation.data.local.BotRepositoryImpl
 import com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl
+import com.ghdinteractivestudio.codestation.data.local.MemoryRepositoryImpl
 import com.ghdinteractivestudio.codestation.data.local.ServerRepositoryImpl
 import com.ghdinteractivestudio.codestation.data.local.CodeStationDatabase
 import com.ghdinteractivestudio.codestation.data.preferences.PreferencesRepositoryImpl
@@ -11,6 +12,7 @@ import com.ghdinteractivestudio.codestation.data.remote.CodeStationApiService
 import com.ghdinteractivestudio.codestation.domain.repository.AntigravityModelRepository
 import com.ghdinteractivestudio.codestation.domain.repository.BotRepository
 import com.ghdinteractivestudio.codestation.domain.repository.ChatRepository
+import com.ghdinteractivestudio.codestation.domain.repository.MemoryRepository
 import com.ghdinteractivestudio.codestation.domain.repository.PreferencesRepository
 import com.ghdinteractivestudio.codestation.domain.repository.ServerRepository
 import kotlinx.serialization.json.Json
@@ -29,6 +31,7 @@ interface AppContainer {
     val antigravityModelRepository: AntigravityModelRepository
     val eventStreamClient: com.ghdinteractivestudio.codestation.data.remote.CodeStationEventStreamClient
     val approvalDao: com.ghdinteractivestudio.codestation.data.local.ApprovalDao
+    val memoryRepository: MemoryRepository
 }
 
 class CodeStationContainer(override val context: Context) : AppContainer {
@@ -122,6 +125,16 @@ class CodeStationContainer(override val context: Context) : AppContainer {
                 val config = serverRepository.getServerConfig()
                 createApiService(config.url)
             }
+        )
+    }
+
+    override val memoryRepository: MemoryRepository by lazy {
+        MemoryRepositoryImpl(
+            apiServiceProvider = {
+                val config = serverRepository.getServerConfig()
+                createApiService(config.url)
+            },
+            serverRepository = serverRepository
         )
     }
 

@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import com.ghdinteractivestudio.codestation.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.codestation.ui.components.BotCard
 import com.ghdinteractivestudio.codestation.ui.components.CharacterAvatar
+import com.ghdinteractivestudio.codestation.ui.components.CollectiveMemoryCard
 import com.ghdinteractivestudio.codestation.ui.components.Edge
 import com.ghdinteractivestudio.codestation.ui.components.GlassAlertDialog
 import com.ghdinteractivestudio.codestation.ui.components.GlassMenu
@@ -75,6 +76,7 @@ import com.ghdinteractivestudio.codestation.viewmodel.RosterViewModel
 fun RosterScreen(
     viewModel: RosterViewModel,
     onBotClick: (String) -> Unit,
+    onMemoryClick: () -> Unit = {},
     onCreateBotClick: () -> Unit,
     onCreateGroupClick: () -> Unit,
     onConfigureServerClick: () -> Unit,
@@ -82,6 +84,7 @@ fun RosterScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val memoryStatus by viewModel.memoryStatus.collectAsState()
     var isNewMenuOpen by remember { mutableStateOf(false) }
     var isComputerMenuOpen by remember { mutableStateOf(false) }
     var selectedTab by rememberSaveable { mutableStateOf("bots") }
@@ -315,6 +318,13 @@ fun RosterScreen(
                         }
                     }
                 } else {
+                    item("collective_memory_card") {
+                        CollectiveMemoryCard(
+                            status = memoryStatus,
+                            onClick = onMemoryClick
+                        )
+                    }
+
                     items(allBots, key = { it.id }) { bot ->
                         SwipeToDismissBotItem(
                             bot = bot,

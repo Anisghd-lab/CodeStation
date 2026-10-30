@@ -5,6 +5,7 @@ mod analytics;
 mod api;
 mod background;
 mod chat;
+pub mod collective_memory;
 mod compat;
 mod environment;
 mod hub;

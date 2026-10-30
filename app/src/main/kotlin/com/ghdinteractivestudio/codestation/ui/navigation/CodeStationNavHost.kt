@@ -27,6 +27,7 @@ import com.ghdinteractivestudio.codestation.ui.screens.TraceScreen
 import com.ghdinteractivestudio.codestation.ui.screens.VoiceScreen
 import com.ghdinteractivestudio.codestation.viewmodel.BotEditorViewModel
 import com.ghdinteractivestudio.codestation.viewmodel.ChatViewModel
+import com.ghdinteractivestudio.codestation.viewmodel.MemoryViewModel
 import com.ghdinteractivestudio.codestation.viewmodel.PairingViewModel
 import com.ghdinteractivestudio.codestation.viewmodel.RosterViewModel
 import com.ghdinteractivestudio.codestation.viewmodel.SettingsViewModel
@@ -72,11 +73,16 @@ fun CodeStationNavHost(
         // 3. Roster des Bots
         composable(Screen.Roster.route) {
             val rosterViewModel: RosterViewModel = viewModel(
-                factory = RosterViewModel.provideFactory(container.botRepository, container.serverRepository)
+                factory = RosterViewModel.provideFactory(
+                    container.botRepository,
+                    container.serverRepository,
+                    container.memoryRepository
+                )
             )
             RosterScreen(
                 viewModel = rosterViewModel,
                 onBotClick = { botId -> navController.navigate(Screen.Chat.createRoute(botId)) },
+                onMemoryClick = { navController.navigate(Screen.Memory.route) },
                 onCreateBotClick = { navController.navigate(Screen.BotEditor.createRoute()) },
                 onCreateGroupClick = { navController.navigate(Screen.GroupEditor.route) },
                 onConfigureServerClick = { navController.navigate(Screen.Pairing.route) },
@@ -197,7 +203,13 @@ fun CodeStationNavHost(
 
         // 10. Pages Complémentaires
         composable(Screen.Memory.route) {
-            MemoryScreen(onNavigateBack = { navController.popBackStack() })
+            val memoryViewModel: MemoryViewModel = viewModel(
+                factory = MemoryViewModel.provideFactory(container.memoryRepository)
+            )
+            MemoryScreen(
+                viewModel = memoryViewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
         composable(Screen.Routines.route) {
             RoutinesScreen(onNavigateBack = { navController.popBackStack() })

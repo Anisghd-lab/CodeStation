@@ -150,6 +150,28 @@ fun SettingsScreen(
                 }
             }
 
+            // Section 1.5: Mémoire collective
+            CardSection(
+                title = "Mémoire & Connaissances"
+            ) {
+                row {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .plainButton(action = onOpenMemory),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Symbol("brain.head.profile", size = 20.dp, tint = Palette.added)
+                        Column(Modifier.weight(1f)) {
+                            Text("Mémoire collective", style = Type.body, color = Palette.text)
+                            Text("Consulter et synchroniser la base de connaissances partagée", style = Type.caption, color = Palette.secondary)
+                        }
+                        Symbol("chevron.right", size = 14.dp, tint = Palette.tertiary)
+                    }
+                }
+            }
+
             // Section 2: Préférences & Discussion (Regroupées pour éliminer le vide artificiel)
             CardSection(
                 title = "Préférences générales"

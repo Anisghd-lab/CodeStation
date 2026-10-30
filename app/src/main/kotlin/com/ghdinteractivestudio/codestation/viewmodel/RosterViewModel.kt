@@ -5,12 +5,15 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ghdinteractivestudio.codestation.domain.model.Bot
 import com.ghdinteractivestudio.codestation.domain.model.BotStatus
+import com.ghdinteractivestudio.codestation.domain.model.CollectiveMemoryStatus
 import com.ghdinteractivestudio.codestation.domain.model.ServerConfig
 import com.ghdinteractivestudio.codestation.domain.repository.BotRepository
+import com.ghdinteractivestudio.codestation.domain.repository.MemoryRepository
 import com.ghdinteractivestudio.codestation.domain.repository.ServerRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -25,6 +28,7 @@ data class RosterUiState(
     val leadBot: Bot? = null,
     val pinnedBots: List<Bot> = emptyList(),
     val otherBots: List<Bot> = emptyList(),
+    val memoryStatus: CollectiveMemoryStatus = CollectiveMemoryStatus(),
     val serverConfig: ServerConfig = ServerConfig(),
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
@@ -36,12 +40,26 @@ data class RosterUiState(
 
 class RosterViewModel(
     private val botRepository: BotRepository,
-    private val serverRepository: ServerRepository
+    private val serverRepository: ServerRepository,
+    private val memoryRepository: MemoryRepository? = null
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
     private val _activeFilter = MutableStateFlow(BotFilter.ALL)
     private val _isRefreshing = MutableStateFlow(false)
+    private val _memoryStatus = MutableStateFlow(CollectiveMemoryStatus())
+    val memoryStatus: StateFlow<CollectiveMemoryStatus> = _memoryStatus.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            memoryRepository?.refreshStatus()
+        }
+        viewModelScope.launch {
+            memoryRepository?.memoryStatus?.collect { status ->
+                _memoryStatus.value = status
+            }
+        }
+    }
 
     val uiState: StateFlow<RosterUiState> = combine(
         botRepository.getBotsStream(),
@@ -93,6 +111,7 @@ class RosterViewModel(
             _isRefreshing.value = true
             botRepository.refreshBots()
             serverRepository.testConnection()
+            memoryRepository?.refreshStatus()
             _isRefreshing.value = false
         }
     }
@@ -118,11 +137,12 @@ class RosterViewModel(
     companion object {
         fun provideFactory(
             botRepository: BotRepository,
-            serverRepository: ServerRepository
+            serverRepository: ServerRepository,
+            memoryRepository: MemoryRepository? = null
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return RosterViewModel(botRepository, serverRepository) as T
+                return RosterViewModel(botRepository, serverRepository, memoryRepository) as T
             }
         }
     }
