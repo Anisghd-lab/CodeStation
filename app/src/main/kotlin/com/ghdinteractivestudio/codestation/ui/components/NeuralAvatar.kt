@@ -39,11 +39,11 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Animated Memory Avatar for CodeStation Roster.
- * - Organic C-loop / embryo shape extracted directly from Screenshot_2026-10-31-10-38-51-33.JPG.
- * - Uses the EXACT same dot matrix pattern and circular points as agent avatars.
- * - Continuous perpetual rotation animation (turns perpetually around its center + 3D lighting).
- * - Emerald Green (#00E676), Turquoise Cyan (#00BCA6), Slate Grey (#4B5563) & Graphite palette.
+ * Animated Memory Avatar for CodeStation Roster (Ultimate Holographic Animation).
+ * - Exact organic C-loop / embryo silhouette extracted from Screenshot_2026-10-31-10-38-51-33.JPG.
+ * - Circular dot matrix with living harmonic color morphing across all points:
+ *   Emerald (#00E676) -> Cyan (#00E5FF) -> Electric Sky (#38BDF8) -> Violet (#A855F7) -> Magenta (#EC4899).
+ * - Continuous perpetual rotation (turns smoothly around center + 3D lighting).
  * - Single tap opens Memory; double tap triggers dispersion and spring reconstitution.
  */
 @Composable
@@ -66,7 +66,7 @@ fun NeuralAvatar(
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
 
-    // Continuous Frame Time for perpetual rotation (1 unit = 1 second)
+    // Continuous Frame Time for perpetual rotation & living color morph (1 unit = 1 second)
     val transition = rememberInfiniteTransition(label = "MemoryAvatarPerpetualRotation")
     val elapsedSeconds by transition.animateFloat(
         initialValue = 0f,
@@ -84,11 +84,13 @@ fun NeuralAvatar(
     val cells = if (size < 18.dp) 7 else if (size < 28.dp) 9 else 13
     val dots = remember(cells) { avatarDots("seed", cells) }
 
-    // Authentic Emerald & Slate Palette
-    val emeraldGreen = Color(0xFF00E676)
-    val turquoiseCyan = Color(0xFF00BCA6)
-    val slateGrey = Color(0xFF4B5563)
-    val darkGrey = Color(0xFF374151)
+    // Vibrant Prismatic Spectrum Colors for Ultimate Animation
+    val cEmerald = Color(0xFF00E676)
+    val cCyan = Color(0xFF00E5FF)
+    val cElectricBlue = Color(0xFF38BDF8)
+    val cViolet = Color(0xFFA855F7)
+    val cMagenta = Color(0xFFEC4899)
+    val cSlateDark = Color(0xFF334155)
 
     Box(
         modifier = modifier
@@ -148,33 +150,34 @@ fun NeuralAvatar(
                     val dotProd = u * lx + v * ly + z * lz
                     val shade = (0.30 + 0.70 * max(0.0, dotProd / (nl * ll))).coerceIn(0.2, 1.0)
 
-                    // Diagonal gradient distribution across the shape
-                    val diagPos = ((col + row).toFloat() / (cells * 2f))
-                    val isLuminousRegion = diagPos < 0.60f
-                    val baseColor = when {
-                        diagPos < 0.30f -> emeraldGreen
-                        diagPos < 0.55f -> turquoiseCyan
-                        diagPos < 0.75f -> slateGrey
-                        else -> darkGrey
+                    // Dynamic Harmonic Living Color Morphing across all points:
+                    // Combines spatial coordinate wave + time progression for ultimate fluid gradient flow
+                    val colorPhase = ((sec * 0.30 + (col * 0.08 + row * 0.06)) % 1.0 + 1.0).toFloat() % 1.0f
+
+                    val morphColor = when {
+                        colorPhase < 0.20f -> morphColor(cEmerald, cCyan, colorPhase / 0.20f)
+                        colorPhase < 0.40f -> morphColor(cCyan, cElectricBlue, (colorPhase - 0.20f) / 0.20f)
+                        colorPhase < 0.60f -> morphColor(cElectricBlue, cViolet, (colorPhase - 0.40f) / 0.20f)
+                        colorPhase < 0.80f -> morphColor(cViolet, cMagenta, (colorPhase - 0.60f) / 0.20f)
+                        else -> morphColor(cMagenta, cEmerald, (colorPhase - 0.80f) / 0.20f)
                     }
 
+                    // Blend with deep slate on shadowed side for realistic 3D volumetric depth
+                    val finalPointColor = morphColor(cSlateDark, morphColor, (shade.toFloat() * 1.15f).coerceIn(0.25f, 1.0f))
+
                     val radius = (step * 0.42f * (0.55f + 0.45f * shade.toFloat())).coerceIn(1.2f, step * 0.48f)
-                    val alpha = if (isLuminousRegion) {
-                        (0.65f + 0.35f * shade.toFloat()).coerceIn(0.4f, 1.0f)
-                    } else {
-                        (0.35f + 0.25f * shade.toFloat()).coerceIn(0.2f, 0.65f)
-                    }
+                    val alpha = (0.75f + 0.25f * shade.toFloat()).coerceIn(0.45f, 1.0f)
 
                     // Base circular dot (identical to bot avatars)
                     drawCircle(
-                        color = baseColor.copy(alpha = alpha),
+                        color = finalPointColor.copy(alpha = alpha),
                         radius = radius,
                         center = center
                     )
 
                     // Specular highlight glint on rotating crest
-                    if (shade > 0.72) {
-                        val specularAlpha = ((shade - 0.72) / 0.28 * 0.75).toFloat().coerceIn(0f, 0.75f)
+                    if (shade > 0.70) {
+                        val specularAlpha = ((shade - 0.70) / 0.30 * 0.85).toFloat().coerceIn(0f, 0.85f)
                         drawCircle(
                             color = Color.White.copy(alpha = specularAlpha),
                             radius = radius * 0.45f,
@@ -185,4 +188,17 @@ fun NeuralAvatar(
             }
         }
     }
+}
+
+/**
+ * Smooth linear interpolation between two Jetpack Compose Colors.
+ */
+private fun morphColor(c1: Color, c2: Color, fraction: Float): Color {
+    val f = fraction.coerceIn(0f, 1f)
+    return Color(
+        red = c1.red + (c2.red - c1.red) * f,
+        green = c1.green + (c2.green - c1.green) * f,
+        blue = c1.blue + (c2.blue - c1.blue) * f,
+        alpha = c1.alpha + (c2.alpha - c1.alpha) * f
+    )
 }

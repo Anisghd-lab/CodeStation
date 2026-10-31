@@ -54,7 +54,7 @@ object AvatarPalette {
         "magenta" to 0xFFFF309B,
         "gray" to 0xFF777777
     )
-    val shapes = listOf("blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop", "seed")
+    val shapes = listOf("blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop")
 
     fun tint(id: String): Color = Color(colors[id.lowercase()] ?: colors.getValue("blue"))
 }
