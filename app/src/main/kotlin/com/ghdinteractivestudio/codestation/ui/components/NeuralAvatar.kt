@@ -10,26 +10,22 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -38,203 +34,152 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.max
 import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Native Jetpack Compose Neural Avatar for CodeStation Collective Memory.
- * Faithfully matches the neural particle grid visual reference:
- * - Circular dot lattice: left side emerald & turquoise green, right side slate grey.
- * - Continuous subtle orbital oscillation and breathing luminescence.
- * - Interactive: drag-to-rotate, double-tap particle dispersion & reconstitution, single-tap onClick.
- * - Lifecycle-aware: pauses animations when in background.
+ * Animated Memory Avatar for CodeStation Roster.
+ * - Organic C-loop / embryo shape extracted directly from Screenshot_2026-10-31-10-38-51-33.JPG.
+ * - Uses the EXACT same dot matrix pattern and circular points as agent avatars.
+ * - Continuous perpetual rotation animation (turns perpetually around its center + 3D lighting).
+ * - Emerald Green (#00E676), Turquoise Cyan (#00BCA6), Slate Grey (#4B5563) & Graphite palette.
+ * - Single tap opens Memory; double tap triggers dispersion and spring reconstitution.
  */
 @Composable
 fun NeuralAvatar(
-    size: Dp = 48.dp,
-    onClick: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    size: Dp = 44.dp,
+    onClick: () -> Unit = {}
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val owner = LocalLifecycleOwner.current
 
-    var isLifecycleActive by remember { mutableStateOf(true) }
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            isLifecycleActive = event.targetState.isAtLeast(Lifecycle.State.RESUMED)
+    var active by remember(owner) {
+        mutableStateOf(owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+    }
+    DisposableEffect(owner) {
+        val observer = LifecycleEventObserver { _, _ ->
+            active = owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
         }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
     }
 
-    // Interactive Drag rotation angle
-    var dragRotationAngle by remember { mutableFloatStateOf(0f) }
+    // Continuous Frame Time for perpetual rotation (1 unit = 1 second)
+    val transition = rememberInfiniteTransition(label = "MemoryAvatarPerpetualRotation")
+    val elapsedSeconds by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 3600f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3_600_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "MemoryAvatarSeconds"
+    )
 
-    // Double-tap Radial Dispersion animatable (0f = intact lattice, 1f = dispersed)
+    // Double-tap dispersion animation
     val dispersionAnim = remember { Animatable(0f) }
 
-    // Continuous Subtle Orbital Oscillation (-6° to +6°)
-    val infiniteTransition = rememberInfiniteTransition(label = "NeuralAvatarOrbit")
-    val orbitAngle by infiniteTransition.animateFloat(
-        initialValue = -5f,
-        targetValue = 5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "OrbitOscillation"
-    )
+    val cells = if (size < 18.dp) 7 else if (size < 28.dp) 9 else 13
+    val dots = remember(cells) { avatarDots("seed", cells) }
 
-    // Luminescence breathing wave
-    val pulseFactor by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2800, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "LuminescenceWave"
-    )
-
-    // Palette Colors matching visual reference
-    val vibrantGreen = Color(0xFF00E676)
-    val emeraldGreen = Color(0xFF10B981)
-    val turquoise = Color(0xFF2DD4BF)
-    val deepGreen = Color(0xFF059669)
+    // Authentic Emerald & Slate Palette
+    val emeraldGreen = Color(0xFF00E676)
+    val turquoiseCyan = Color(0xFF00BCA6)
     val slateGrey = Color(0xFF4B5563)
     val darkGrey = Color(0xFF374151)
-    val mutedGrey = Color(0xFF6B7280)
-
-    val currentTotalAngle = if (isLifecycleActive) orbitAngle + dragRotationAngle else dragRotationAngle
 
     Box(
         modifier = modifier
             .size(size)
+            .clearAndSetSemantics { }
             .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = {
-                        // Double tap: disperse particles radially and spring back
                         coroutineScope.launch {
-                            dispersionAnim.animateTo(
-                                targetValue = 1.6f,
-                                animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing)
-                            )
-                            dispersionAnim.animateTo(
-                                targetValue = 0f,
-                                animationSpec = spring(dampingRatio = 0.55f, stiffness = 220f)
-                            )
+                            dispersionAnim.animateTo(1.6f, tween(220, easing = FastOutSlowInEasing))
+                            dispersionAnim.animateTo(0f, spring(dampingRatio = 0.55f, stiffness = 220f))
                         }
                     },
-                    onTap = {
-                        onClick?.invoke()
-                    }
+                    onTap = { onClick() }
                 )
-            }
-            .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    change.consume()
-                    dragRotationAngle = (dragRotationAngle + dragAmount.x * 0.45f) % 360f
-                }
             }
     ) {
         Canvas(modifier = Modifier.size(size)) {
-            val center = Offset(this.size.width / 2f, this.size.height / 2f)
-            val radius = this.size.minDimension / 2f
+            val step = this.size.width / cells
+            val half = this.size.width / 2f
+            val sec = if (active) elapsedSeconds.toDouble() else 0.0
             val dispersion = dispersionAnim.value
 
-            // Draw dark circular background subtle backing
-            drawCircle(
-                color = Color(0xFF0B1015),
-                radius = radius,
-                center = center
-            )
+            // Perpetual 2D rotation of the organic avatar (smooth 360° turn every ~9 seconds)
+            val rotDegrees = (sec * 40.0 % 360.0).toFloat()
 
-            // Outer delicate halo ring
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        emeraldGreen.copy(alpha = 0.18f * pulseFactor),
-                        Color.Transparent
-                    ),
-                    center = center,
-                    radius = radius * 1.05f
-                ),
-                radius = radius,
-                center = center
-            )
+            // 3D spherical lighting rotating with orbital light vector
+            val yaw = sec * 1.5
+            val lx = sin(yaw) * 0.85
+            val ly = 0.55
+            val lz = cos(yaw) * 0.65 + 0.55
+            val ll = sqrt(lx * lx + ly * ly + lz * lz)
 
-            // Rotate canvas for subtle orbital motion and drag interaction
-            rotate(degrees = currentTotalAngle, pivot = center) {
-                // Lattice generation: 8x8 grid clipped to circular boundary
-                val gridSteps = 8
-                val stepSize = (radius * 1.76f) / (gridSteps - 1)
-                val startX = center.x - (radius * 0.88f)
-                val startY = center.y - (radius * 0.88f)
-                val dotBaseRadius = (size.toPx() / 48f) * 1.55f
+            rotate(degrees = rotDegrees, pivot = Offset(half, half)) {
+                for ((row, col) in dots) {
+                    val baseCenterX = (col + 0.5f) * step
+                    val baseCenterY = (row + 0.5f) * step
 
-                for (row in 0 until gridSteps) {
-                    for (col in 0 until gridSteps) {
-                        val basePx = startX + col * stepSize
-                        val basePy = startY + row * stepSize
+                    // Radial dispersion offset for double-tap
+                    val dx = baseCenterX - half
+                    val dy = baseCenterY - half
+                    val dist = hypot(dx, dy)
+                    val dirX = if (dist > 0.001f) dx / dist else 0f
+                    val dirY = if (dist > 0.001f) dy / dist else 0f
 
-                        val dx = basePx - center.x
-                        val dy = basePy - center.y
-                        val distFromCenter = hypot(dx, dy)
+                    val curCenterX = baseCenterX + dirX * (dispersion * half * 0.9f)
+                    val curCenterY = baseCenterY + dirY * (dispersion * half * 0.9f)
+                    val center = Offset(curCenterX, curCenterY)
 
-                        // Circular boundary mask with slight margin
-                        if (distFromCenter <= radius * 0.90f) {
-                            // Apply radial dispersion if triggered
-                            val dispersionOffsetMultiplier = if (dispersion > 0f) {
-                                1f + dispersion * (0.8f + (distFromCenter / radius) * 0.9f)
-                            } else 1f
+                    // Normalized position (-1.0 to +1.0)
+                    val u = ((baseCenterX - half) / half).toDouble()
+                    val v = ((half - baseCenterY) / half).toDouble()
+                    val z = sqrt(max(0.2, 1.0 - u * u - v * v))
+                    val nl = sqrt(u * u + v * v + z * z)
 
-                            val finalPx = center.x + dx * dispersionOffsetMultiplier
-                            val finalPy = center.y + dy * dispersionOffsetMultiplier
-                            val finalDist = hypot(finalPx - center.x, finalPy - center.y)
+                    // 3D Spherical shade rotating perpetually
+                    val dotProd = u * lx + v * ly + z * lz
+                    val shade = (0.30 + 0.70 * max(0.0, dotProd / (nl * ll))).coerceIn(0.2, 1.0)
 
-                            if (finalDist <= radius * 1.25f) {
-                                // Column bias determines green vs grey
-                                // Left side (col < 4) = Vibrant emerald / turquoise
-                                // Right side (col >= 4) = Slate / dark grey
-                                val normalizedCol = col.toFloat() / (gridSteps - 1) // 0.0 (left) to 1.0 (right)
+                    // Diagonal gradient distribution across the shape
+                    val diagPos = ((col + row).toFloat() / (cells * 2f))
+                    val isLuminousRegion = diagPos < 0.60f
+                    val baseColor = when {
+                        diagPos < 0.30f -> emeraldGreen
+                        diagPos < 0.55f -> turquoiseCyan
+                        diagPos < 0.75f -> slateGrey
+                        else -> darkGrey
+                    }
 
-                                val dotColor = when {
-                                    normalizedCol < 0.28f -> vibrantGreen
-                                    normalizedCol < 0.45f -> {
-                                        if ((row + col) % 3 == 0) turquoise else emeraldGreen
-                                    }
-                                    normalizedCol < 0.58f -> {
-                                        // Transition boundary
-                                        if (row % 2 == 0) deepGreen else slateGrey
-                                    }
-                                    normalizedCol < 0.80f -> slateGrey
-                                    else -> darkGrey
-                                }
+                    val radius = (step * 0.42f * (0.55f + 0.45f * shade.toFloat())).coerceIn(1.2f, step * 0.48f)
+                    val alpha = if (isLuminousRegion) {
+                        (0.65f + 0.35f * shade.toFloat()).coerceIn(0.4f, 1.0f)
+                    } else {
+                        (0.35f + 0.25f * shade.toFloat()).coerceIn(0.2f, 0.65f)
+                    }
 
-                                val isGreenDot = normalizedCol < 0.52f
-                                val dotAlpha = if (isGreenDot) {
-                                    (0.85f * pulseFactor).coerceIn(0.6f, 1f)
-                                } else {
-                                    0.45f
-                                }
+                    // Base circular dot (identical to bot avatars)
+                    drawCircle(
+                        color = baseColor.copy(alpha = alpha),
+                        radius = radius,
+                        center = center
+                    )
 
-                                // Glowing halo around brighter green dots
-                                if (isGreenDot && (row + col) % 2 == 0) {
-                                    drawCircle(
-                                        color = dotColor.copy(alpha = 0.28f * pulseFactor),
-                                        radius = dotBaseRadius * 2.2f,
-                                        center = Offset(finalPx, finalPy)
-                                    )
-                                }
-
-                                // Core particle dot
-                                drawCircle(
-                                    color = dotColor.copy(alpha = dotAlpha),
-                                    radius = dotBaseRadius,
-                                    center = Offset(finalPx, finalPy)
-                                )
-                            }
-                        }
+                    // Specular highlight glint on rotating crest
+                    if (shade > 0.72) {
+                        val specularAlpha = ((shade - 0.72) / 0.28 * 0.75).toFloat().coerceIn(0f, 0.75f)
+                        drawCircle(
+                            color = Color.White.copy(alpha = specularAlpha),
+                            radius = radius * 0.45f,
+                            center = center
+                        )
                     }
                 }
             }

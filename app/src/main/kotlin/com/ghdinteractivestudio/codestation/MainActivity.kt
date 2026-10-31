@@ -106,6 +106,7 @@ class MainActivity : ComponentActivity() {
         val app = application as? CodeStationApplication ?: return
         val container = app.container
         CoroutineScope(Dispatchers.IO).launch {
+            container.eventStreamClient.start()
             container.botRepository.refreshBots()
             container.serverRepository.testConnection()
             com.ghdinteractivestudio.codestation.widget.CodeStationWidgetManager.updateAllWidgets(this@MainActivity)

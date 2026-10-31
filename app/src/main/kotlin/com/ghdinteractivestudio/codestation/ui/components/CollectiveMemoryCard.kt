@@ -59,9 +59,9 @@ fun CollectiveMemoryCard(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Native Animated Neural Avatar
+        // Native Animated Neural Avatar (Matching agent bots dot matrix)
         NeuralAvatar(
-            size = 48.dp,
+            size = 44.dp,
             onClick = onClick
         )
 
@@ -75,7 +75,7 @@ fun CollectiveMemoryCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Mémoire collective",
+                    text = "Mémoire",
                     style = Type.body.semibold,
                     color = Palette.text,
                     maxLines = 1,

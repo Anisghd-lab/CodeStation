@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
@@ -50,6 +51,9 @@ import androidx.compose.ui.unit.sp
 import com.ghdinteractivestudio.codestation.domain.model.MemoryExperience
 import com.ghdinteractivestudio.codestation.domain.model.MemoryKnowledge
 import com.ghdinteractivestudio.codestation.domain.model.MemorySearchResultItem
+import com.ghdinteractivestudio.codestation.ui.components.DynamicNeuralGraphView
+import com.ghdinteractivestudio.codestation.ui.components.GraphNode3D
+import com.ghdinteractivestudio.codestation.ui.components.GraphNodeType
 import com.ghdinteractivestudio.codestation.ui.components.GlassStage
 import com.ghdinteractivestudio.codestation.ui.components.GlassStyle
 import com.ghdinteractivestudio.codestation.ui.components.NeuralAvatar
@@ -81,6 +85,7 @@ fun MemoryScreen(
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     var showDetailSheet by remember { mutableStateOf(false) }
+    var selectedGraphNode by remember { mutableStateOf<GraphNode3D?>(null) }
 
     GlassStage(
         modifier = modifier
@@ -111,7 +116,7 @@ fun MemoryScreen(
                 Spacer(Modifier.width(12.dp))
 
                 Text(
-                    text = "Mémoire collective",
+                    text = "Mémoire",
                     style = Type.title3.semibold,
                     color = Palette.text,
                     modifier = Modifier.weight(1f)
@@ -120,10 +125,10 @@ fun MemoryScreen(
                 // Sync Action Button
                 Box(
                     Modifier
-                        .height(36.dp)
-                        .glass(Capsule())
+                        .height(40.dp)
+                        .glass(Capsule(), style = GlassStyle.Regular)
                         .clickable(role = Role.Button, onClick = { viewModel.triggerSync() })
-                        .padding(horizontal = 12.dp),
+                        .padding(horizontal = 14.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Row(
@@ -133,7 +138,7 @@ fun MemoryScreen(
                         if (state.isSyncing) {
                             Spinner(size = 14.dp)
                         } else {
-                            Symbol("arrow.triangle.2.circlepath", size = 14.dp, tint = Palette.electricBlue)
+                            Symbol("arrow.triangle.2.circlepath", size = 16.dp, tint = Palette.electricBlue)
                         }
                         Text(
                             text = if (state.isSyncing) "Synchro…" else "Synchroniser",
@@ -150,76 +155,32 @@ fun MemoryScreen(
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
-                top = topInset + 56.dp,
+                top = topInset + 46.dp,
                 bottom = 32.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // 1. Hero Presentation Section
-            item("hero") {
-                Column(
+            // 1. Dynamic Neural Network Graph Section (Compact 3D Smoked Glass Sphere)
+            item("neural_graph") {
+                DynamicNeuralGraphView(
+                    experiences = state.allExperiences,
+                    knowledge = state.allKnowledge,
+                    onSelectExperience = { exp ->
+                        viewModel.selectExperience(exp)
+                        showDetailSheet = true
+                    },
+                    onSelectKnowledge = { knw ->
+                        viewModel.selectKnowledge(knw)
+                        showDetailSheet = true
+                    },
+                    onNodeSelected = { node ->
+                        selectedGraphNode = node
+                    },
+                    height = 230.dp,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .glass(RoundedRectangle(20.dp), style = GlassStyle.Card)
-                        .padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Enlarged interactive Neural Avatar
-                    NeuralAvatar(
-                        size = 88.dp,
-                        onClick = { viewModel.triggerSync() }
-                    )
-
-                    // Title & Description
-                    Text(
-                        text = "CodeStation Collective Memory",
-                        style = Type.title2.semibold,
-                        color = Palette.text,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Text(
-                        text = "Un espace commun où les expériences et connaissances des agents sont conservées et partagées.",
-                        style = Type.subheadline,
-                        color = Palette.secondary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    )
-
-                    // Status Badge Capsule
-                    val syncDotColor = Color(android.graphics.Color.parseColor(state.status.syncStatus.dotColorHex))
-                    Row(
-                        modifier = Modifier
-                            .clip(Capsule())
-                            .background(syncDotColor.copy(alpha = 0.14f))
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Box(
-                            Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(syncDotColor)
-                        )
-                        Text(
-                            text = state.status.syncStatus.displayLabel,
-                            style = Type.caption.semibold,
-                            color = syncDotColor
-                        )
-                    }
-
-                    // Feedback Message
-                    state.syncFeedbackMessage?.let { msg ->
-                        Text(
-                            text = msg,
-                            style = Type.caption,
-                            color = Palette.tertiary,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
+                        .clipToBounds()
+                )
             }
 
             // 2. Real Metrics Grid
@@ -413,6 +374,243 @@ fun MemoryScreen(
             }
         }
     }
+
+    // Node Quick Detail Bottom Sheet (Appears cleanly below the graph on Android)
+    if (selectedGraphNode != null) {
+        val node = selectedGraphNode!!
+        val exp = if (node.type == GraphNodeType.EXPERIENCE) {
+            state.allExperiences.find { it.id == node.dataRefId }
+        } else null
+        val knw = if (node.type == GraphNodeType.KNOWLEDGE) {
+            state.allKnowledge.find { it.id == node.dataRefId }
+        } else null
+
+        NodeQuickDetailSheet(
+            node = node,
+            experience = exp,
+            knowledge = knw,
+            onOpenFullDetail = {
+                if (exp != null) {
+                    viewModel.selectExperience(exp)
+                    showDetailSheet = true
+                } else if (knw != null) {
+                    viewModel.selectKnowledge(knw)
+                    showDetailSheet = true
+                }
+                selectedGraphNode = null
+            },
+            onDismiss = { selectedGraphNode = null }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NodeQuickDetailSheet(
+    node: GraphNode3D,
+    experience: MemoryExperience?,
+    knowledge: MemoryKnowledge?,
+    onOpenFullDetail: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val categoryTitle = when (node.type) {
+        GraphNodeType.AGENT -> "Agent IA"
+        GraphNodeType.PROJECT -> "Cœur Neuronal"
+        GraphNodeType.EXPERIENCE -> "Expérience"
+        GraphNodeType.KNOWLEDGE -> "Connaissance Validée"
+        GraphNodeType.INTERNEURON -> "Interneurone Synaptique"
+    }
+
+    val displayTitle = experience?.title ?: knowledge?.title ?: node.label
+    val author = experience?.agent ?: (if (node.type == GraphNodeType.AGENT) node.label else "CodeStation Memory")
+    val validationStatus = experience?.validationStatus ?: knowledge?.validationStatus ?: "Connecté"
+    val isValidated = validationStatus in listOf("validated", "validated_solution", "active")
+
+    val shortDescription = when {
+        experience != null -> experience.solution.ifBlank { experience.problem }.take(220)
+        knowledge != null -> knowledge.content.take(220)
+        else -> node.subtitle
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Palette.surface,
+        scrimColor = Color.Black.copy(alpha = 0.55f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Header Row: Category Badge + Status Badge + Close Button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Category Indicator Chip
+                    Box(
+                        modifier = Modifier
+                            .clip(Capsule())
+                            .background(node.color.copy(alpha = 0.16f))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(node.color)
+                            )
+                            Text(
+                                text = categoryTitle,
+                                style = Type.caption.semibold,
+                                color = node.color
+                            )
+                        }
+                    }
+
+                    // Validation Status Badge
+                    if (isValidated) {
+                        Box(
+                            modifier = Modifier
+                                .clip(Capsule())
+                                .background(Palette.added.copy(alpha = 0.16f))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "Validée",
+                                style = Type.caption.semibold,
+                                color = Palette.added
+                            )
+                        }
+                    }
+                }
+
+                // Close Button
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .clickable(role = Role.Button, onClick = onDismiss),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Symbol("xmark.circle.fill", size = 22.dp, tint = Palette.tertiary)
+                }
+            }
+
+            // Node Name / Title (Full horizontal, natural wrap, never vertical)
+            Text(
+                text = displayTitle,
+                style = Type.title3.semibold,
+                color = Palette.text,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Author and ID Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Symbol("person.crop.circle", size = 14.dp, tint = Palette.secondary)
+                Text(
+                    text = "Auteur : $author",
+                    style = Type.subheadline,
+                    color = Palette.secondary
+                )
+                Text(
+                    text = "• ${node.id}",
+                    style = Type.caption,
+                    color = Palette.tertiary
+                )
+            }
+
+            // Short Description Box
+            if (shortDescription.isNotBlank()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .glass(RoundedRectangle(12.dp), style = GlassStyle.Card)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "Description & Contexte",
+                        style = Type.caption.semibold,
+                        color = Palette.electricBlue
+                    )
+                    Text(
+                        text = shortDescription,
+                        style = Type.body,
+                        color = Palette.text,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            // Action Buttons
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (experience != null || knowledge != null) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                            .glass(Capsule(), style = GlassStyle.Regular)
+                            .clickable(role = Role.Button, onClick = onOpenFullDetail)
+                            .padding(horizontal = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Symbol("doc.text", size = 16.dp, tint = Palette.added)
+                            Text(
+                                text = "Détails complets",
+                                style = Type.body.semibold,
+                                color = Palette.added
+                            )
+                        }
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .then(if (experience != null || knowledge != null) Modifier.width(100.dp) else Modifier.fillMaxWidth())
+                        .height(44.dp)
+                        .glass(Capsule(), style = GlassStyle.Card)
+                        .clickable(role = Role.Button, onClick = onDismiss)
+                        .padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Fermer",
+                        style = Type.body,
+                        color = Palette.secondary
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+        }
+    }
 }
 
 @Composable
@@ -454,12 +652,10 @@ private fun FilterChip(
     Box(
         modifier = Modifier
             .pressScale(pressed)
-            .clip(Capsule())
-            .background(if (isSelected) Palette.electricBlue.copy(alpha = 0.22f) else Palette.glassCard)
-            .border(
-                width = 1.dp,
-                color = if (isSelected) Palette.electricBlue.copy(alpha = 0.5f) else Color.Transparent,
-                shape = Capsule()
+            .glass(
+                Capsule(),
+                style = if (isSelected) GlassStyle.Regular else GlassStyle.Card,
+                pressed = pressed
             )
             .clickable(source, null, role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 7.dp)

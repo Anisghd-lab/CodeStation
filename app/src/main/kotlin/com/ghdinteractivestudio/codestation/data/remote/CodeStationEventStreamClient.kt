@@ -59,15 +59,22 @@ class CodeStationEventStreamClient(
     private val botPreviousStatus = ConcurrentHashMap<String, String>()
 
     private val client = OkHttpClient.Builder()
-        .readTimeout(0, TimeUnit.MILLISECONDS) // SSE stream illimité
+        .readTimeout(35, TimeUnit.SECONDS) // Auto-détection de socket orphelin (KeepAlive hôte = 15s)
         .connectTimeout(10, TimeUnit.SECONDS)
-        .pingInterval(15, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
         .build()
 
     fun start() {
         if (streamJob?.isActive == true) return
         android.util.Log.i(TAG, "Starting CodeStationEventStreamClient SSE loop (since=$lastRev)")
+        streamJob = scope.launch {
+            runEventLoop()
+        }
+    }
+
+    fun reconnectNow() {
+        android.util.Log.i(TAG, "Force reconnecting CodeStationEventStreamClient SSE loop (since=$lastRev)")
+        streamJob?.cancel()
         streamJob = scope.launch {
             runEventLoop()
         }
@@ -163,6 +170,9 @@ class CodeStationEventStreamClient(
                 }
                 "hello" -> {
                     android.util.Log.i(TAG, "Handshake hello received: rev=$rev")
+                    if (lastRev == 0L && rev != null && rev > 0) {
+                        lastRev = rev
+                    }
                     initialSyncCompleted = true
                 }
                 "bot" -> {

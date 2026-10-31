@@ -54,7 +54,7 @@ object AvatarPalette {
         "magenta" to 0xFFFF309B,
         "gray" to 0xFF777777
     )
-    val shapes = listOf("blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop")
+    val shapes = listOf("blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop", "seed")
 
     fun tint(id: String): Color = Color(colors[id.lowercase()] ?: colors.getValue("blue"))
 }
@@ -173,6 +173,34 @@ private fun eyeRows(cells: Int) = when (cells) { 7 -> listOf(2, 3); 9 -> listOf(
 private fun dotInk(cells: Int, shade: Double) = if (cells < 13) .4 + .4 * shade else .2 + .4 * min(1.0, shade / .7)
 
 fun avatarDots(shape: String, cells: Int): List<Pair<Int, Int>> {
+    if (shape.lowercase() in listOf("seed", "graine")) {
+        return when (cells) {
+            7 -> listOf(
+                0 to 2, 0 to 3, 1 to 1, 2 to 0, 3 to 0, 4 to 0, 4 to 1,
+                5 to 0, 5 to 1, 5 to 2, 6 to 1, 6 to 2, 6 to 3
+            )
+            9 -> listOf(
+                0 to 2, 0 to 3, 0 to 4, 0 to 5, 1 to 1, 1 to 2, 2 to 0, 2 to 1,
+                3 to 0, 3 to 1, 4 to 0, 4 to 1, 5 to 0, 5 to 1, 6 to 0, 6 to 1, 6 to 2,
+                7 to 1, 7 to 2, 7 to 3, 7 to 4, 8 to 2, 8 to 3, 8 to 4
+            )
+            else -> listOf(
+                0 to 4, 0 to 5, 0 to 6, 0 to 7, 0 to 8,
+                1 to 2, 1 to 3, 1 to 4, 1 to 8, 1 to 9,
+                2 to 1, 2 to 2, 2 to 3,
+                3 to 1, 3 to 2,
+                4 to 0, 4 to 1,
+                5 to 0, 5 to 1,
+                6 to 0, 6 to 1,
+                7 to 0, 7 to 1,
+                8 to 0, 8 to 1, 8 to 2,
+                9 to 1, 9 to 2, 9 to 3,
+                10 to 1, 10 to 2, 10 to 3, 10 to 4, 10 to 5, 10 to 6,
+                11 to 2, 11 to 3, 11 to 4, 11 to 5, 11 to 6,
+                12 to 3, 12 to 4, 12 to 5, 12 to 6
+            )
+        }
+    }
     val path = avatarPath(shape)
     val region = Region().apply { setPath(path, Region(-100, -100, 1100, 1100)) }
     return buildList {
@@ -226,6 +254,27 @@ private fun avatarPath(shape: String): Path = Path().apply {
             cubicTo(620f, 200f, 940f, 380f, 940f, 620f)
             arcTo(RectF(60f, 180f, 940f, 1060f), 0f, 180f)
             cubicTo(60f, 380f, 380f, 200f, 500f, 0f)
+            close()
+        }
+        "seed", "graine" -> {
+            val cx = 500f
+            val cy = 500f
+            val steps = 72
+            val tiltAngle = -12.0 * (PI / 180.0)
+            val cosTilt = cos(tiltAngle)
+            val sinTilt = sin(tiltAngle)
+            for (i in 0..steps) {
+                val t = i.toDouble() / steps * 2.0 * PI
+                val a = 380.0
+                val b = 470.0
+                val k = 0.22
+                val organicWarp = 1.0 + 0.04 * sin(2.0 * t + 0.4)
+                val rawX = a * sin(t) * (1.0 - k * cos(t)) * organicWarp
+                val rawY = -b * cos(t)
+                val rotX = cx + (rawX * cosTilt - rawY * sinTilt).toFloat()
+                val rotY = cy + (rawX * sinTilt + rawY * cosTilt).toFloat()
+                if (i == 0) moveTo(rotX, rotY) else lineTo(rotX, rotY)
+            }
             close()
         }
         else -> {
