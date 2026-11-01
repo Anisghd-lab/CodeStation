@@ -222,10 +222,26 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
             
         heartbeat_stop.set()
         heartbeat_thread.join(timeout=1.0)
-        active_proc.wait()
+        try:
+            active_proc.wait(timeout=300.0)
+        except subprocess.TimeoutExpired:
+            log("agy execution timed out after 300s, killing process")
+            with active_proc_lock:
+                if active_proc is not None:
+                    try:
+                        active_proc.terminate()
+                        time.sleep(1.0)
+                        if active_proc.poll() is None:
+                            active_proc.kill()
+                    except Exception:
+                        pass
+                    active_proc = None
+            send_response(req_id, error={"code": -32000, "message": "Google Antigravity process timed out after 300s"})
+            return
+
         stderr_thread.join(timeout=2.0)
         
-        exit_code = active_proc.returncode
+        exit_code = active_proc.returncode if active_proc else -1
         with active_proc_lock:
             active_proc = None
 
@@ -327,8 +343,12 @@ def main():
             prompt_list = params.get("prompt", [])
             prompt_text = ""
             for item in prompt_list:
-                if isinstance(item, dict) and "text" in item:
-                    prompt_text += item["text"] + " "
+                if isinstance(item, dict):
+                    if item.get("type") == "text" and "text" in item:
+                        prompt_text += item["text"] + " "
+                    elif item.get("type") == "image":
+                        mime = item.get("mimeType", "image/png")
+                        prompt_text += f"\n[Attached image file ({mime})]\n"
                 elif isinstance(item, str):
                     prompt_text += item + " "
             prompt_text = prompt_text.strip()
@@ -344,8 +364,12 @@ def main():
                 if active_proc is not None:
                     try:
                         active_proc.terminate()
+                        time.sleep(0.5)
+                        if active_proc.poll() is None:
+                            active_proc.kill()
                     except Exception:
                         pass
+                    active_proc = None
             if req_id is not None:
                 send_response(req_id, {})
         elif method == "session/close":

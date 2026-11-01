@@ -11,6 +11,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <TextView
@@ -18,8 +19,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Statut des Agents &amp; Tâches"
-            android:textColor="#9CA3AF"
-            android:textSize="12sp"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
             android:textStyle="bold" />
 
         <TextView
@@ -41,45 +42,55 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="10dp"
         android:layout_weight="1"
         android:orientation="horizontal">
 
+        <!-- Left card: Active Bot with Avatar -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_marginEnd="6dp"
             android:layout_weight="1"
             android:background="@drawable/widget_card_item_bg"
-            android:orientation="vertical"
-            android:padding="8dp">
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="10dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Dernière activité"
-                android:textColor="#9CA3AF"
-                android:textSize="11sp" />
+            <ImageView
+                android:id="@+id/iv_bot_avatar"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:contentDescription="Bot Avatar" />
 
-            <TextView
-                android:id="@+id/tv_last_active_bot"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="OpenCode GLM"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/tv_last_active_status"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Prêt à recevoir des instructions"
-                android:textColor="#438DFF"
-                android:textSize="10sp" />
+                <TextView
+                    android:id="@+id/tv_last_active_bot"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Google Antigravity"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_last_active_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Prêt à coder"
+                    android:textColor="#38BDF8"
+                    android:textSize="10sp" />
+            </LinearLayout>
         </LinearLayout>
 
+        <!-- Right card: Approvals & Total -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
@@ -87,14 +98,14 @@
             android:layout_weight="1"
             android:background="@drawable/widget_card_item_bg"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:padding="10dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Approbations"
-                android:textColor="#9CA3AF"
-                android:textSize="11sp" />
+                android:text="File &amp; Approbations"
+                android:textColor="#94A3B8"
+                android:textSize="10sp" />
 
             <TextView
                 android:id="@+id/tv_pending_approvals"
@@ -110,9 +121,10 @@
                 android:id="@+id/tv_total_bots"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:text="3 agents configurés"
-                android:textColor="#6B7280"
-                android:textSize="10sp" />
+                android:textColor="#64748B"
+                android:textSize="9sp" />
         </LinearLayout>
     </LinearLayout>
 

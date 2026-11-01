@@ -11,6 +11,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <TextView
@@ -28,88 +29,187 @@
             android:layout_height="wrap_content"
             android:background="@drawable/widget_chip_emerald"
             android:paddingStart="8dp"
-            android:paddingTop="2dp"
+            android:paddingTop="3dp"
             android:paddingEnd="8dp"
-            android:paddingBottom="2dp"
+            android:paddingBottom="3dp"
             android:text="3 bots opérationnels"
             android:textColor="#10B981"
             android:textSize="10sp"
             android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- Member 1 -->
     <LinearLayout
+        android:id="@+id/team_row_1"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:background="@drawable/widget_card_item_bg"
-        android:orientation="vertical"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
         android:padding="10dp">
 
+        <ImageView
+            android:id="@+id/iv_team1_avatar"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:contentDescription="Lead" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_team1_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Google Antigravity"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_team1_desc"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Lead Agent · gemini-4-argon-medium"
+                android:textColor="#38BDF8"
+                android:textSize="10sp" />
+        </LinearLayout>
+
         <TextView
+            android:id="@+id/tv_team1_badge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="1. Google Antigravity (Lead Agent)"
+            android:background="@drawable/widget_chip_blue"
+            android:paddingStart="6dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="2dp"
+            android:text="Lead"
             android:textColor="#438DFF"
-            android:textSize="13sp"
+            android:textSize="9sp"
             android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="Moteur : agy · Modèle : gemini-4-argon-medium"
-            android:textColor="#D1D5DB"
-            android:textSize="11sp" />
     </LinearLayout>
 
+    <!-- Member 2 -->
     <LinearLayout
+        android:id="@+id/team_row_2"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:background="@drawable/widget_card_item_bg"
-        android:orientation="vertical"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
         android:padding="10dp">
 
+        <ImageView
+            android:id="@+id/iv_team2_avatar"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:contentDescription="OpenCode" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_team2_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="OpenCode GLM"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_team2_desc"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Code Specialist · glm-5.3-flash-free"
+                android:textColor="#10B981"
+                android:textSize="10sp" />
+        </LinearLayout>
+
         <TextView
+            android:id="@+id/tv_team2_badge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="2. OpenCode GLM (Agent Assistant)"
+            android:background="@drawable/widget_chip_emerald"
+            android:paddingStart="6dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="2dp"
+            android:text="GLM"
             android:textColor="#10B981"
-            android:textSize="13sp"
+            android:textSize="9sp"
             android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="Moteur : opencode · Modèle : opencode/glm-5.3-flash-free"
-            android:textColor="#D1D5DB"
-            android:textSize="11sp" />
     </LinearLayout>
 
+    <!-- Member 3 -->
     <LinearLayout
+        android:id="@+id/team_row_3"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:background="@drawable/widget_card_item_bg"
-        android:orientation="vertical"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
         android:padding="10dp">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <ImageView
+            android:id="@+id/iv_team3_avatar"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:contentDescription="Codex" />
+
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="3. Codex Terminal (Session Directe)"
-            android:textColor="#F0A030"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_team3_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CodeBuddy Code"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_team3_desc"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Terminal Assistant · PRoot"
+                android:textColor="#F0A030"
+                android:textSize="10sp" />
+        </LinearLayout>
 
         <TextView
+            android:id="@+id/tv_team3_badge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="Moteur : codex · Environnement : Ubuntu PRoot"
-            android:textColor="#D1D5DB"
-            android:textSize="11sp" />
+            android:background="@drawable/widget_chip_amber"
+            android:paddingStart="6dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="2dp"
+            android:text="PRoot"
+            android:textColor="#F0A030"
+            android:textSize="9sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
 </LinearLayout>

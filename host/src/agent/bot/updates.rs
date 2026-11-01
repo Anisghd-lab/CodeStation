@@ -337,17 +337,24 @@ impl Actor {
             }
             return;
         }
-        if let Seg::Open { buf, dirty, .. } = &mut self.seg {
+        let mut should_flush = false;
+        if let Seg::Open { buf, dirty, flushed, .. } = &mut self.seg {
             buf.push_str(text);
             *dirty = true;
+            if flushed.elapsed() >= Duration::from_millis(50) || text.contains('\n') {
+                should_flush = true;
+            }
+        }
+        if should_flush {
+            self.flush(true);
         }
     }
 
-    /// Persists streamed text at most every 300 ms (or immediately with `force`).
+    /// Persists streamed text at most every 50 ms (or immediately with `force`).
     pub(super) fn flush(&mut self, force: bool) {
         if let Seg::Open { kind, entry_id, buf, flushed, dirty } = &mut self.seg
             && *dirty
-            && (force || flushed.elapsed() >= Duration::from_millis(300))
+            && (force || flushed.elapsed() >= Duration::from_millis(50))
         {
             let data = match kind {
                 SegKind::Text => json!({"text": buf, "final": false, "author": self.cfg.id}),

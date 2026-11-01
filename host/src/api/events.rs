@@ -43,7 +43,9 @@ pub fn events_stream(
 ) -> Result<impl Stream<Item = Value> + Send + use<>> {
     let live = BroadcastStream::new(hub.events.subscribe());
     let mut catch_up: Vec<Value> = vec![];
-    for bot in hub.bots_json(since)? {
+    // Always send current runtime status of all bots so reconnecting clients
+    // (reconnect from background / network change) immediately get accurate bot status (Idle/Working/Error).
+    for bot in hub.bots_json(0)? {
         catch_up.push(json!({"type": "bot", "rev": bot["rev"], "bot": bot}));
     }
     for e in hub.store.entries_since(since, CATCH_UP_PER_BOT)? {

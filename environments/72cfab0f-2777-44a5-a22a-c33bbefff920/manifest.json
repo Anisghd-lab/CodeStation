@@ -1,0 +1,8 @@
+{
+  "bot_id": "72cfab0f-2777-44a5-a22a-c33bbefff920",
+  "status": "ERROR",
+  "updated_at": 1793491567300,
+  "rootfs": "/root/CodeStation/environments/72cfab0f-2777-44a5-a22a-c33bbefff920/rootfs",
+  "run_script": "/root/CodeStation/environments/72cfab0f-2777-44a5-a22a-c33bbefff920/run.sh",
+  "last_error": "Rootfs is missing or corrupted"
+}

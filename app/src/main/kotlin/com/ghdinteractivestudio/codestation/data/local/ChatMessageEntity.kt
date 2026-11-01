@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import com.ghdinteractivestudio.codestation.domain.model.ArtifactMetadata
 import com.ghdinteractivestudio.codestation.domain.model.ChatMessage
 import com.ghdinteractivestudio.codestation.domain.model.FileAttachment
 import com.ghdinteractivestudio.codestation.domain.model.MessageAuthor
@@ -47,13 +48,22 @@ data class ChatMessageEntity(
 
         val parsedAttachments: List<FileAttachment> = if (!attachmentsJson.isNullOrBlank()) {
             try {
-                Json.decodeFromString<List<FileAttachmentDto>>(attachmentsJson).map {
-                    FileAttachment(it.id, it.name, it.sizeBytes, it.mimeType, it.localUri)
+                val json = Json { ignoreUnknownKeys = true }
+                json.decodeFromString<List<FileAttachmentDto>>(attachmentsJson).map {
+                    FileAttachment(it.id, it.name, it.sizeBytes, it.mimeType, it.localUri, it.isArtifact, it.artifactTitle)
                 }
             } catch (_: Exception) {
                 emptyList()
             }
         } else emptyList()
+
+        val parsedArtifact = parsedAttachments.firstOrNull { it.isArtifact }?.let { att: FileAttachment ->
+            ArtifactMetadata(
+                id = att.id,
+                title = att.artifactTitle ?: att.name.removeSuffix(".html"),
+                updatedAt = timestamp
+            )
+        }
 
         return ChatMessage(
             id = id,
@@ -63,7 +73,8 @@ data class ChatMessageEntity(
             timestamp = timestamp,
             isFinal = isFinal,
             replyTo = replyTo,
-            attachments = parsedAttachments
+            attachments = parsedAttachments,
+            artifact = parsedArtifact
         )
     }
 
@@ -72,9 +83,10 @@ data class ChatMessageEntity(
             val jsonStr = if (msg.attachments.isNotEmpty()) {
                 try {
                     val dtos = msg.attachments.map {
-                        FileAttachmentDto(it.id, it.name, it.sizeBytes, it.mimeType, it.localUri)
+                        FileAttachmentDto(it.id, it.name, it.sizeBytes, it.mimeType, it.localUri, it.isArtifact, it.artifactTitle)
                     }
-                    Json.encodeToString(dtos)
+                    val json = Json { ignoreUnknownKeys = true }
+                    json.encodeToString(dtos)
                 } catch (_: Exception) { null }
             } else null
 
@@ -102,7 +114,9 @@ data class FileAttachmentDto(
     val name: String,
     val sizeBytes: Long,
     val mimeType: String,
-    val localUri: String? = null
+    val localUri: String? = null,
+    val isArtifact: Boolean = false,
+    val artifactTitle: String? = null
 )
 
 @Dao
@@ -134,16 +148,38 @@ interface MessageDao {
             val existing = getMessageById(clientNonce)
             if (existing != null) {
                 deleteMessageById(clientNonce)
+                val mergedAttachments = mergeAttachmentUris(existing.attachmentsJson, serverEntity.attachmentsJson)
                 val merged = serverEntity.copy(
                     replyToMessageId = serverEntity.replyToMessageId ?: existing.replyToMessageId,
                     replyToAuthor = serverEntity.replyToAuthor ?: existing.replyToAuthor,
                     replyToText = serverEntity.replyToText ?: existing.replyToText,
-                    attachmentsJson = serverEntity.attachmentsJson ?: existing.attachmentsJson
+                    attachmentsJson = mergedAttachments
                 )
                 insertMessage(merged)
                 return
             }
         }
         insertMessage(serverEntity)
+    }
+
+    private fun mergeAttachmentUris(existingJson: String?, serverJson: String?): String? {
+        if (existingJson.isNullOrBlank()) return serverJson
+        if (serverJson.isNullOrBlank()) return existingJson
+        return try {
+            val json = Json { ignoreUnknownKeys = true }
+            val existingList = json.decodeFromString<List<FileAttachmentDto>>(existingJson)
+            val serverList = json.decodeFromString<List<FileAttachmentDto>>(serverJson)
+            val merged = serverList.map { serverAtt ->
+                val match = existingList.find { it.id == serverAtt.id || it.name == serverAtt.name }
+                if (match?.localUri != null) {
+                    serverAtt.copy(localUri = match.localUri)
+                } else {
+                    serverAtt
+                }
+            }
+            json.encodeToString(merged)
+        } catch (_: Exception) {
+            serverJson ?: existingJson
+        }
     }
 }

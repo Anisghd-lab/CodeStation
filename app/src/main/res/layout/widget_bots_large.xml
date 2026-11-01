@@ -11,13 +11,14 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Agents Actifs &amp; File d'attente"
+            android:text="Agents Actifs &amp; File de Tâches"
             android:textColor="#FFFFFF"
             android:textSize="14sp"
             android:textStyle="bold" />
@@ -28,97 +29,187 @@
             android:layout_height="wrap_content"
             android:background="@drawable/widget_chip_emerald"
             android:paddingStart="8dp"
-            android:paddingTop="2dp"
+            android:paddingTop="3dp"
             android:paddingEnd="8dp"
-            android:paddingBottom="2dp"
+            android:paddingBottom="3dp"
             android:text="3 bots"
             android:textColor="#10B981"
             android:textSize="10sp"
             android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- Bot Row 1 -->
     <LinearLayout
         android:id="@+id/bot_row_1"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:background="@drawable/widget_card_item_bg"
-        android:orientation="vertical"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
         android:padding="10dp">
 
-        <TextView
-            android:id="@+id/tv_bot1_name"
-            android:layout_width="wrap_content"
+        <ImageView
+            android:id="@+id/iv_bot1_avatar"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:contentDescription="Bot 1" />
+
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Google Antigravity"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_bot1_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Google Antigravity"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_bot1_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Prêt · gemini-4-argon-medium"
+                android:textColor="#38BDF8"
+                android:textSize="10sp" />
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/tv_bot1_status"
+            android:id="@+id/tv_bot1_badge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="Prêt · gemini-4-argon-medium"
+            android:background="@drawable/widget_chip_blue"
+            android:paddingStart="6dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="2dp"
+            android:text="Lead"
             android:textColor="#438DFF"
-            android:textSize="11sp" />
+            android:textSize="9sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- Bot Row 2 -->
     <LinearLayout
         android:id="@+id/bot_row_2"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:background="@drawable/widget_card_item_bg"
-        android:orientation="vertical"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
         android:padding="10dp">
 
-        <TextView
-            android:id="@+id/tv_bot2_name"
-            android:layout_width="wrap_content"
+        <ImageView
+            android:id="@+id/iv_bot2_avatar"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:contentDescription="Bot 2" />
+
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="OpenCode GLM"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_bot2_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="OpenCode GLM"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_bot2_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Prêt · opencode/glm-5.3-flash-free"
+                android:textColor="#10B981"
+                android:textSize="10sp" />
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/tv_bot2_status"
+            android:id="@+id/tv_bot2_badge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="Prêt · opencode/glm-5.3-flash-free"
+            android:background="@drawable/widget_chip_emerald"
+            android:paddingStart="6dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="2dp"
+            android:text="GLM"
             android:textColor="#10B981"
-            android:textSize="11sp" />
+            android:textSize="9sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- Bot Row 3 -->
     <LinearLayout
         android:id="@+id/bot_row_3"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:background="@drawable/widget_card_item_bg"
-        android:orientation="vertical"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
         android:padding="10dp">
 
-        <TextView
-            android:id="@+id/tv_bot3_name"
-            android:layout_width="wrap_content"
+        <ImageView
+            android:id="@+id/iv_bot3_avatar"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:contentDescription="Bot 3" />
+
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Codex Terminal"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_bot3_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Codex Terminal"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_bot3_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Prêt · Terminal Termux PRoot"
+                android:textColor="#F0A030"
+                android:textSize="10sp" />
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/tv_bot3_status"
+            android:id="@+id/tv_bot3_badge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="Terminal Termux PRoot"
-            android:textColor="#D1D5DB"
-            android:textSize="11sp" />
+            android:background="@drawable/widget_chip_amber"
+            android:paddingStart="6dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="2dp"
+            android:text="PRoot"
+            android:textColor="#F0A030"
+            android:textSize="9sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
 </LinearLayout>

@@ -11,16 +11,38 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <TextView
+        <ImageView
+            android:id="@+id/iv_host_icon"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:contentDescription="Hôte" />
+
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
             android:layout_weight="1"
-            android:text="Quotas &amp; Santé Système"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Quotas &amp; Santé Système"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_host_sub"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Ubuntu PRoot · Environnement local"
+                android:textColor="#94A3B8"
+                android:textSize="10sp" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/tv_server_status"
@@ -28,19 +50,70 @@
             android:layout_height="wrap_content"
             android:background="@drawable/widget_chip_emerald"
             android:paddingStart="8dp"
-            android:paddingTop="2dp"
+            android:paddingTop="3dp"
             android:paddingEnd="8dp"
-            android:paddingBottom="2dp"
+            android:paddingBottom="3dp"
             android:text="Serveur en ligne"
             android:textColor="#10B981"
             android:textSize="10sp"
             android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- RAM Card with Progress -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/widget_card_item_bg"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Mémoire RAM Smartphone"
+                android:textColor="#438DFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_ram_percent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="20% libre"
+                android:textColor="#38BDF8"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/iv_ram_progress"
+            android:layout_width="match_parent"
+            android:layout_height="8dp"
+            android:layout_marginTop="5dp"
+            android:scaleType="fitXY" />
+
+        <TextView
+            android:id="@+id/tv_ram_details"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="RAM disponible : 2 450 Mo sur 12 288 Mo"
+            android:textColor="#CBD5E1"
+            android:textSize="10sp" />
+    </LinearLayout>
+
+    <!-- Host Connection Card -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:background="@drawable/widget_card_item_bg"
         android:orientation="vertical"
         android:padding="10dp">
@@ -48,9 +121,9 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Hôte Local Termux"
-            android:textColor="#438DFF"
-            android:textSize="13sp"
+            android:text="Connexion Hôte Termux"
+            android:textColor="#10B981"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <TextView
@@ -59,10 +132,11 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:text="Adresse : http://127.0.0.1:19222 · Latence : 3 ms"
-            android:textColor="#D1D5DB"
-            android:textSize="11sp" />
+            android:textColor="#CBD5E1"
+            android:textSize="10sp" />
     </LinearLayout>
 
+    <!-- Quotas & Storage Card -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -74,35 +148,9 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Ressources Matérielles Smartphone"
-            android:textColor="#10B981"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tv_ram_details"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="RAM disponible : 2 450 Mo · Stockage libre : 148 Go"
-            android:textColor="#D1D5DB"
-            android:textSize="11sp" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/widget_card_item_bg"
-        android:orientation="vertical"
-        android:padding="10dp">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Conteneurs &amp; Quotas"
+            android:text="Stockage &amp; Quotas"
             android:textColor="#F0A030"
-            android:textSize="13sp"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <TextView
@@ -110,9 +158,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:text="Limites : Aucune restriction locale détectée sur PRoot"
-            android:textColor="#D1D5DB"
-            android:textSize="11sp" />
+            android:text="Stockage : 148 Go libres · Aucune restriction de quota"
+            android:textColor="#CBD5E1"
+            android:textSize="10sp" />
     </LinearLayout>
 
 </LinearLayout>

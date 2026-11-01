@@ -42,7 +42,9 @@ data class ChatUiState(
     val isVoiceRecording: Boolean = false,
     val voiceDurationSeconds: Int = 0,
     val isTranscribing: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val serverUrl: String = "http://127.0.0.1:19222",
+    val serverToken: String = ""
 )
 
 class ChatViewModel(
@@ -62,6 +64,8 @@ class ChatViewModel(
     private val _isVoiceRecording = MutableStateFlow(false)
     private val _voiceDurationSeconds = MutableStateFlow(0)
     private val _isTranscribing = MutableStateFlow(false)
+    private val _serverUrl = MutableStateFlow("http://127.0.0.1:19222")
+    private val _serverToken = MutableStateFlow("")
 
     private var lastSentText: String? = null
     private var lastSentAttachments: List<PendingAttachment> = emptyList()
@@ -169,8 +173,10 @@ class ChatViewModel(
 
     val uiState: StateFlow<ChatUiState> = combine(
         _botDataFlow,
-        _uiInputFlow
-    ) { (bot, messages, approvals), input ->
+        _uiInputFlow,
+        _serverUrl,
+        _serverToken
+    ) { (bot, messages, approvals), input, sUrl, sToken ->
         ChatUiState(
             bot = bot,
             messages = messages,
@@ -184,7 +190,9 @@ class ChatViewModel(
             isVoiceRecording = input.isVoiceRecording,
             voiceDurationSeconds = input.voiceDurationSeconds,
             isTranscribing = input.isTranscribing,
-            errorMessage = input.error
+            errorMessage = input.error,
+            serverUrl = sUrl,
+            serverToken = sToken
         )
     }.stateIn(
         scope = viewModelScope,
@@ -193,6 +201,16 @@ class ChatViewModel(
     )
 
     init {
+        val serverRepo = context?.let {
+            (it.applicationContext as? com.ghdinteractivestudio.codestation.CodeStationApplication)?.container?.serverRepository
+        }
+        viewModelScope.launch {
+            serverRepo?.getServerConfigStream()?.collect { cfg ->
+                _serverUrl.value = cfg.url.ifBlank { "http://127.0.0.1:19222" }
+                _serverToken.value = cfg.token ?: ""
+            }
+        }
+
         _workingSteps.value = RequestTracer.getSteps(botId)
         viewModelScope.launch {
             RequestTracer.getStepsFlow(botId).collect { steps ->
@@ -207,7 +225,7 @@ class ChatViewModel(
         // Observer l'état du bot : s'il passe à IDLE, libérer l'état de génération (hors transition de démarrage)
         viewModelScope.launch {
             botRepository.getBotByIdStream(botId).collect { bot ->
-                if (bot?.status == BotStatus.IDLE && _isBotWorking.value && (System.currentTimeMillis() - turnStartTimeMs > 1500L)) {
+                if ((bot?.status == BotStatus.IDLE || bot?.status == BotStatus.OFFLINE) && _isBotWorking.value && (System.currentTimeMillis() - turnStartTimeMs > 1500L)) {
                     turnTimeoutJob?.cancel()
                     turnTimeoutJob = null
                     _isBotWorking.value = false

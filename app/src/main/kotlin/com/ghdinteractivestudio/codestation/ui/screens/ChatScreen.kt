@@ -81,9 +81,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.UUID
 import com.ghdinteractivestudio.codestation.ui.components.ApprovalCardItem
+import com.ghdinteractivestudio.codestation.ui.components.ArtifactViewerDialog
 import com.ghdinteractivestudio.codestation.ui.components.BotAvatar
 import com.ghdinteractivestudio.codestation.ui.components.ChatMessageItem
-import com.ghdinteractivestudio.codestation.ui.components.ChatMessageItem
+import com.ghdinteractivestudio.codestation.ui.components.ImageFullscreenViewerDialog
 import com.ghdinteractivestudio.codestation.ui.components.GlassAlertDialog
 import com.ghdinteractivestudio.codestation.ui.components.GlassCodeBlocksDialog
 import com.ghdinteractivestudio.codestation.ui.components.GlassMenu
@@ -133,12 +134,16 @@ fun ChatScreen(
     var activeContextMenuMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var messageForSelection by remember { mutableStateOf<ChatMessage?>(null) }
     var codeBlocksForDialog by remember { mutableStateOf<List<MarkdownCodeBlock>?>(null) }
+    var fullscreenImage by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var activeArtifact by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     // Réinitialisation des menus et du mode édition lors d'un changement de conversation
     LaunchedEffect(state.bot?.id) {
         activeContextMenuMessage = null
         messageForSelection = null
         codeBlocksForDialog = null
+        fullscreenImage = null
+        activeArtifact = null
         if (state.editingMessage != null) {
             viewModel.cancelEditingMessage()
         }
@@ -146,9 +151,11 @@ fun ChatScreen(
 
     // Gestion du bouton Retour Android : fermeture prioritaire des menus et dialogues actifs
     BackHandler(
-        enabled = activeContextMenuMessage != null || messageForSelection != null || codeBlocksForDialog != null || state.editingMessage != null
+        enabled = activeContextMenuMessage != null || messageForSelection != null || codeBlocksForDialog != null || fullscreenImage != null || activeArtifact != null || state.editingMessage != null
     ) {
         when {
+            fullscreenImage != null -> fullscreenImage = null
+            activeArtifact != null -> activeArtifact = null
             activeContextMenuMessage != null -> activeContextMenuMessage = null
             messageForSelection != null -> messageForSelection = null
             codeBlocksForDialog != null -> codeBlocksForDialog = null
@@ -630,6 +637,8 @@ fun ChatScreen(
                 ) {
                     ChatMessageItem(
                         message = msg,
+                        serverUrl = state.serverUrl,
+                        serverToken = state.serverToken,
                         onQuoteReply = {
                             activeQuotedReply = QuotedReply(
                                 messageId = it.id,
@@ -639,6 +648,14 @@ fun ChatScreen(
                         },
                         onLongClick = {
                             activeContextMenuMessage = it
+                        },
+                        onImageClick = { url, title ->
+                            fullscreenImage = url to title
+                        },
+                        onArtifactClick = { artId, title ->
+                            val fullUrl = "${state.serverUrl.trimEnd('/')}/media/artifact/${state.bot?.id ?: msg.botId}/$artId" +
+                                if (state.serverToken.isNotBlank()) "?token=${state.serverToken}" else ""
+                            activeArtifact = fullUrl to title
                         }
                     )
 
@@ -784,13 +801,31 @@ fun ChatScreen(
                 }
             )
         }
+
+        // Visionneuse interactive plein écran pour les images
+        fullscreenImage?.let { (url, title) ->
+            ImageFullscreenViewerDialog(
+                imageUrl = url,
+                title = title,
+                onDismiss = { fullscreenImage = null }
+            )
+        }
+
+        // Visionneuse de document interactif pour les artefacts HTML
+        activeArtifact?.let { (url, title) ->
+            ArtifactViewerDialog(
+                artifactUrl = url,
+                title = title,
+                onDismiss = { activeArtifact = null }
+            )
+        }
     }
 }
 
 private fun getChatUriDetails(context: Context, uri: Uri): Triple<String, String, Long> {
     var name = "fichier"
     var size = 0L
-    val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+    var mimeType = context.contentResolver.getType(uri).orEmpty()
 
     context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
         val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
@@ -798,6 +833,18 @@ private fun getChatUriDetails(context: Context, uri: Uri): Triple<String, String
         if (cursor.moveToFirst()) {
             if (nameIndex != -1) name = cursor.getString(nameIndex) ?: "fichier"
             if (sizeIndex != -1) size = cursor.getLong(sizeIndex)
+        }
+    }
+    if (mimeType.isBlank() || mimeType == "application/octet-stream") {
+        val ext = name.substringAfterLast('.', "").lowercase()
+        mimeType = when (ext) {
+            "png" -> "image/png"
+            "jpg", "jpeg" -> "image/jpeg"
+            "webp" -> "image/webp"
+            "svg" -> "image/svg+xml"
+            "gif" -> "image/gif"
+            "mp4" -> "video/mp4"
+            else -> "application/octet-stream"
         }
     }
     return Triple(name, mimeType, size)

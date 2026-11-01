@@ -38,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -45,6 +46,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import com.ghdinteractivestudio.codestation.widget.WidgetStateRepository
+import com.ghdinteractivestudio.codestation.widget.CodeStationWidgetManager
+import com.ghdinteractivestudio.codestation.widget.UsageWidgetProvider
+import com.ghdinteractivestudio.codestation.widget.LimitsWidgetProvider
+import com.ghdinteractivestudio.codestation.widget.BotsWidgetProvider
+import com.ghdinteractivestudio.codestation.widget.TeamWidgetProvider
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
+import android.app.PendingIntent
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -222,6 +232,11 @@ private fun WidgetGallery(
     var sizeChoice by rememberSaveable { mutableStateOf("medium") }
     var originalIcons by rememberSaveable { mutableStateOf(false) }
 
+    val installedWidgets by WidgetStateRepository.installedWidgetsFlow.collectAsState()
+    val hasInstalledWidgets = rememberOnResume {
+        WidgetStateRepository.refresh(context).isNotEmpty()
+    } || installedWidgets.isNotEmpty()
+
     // Top Header Banner
     Row(
         Modifier
@@ -256,7 +271,7 @@ private fun WidgetGallery(
         ) {
             SetupRow("Connect a computer", isHostConnected)
             Box(Modifier.fillMaxWidth().height(0.5.dp).padding(start = 42.dp).background(Palette.glassDivider))
-            SetupRow("Add a CodeStation widget", false)
+            SetupRow("Add a CodeStation widget", hasInstalledWidgets)
             Box(Modifier.fillMaxWidth().height(0.5.dp).padding(start = 42.dp).background(Palette.glassDivider))
             SetupRow(
                 title = if (!allowed && asked > 0) "Turn on notifications in Settings" else "Turn on notifications",
@@ -277,11 +292,82 @@ private fun WidgetGallery(
         Text("Steps check themselves as you finish them.", style = Type.caption2, color = Palette.tertiary)
     }
 
+    // Installed Widgets Status Section
+    if (installedWidgets.isNotEmpty()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                SectionLabel("Widgets installés (${installedWidgets.size})")
+                Text(
+                    "Actualiser",
+                    Modifier.clickable {
+                        CodeStationWidgetManager.updateAllWidgets(context)
+                    },
+                    style = Type.caption.semibold,
+                    color = Palette.accent
+                )
+            }
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .glass(RoundedRectangle(18.dp), style = GlassStyle.Card)
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                installedWidgets.forEachIndexed { idx, widget ->
+                    if (idx > 0) {
+                        Box(Modifier.fillMaxWidth().height(0.5.dp).background(Palette.glassDivider))
+                    }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(8.dp)
+                                    .clip(Capsule())
+                                    .background(Palette.added)
+                            )
+                            Column {
+                                Text(
+                                    widget.category.title,
+                                    style = Type.caption.semibold,
+                                    color = Palette.text
+                                )
+                                Text(
+                                    "Widget #${widget.appWidgetId} · Actif sur l'écran d'accueil",
+                                    style = Type.caption2,
+                                    color = Palette.secondary
+                                )
+                            }
+                        }
+                        Box(
+                            Modifier
+                                .clip(Capsule())
+                                .background(Palette.added.copy(alpha = 0.15f))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text("Actif", style = Type.caption2.semibold, color = Palette.added)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Choose your widget section
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) { SectionLabel("Choose your widget") }
-            Text("Sample data", style = Type.caption2, color = Palette.secondary)
+            Text("Aperçu fidèle", style = Type.caption2, color = Palette.secondary)
         }
 
         ChoicePicker(
@@ -340,9 +426,12 @@ private fun WidgetGallery(
                             "codex" -> "Codex"
                             else -> "AGY"
                         },
-                        isMedium = currentSize != "small"
+                        sizeChoice = currentSize
                     )
-                    else -> BotsWidgetPreview(isSmall = isSmall)
+                    "limits" -> LimitsWidgetPreview(sizeChoice = currentSize)
+                    "bots" -> BotsWidgetPreview(sizeChoice = currentSize)
+                    "team" -> TeamWidgetPreview(sizeChoice = currentSize)
+                    else -> BotsWidgetPreview(sizeChoice = currentSize)
                 }
             }
 
@@ -397,7 +486,29 @@ private fun WidgetGallery(
     // Add a widget
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionLabel("Add a widget")
-        PrimaryButton("Ajouter à l'écran d'accueil") { }
+        PrimaryButton("Ajouter à l'écran d'accueil") {
+            val appWidgetManager = AppWidgetManager.getInstance(context) ?: return@PrimaryButton
+            val providerCls = when (kind) {
+                "usage" -> UsageWidgetProvider::class.java
+                "limits" -> LimitsWidgetProvider::class.java
+                "bots" -> BotsWidgetProvider::class.java
+                "team" -> TeamWidgetProvider::class.java
+                else -> UsageWidgetProvider::class.java
+            }
+            val myProvider = ComponentName(context, providerCls)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && appWidgetManager.isRequestPinAppWidgetSupported) {
+                val successIntent = Intent(context, providerCls).apply {
+                    action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                }
+                val successCallback = PendingIntent.getBroadcast(
+                    context,
+                    kind.hashCode(),
+                    successIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                appWidgetManager.requestPinAppWidget(myProvider, null, successCallback)
+            }
+        }
 
         // Home screen mini preview
         Column(
@@ -433,7 +544,7 @@ private fun WidgetGallery(
 private fun ProviderWidgetPreview(
     providerId: String,
     providerName: String,
-    isMedium: Boolean
+    sizeChoice: String
 ) {
     val tint = when (providerId) {
         "claude" -> Color(0xFFD97757)
@@ -460,6 +571,14 @@ private fun ProviderWidgetPreview(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            Box(
+                Modifier
+                    .clip(Capsule())
+                    .background(Palette.added.copy(alpha = 0.15f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text("Actif", style = Type.system(9f).semibold, color = Palette.added)
+            }
         }
 
         // Limit 1: Session
@@ -478,7 +597,7 @@ private fun ProviderWidgetPreview(
             )
         }
 
-        if (isMedium) {
+        if (sizeChoice != "small") {
             // Limit 2: Hebdomadaire
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -495,25 +614,194 @@ private fun ProviderWidgetPreview(
                 )
             }
         }
+
+        if (sizeChoice == "large") {
+            Spacer(Modifier.height(4.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .glass(RoundedRectangle(12.dp), style = GlassStyle.Card)
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CharacterAvatar("blob", "blue", 20.dp, highlight = Palette.accent)
+                Column {
+                    Text("Google Antigravity CLI", style = Type.system(11f).semibold, color = Palette.text)
+                    Text("Catalogue actif : 13 modèles dispos", style = Type.system(9f), color = Palette.secondary)
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun BotsWidgetPreview(isSmall: Boolean) {
+private fun LimitsWidgetPreview(sizeChoice: String) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Symbol("bubble.left.and.bubble.right.fill", size = 16.dp, tint = Palette.secondary)
-            Text("Bots", style = Type.subheadline.semibold, color = Palette.text)
-        }
         Row(
-            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Symbol("server.rack", size = 18.dp, tint = Palette.accent)
+            Text(
+                "Quotas & Santé Système",
+                Modifier.weight(1f),
+                style = Type.system(13f).semibold,
+                color = Palette.text,
+                maxLines = 1
+            )
+            Box(
+                Modifier
+                    .clip(Capsule())
+                    .background(Palette.added.copy(alpha = 0.15f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text("En ligne", style = Type.system(9f).semibold, color = Palette.added)
+            }
+        }
+
+        // RAM
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Mémoire RAM", Modifier.weight(1f), style = Type.system(11f).medium, color = Palette.secondary)
+                Text("2.4 Go libres", style = Type.system(12f).semibold, color = Palette.accent)
+            }
+            UsageTicks(percent = 20.0, tint = Palette.accent, height = 10.dp)
+            Text("sur 12.0 Go total", Modifier.fillMaxWidth(), style = Type.system(9f), color = Palette.secondary, textAlign = TextAlign.End)
+        }
+
+        if (sizeChoice != "small") {
+            // Disque
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Stockage Disque", Modifier.weight(1f), style = Type.system(11f).medium, color = Palette.secondary)
+                    Text("148 Go libres", style = Type.system(12f).semibold, color = Palette.added)
+                }
+                UsageTicks(percent = 35.0, tint = Palette.added, height = 10.dp)
+                Text("Ubuntu PRoot opérationnel · Latence : 3 ms", Modifier.fillMaxWidth(), style = Type.system(9f), color = Palette.secondary, textAlign = TextAlign.End)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BotsWidgetPreview(sizeChoice: String) {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Symbol("bubble.left.and.bubble.right.fill", size = 16.dp, tint = Palette.accent)
+            Text("Agents & Tâches", Modifier.weight(1f), style = Type.subheadline.semibold, color = Palette.text)
+            Box(
+                Modifier
+                    .clip(Capsule())
+                    .background(Palette.added.copy(alpha = 0.15f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text("3 bots", style = Type.system(9f).semibold, color = Palette.added)
+            }
+        }
+
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .glass(RoundedRectangle(14.dp), style = GlassStyle.Card)
+                .padding(8.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            CharacterAvatar("blob", "green", 34.dp, "working")
+            CharacterAvatar("diamond", "blue", 32.dp, "working")
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Lead Agent", style = Type.caption.semibold, color = Palette.text)
-                Text("Au travail…", style = Type.caption2, color = Palette.secondary)
+                Text("Google Antigravity", style = Type.caption.semibold, color = Palette.text)
+                Text("Au travail · gemini-4-argon-medium", style = Type.caption2, color = Palette.accent)
+            }
+        }
+
+        if (sizeChoice != "small") {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .glass(RoundedRectangle(14.dp), style = GlassStyle.Card)
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CharacterAvatar("hexagon", "green", 32.dp)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("OpenCode GLM", style = Type.caption.semibold, color = Palette.text)
+                    Text("Prêt · glm-5.3-flash-free", style = Type.caption2, color = Palette.added)
+                }
+            }
+        }
+
+        if (sizeChoice == "large") {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .glass(RoundedRectangle(14.dp), style = GlassStyle.Card)
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CharacterAvatar("circle", "orange", 32.dp)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("CodeBuddy Code", style = Type.caption.semibold, color = Palette.text)
+                    Text("Prêt · Terminal PRoot", style = Type.caption2, color = Palette.secondary)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TeamWidgetPreview(sizeChoice: String) {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Symbol("person.2.fill", size = 16.dp, tint = Palette.accent)
+            Text("Équipe d'Agents", Modifier.weight(1f), style = Type.subheadline.semibold, color = Palette.text)
+            Box(
+                Modifier
+                    .clip(Capsule())
+                    .background(Palette.accent.copy(alpha = 0.15f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text("3 membres", style = Type.system(9f).semibold, color = Palette.accent)
+            }
+        }
+
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .glass(RoundedRectangle(14.dp), style = GlassStyle.Card)
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CharacterAvatar("diamond", "blue", 34.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Antigravity · Lead Agent", style = Type.caption.semibold, color = Palette.text)
+                Text("Environnement PRoot OK", style = Type.caption2, color = Palette.added)
+            }
+        }
+
+        if (sizeChoice != "small") {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .glass(RoundedRectangle(14.dp), style = GlassStyle.Card)
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CharacterAvatar("hexagon", "green", 34.dp)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("OpenCode GLM", style = Type.caption.semibold, color = Palette.text)
+                    Text("Spécialiste Code · Prêt", style = Type.caption2, color = Palette.added)
+                }
             }
         }
     }

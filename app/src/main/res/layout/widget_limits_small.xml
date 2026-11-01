@@ -5,41 +5,95 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_glass_background"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:padding="14dp">
 
-    <TextView
-        android:layout_width="wrap_content"
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Quotas &amp; Santé"
-        android:textColor="#9CA3AF"
-        android:textSize="11sp"
-        android:textStyle="bold" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/iv_host_icon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:contentDescription="Hôte" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:text="Quotas &amp; Santé"
+            android:textColor="#94A3B8"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_server_status_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/widget_chip_emerald"
+            android:paddingStart="6dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="2dp"
+            android:text="En ligne"
+            android:textColor="#10B981"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/tv_server_status"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="Hôte Connecté"
-        android:textColor="#10B981"
-        android:textSize="15sp"
+        android:layout_marginTop="8dp"
+        android:text="Hôte PRoot Connecté"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
         android:textStyle="bold" />
 
-    <TextView
-        android:id="@+id/tv_ram_available"
-        android:layout_width="wrap_content"
+    <!-- RAM Info & Progress Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:text="RAM : 2450 Mo dispo"
-        android:textColor="#FFFFFF"
-        android:textSize="12sp" />
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
 
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="RAM"
+            android:textColor="#94A3B8"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/tv_ram_available"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="2.4 Go dispo"
+            android:textColor="#38BDF8"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/iv_ram_progress"
+        android:layout_width="match_parent"
+        android:layout_height="8dp"
+        android:layout_marginTop="3dp"
+        android:scaleType="fitXY" />
+
+    <!-- Latency Footer -->
     <TextView
         android:id="@+id/tv_latency"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="6dp"
         android:text="Latence : 4 ms (Local)"
-        android:textColor="#6B7280"
-        android:textSize="10sp" />
+        android:textColor="#64748B"
+        android:textSize="9sp" />
 </LinearLayout>

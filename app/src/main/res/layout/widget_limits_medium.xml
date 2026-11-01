@@ -11,15 +11,23 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:gravity="center_vertical"
         android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/iv_host_icon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:contentDescription="Hôte" />
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:layout_weight="1"
-            android:text="Quotas &amp; Environnement Hôte"
-            android:textColor="#9CA3AF"
-            android:textSize="12sp"
+            android:text="Quotas &amp; Santé Système"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
             android:textStyle="bold" />
 
         <TextView
@@ -41,10 +49,11 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="10dp"
         android:layout_weight="1"
         android:orientation="horizontal">
 
+        <!-- Card RAM -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
@@ -52,14 +61,30 @@
             android:layout_weight="1"
             android:background="@drawable/widget_card_item_bg"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:padding="10dp">
 
-            <TextView
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Mémoire RAM"
-                android:textColor="#9CA3AF"
-                android:textSize="11sp" />
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Mémoire RAM"
+                    android:textColor="#94A3B8"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/tv_ram_percent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="20%"
+                    android:textColor="#38BDF8"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/tv_ram_value"
@@ -68,18 +93,27 @@
                 android:layout_marginTop="2dp"
                 android:text="2.4 Go libres"
                 android:textColor="#FFFFFF"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/iv_ram_progress"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:layout_marginTop="5dp"
+                android:scaleType="fitXY" />
 
             <TextView
                 android:id="@+id/tv_ram_sub"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
                 android:text="sur 12.0 Go total"
-                android:textColor="#6B7280"
-                android:textSize="10sp" />
+                android:textColor="#64748B"
+                android:textSize="9sp" />
         </LinearLayout>
 
+        <!-- Card Disk -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
@@ -87,13 +121,13 @@
             android:layout_weight="1"
             android:background="@drawable/widget_card_item_bg"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:padding="10dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Stockage Disque"
-                android:textColor="#9CA3AF"
+                android:textColor="#94A3B8"
                 android:textSize="11sp" />
 
             <TextView
@@ -103,16 +137,24 @@
                 android:layout_marginTop="2dp"
                 android:text="148 Go libres"
                 android:textColor="#10B981"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/iv_disk_progress"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:layout_marginTop="5dp"
+                android:scaleType="fitXY" />
 
             <TextView
                 android:id="@+id/tv_env_count"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
                 android:text="Ubuntu PRoot opérationnel"
-                android:textColor="#6B7280"
-                android:textSize="10sp" />
+                android:textColor="#64748B"
+                android:textSize="9sp" />
         </LinearLayout>
     </LinearLayout>
 

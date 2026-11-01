@@ -5,42 +5,75 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_glass_background"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:padding="14dp">
 
+    <!-- Header Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/iv_provider_avatar"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:contentDescription="Avatar Fournisseur" />
+
+        <TextView
+            android:id="@+id/tv_provider_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:text="Antigravity"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_session_percent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="16%"
+            android:textColor="#38BDF8"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Usage Progress Bar -->
     <TextView
-        android:id="@+id/widget_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Consommation IA"
-        android:textColor="#9CA3AF"
-        android:textSize="11sp"
-        android:textStyle="bold" />
+        android:layout_marginTop="8dp"
+        android:text="Session"
+        android:textColor="#94A3B8"
+        android:textSize="10sp" />
+
+    <ImageView
+        android:id="@+id/iv_session_progress"
+        android:layout_width="match_parent"
+        android:layout_height="12dp"
+        android:layout_marginTop="3dp"
+        android:scaleType="fitXY" />
 
     <TextView
-        android:id="@+id/tv_provider_name"
-        android:layout_width="wrap_content"
+        android:id="@+id/tv_session_reset"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="Antigravity"
-        android:textColor="#FFFFFF"
-        android:textSize="16sp"
-        android:textStyle="bold" />
+        android:layout_marginTop="3dp"
+        android:gravity="end"
+        android:text="reset dans 3h 20m"
+        android:textColor="#64748B"
+        android:textSize="9sp" />
 
-    <TextView
-        android:id="@+id/tv_usage_metric"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:text="Actif · 13 modèles"
-        android:textColor="#438DFF"
-        android:textSize="12sp" />
-
+    <!-- Secondary metric -->
     <TextView
         android:id="@+id/tv_secondary_metric"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="OpenCode GLM : Prêt"
-        android:textColor="#6B7280"
+        android:layout_marginTop="6dp"
+        android:text="13 modèles catalogués"
+        android:textColor="#38BDF8"
         android:textSize="10sp" />
 </LinearLayout>

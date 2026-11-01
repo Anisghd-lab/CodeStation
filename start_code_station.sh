@@ -127,7 +127,7 @@ is_running() {
             return 0
         fi
     fi
-    if pgrep -f "codync-host.*serve" >/dev/null 2>&1 || pgrep -f "codestation-host.*serve" >/dev/null 2>&1; then
+    if pgrep -f "codync-host.*serve" >/dev/null 2>&1 || pgrep -f "codestation-host.*serve" >/dev/null 2>&1 || pgrep -f "codestation.*serve" >/dev/null 2>&1; then
         return 0
     fi
     return 1
@@ -169,7 +169,7 @@ case "$CMD" in
         fi
 
         # Si un processus tourne sur un autre port, l'arrêter d'abord pour libérer ~/.codync/host.lock
-        if pgrep -f "codync-host.*serve" >/dev/null 2>&1 || pgrep -f "codestation-host.*serve" >/dev/null 2>&1; then
+        if pgrep -f "codync-host.*serve" >/dev/null 2>&1 || pgrep -f "codestation-host.*serve" >/dev/null 2>&1 || pgrep -f "codestation.*serve" >/dev/null 2>&1; then
             echo "[!] Un processus hôte résiduel a été détecté. Arrêt propre pour libérer le verrou..."
             pkill -TERM -f "codync-host.*serve" 2>/dev/null || true
             pkill -TERM -f "codestation-host.*serve" 2>/dev/null || true
@@ -177,7 +177,7 @@ case "$CMD" in
         fi
 
         echo -e "\n[+] Lancement du serveur CodeStation sur $BIND:$PORT en arrière-plan..."
-        nohup "$HOST_BIN" serve --bind "$BIND" --port "$PORT" > "$LOG_FILE" 2>&1 &
+        nohup "$HOST_BIN" serve --bind "$BIND" --port "$PORT" </dev/null >> "$LOG_FILE" 2>&1 &
         HOST_PID=$!
         echo "$HOST_PID" > "$PID_FILE"
         disown "$HOST_PID" 2>/dev/null || true
@@ -226,7 +226,7 @@ case "$CMD" in
             rm -f "$PID_FILE"
         fi
 
-        for p in $(pgrep -f "codestation-host.*serve" 2>/dev/null || true) $(pgrep -f "codync-host.*serve" 2>/dev/null || true); do
+        for p in $(pgrep -f "codestation.*serve" 2>/dev/null || true) $(pgrep -f "codync-host.*serve" 2>/dev/null || true); do
             kill -TERM "$p" 2>/dev/null || true
             sleep 0.3
             if kill -0 "$p" 2>/dev/null; then
@@ -243,6 +243,18 @@ case "$CMD" in
         ;;
 
     restart)
+        TARGET="${2:-all}"
+        if [ "$TARGET" = "bot" ] && [ -n "$3" ]; then
+            BOT_TO_RESTART="$3"
+            echo -e "\n[+] Redémarrage ciblé du runner pour l'agent $BOT_TO_RESTART..."
+            if [ -d "$SCRIPT_DIR/environments/$BOT_TO_RESTART" ] && [ -x "$SCRIPT_DIR/environments/$BOT_TO_RESTART/run.sh" ]; then
+                "$SCRIPT_DIR/environments/$BOT_TO_RESTART/run.sh" stop 2>/dev/null || true
+                echo "[✓] Runner $BOT_TO_RESTART réinitialisé sans impacter le Host ni les autres agents."
+            else
+                echo "[ERREUR] Environnement du bot $BOT_TO_RESTART introuvable."
+            fi
+            exit 0
+        fi
         $0 stop
         sleep 1
         $0 start
@@ -369,15 +381,30 @@ except Exception as e:
 
     status)
         check_agents
-        if is_running; then
-            PID=$(cat "$PID_FILE" 2>/dev/null || pgrep -f "codync-host.*serve" | head -n 1 || echo "actif")
-            echo -e "\n[✓] CodeStation Host est en cours d'exécution sur $BIND:$PORT (PID: $PID)."
-            if check_port_listening "$PORT"; then
-                echo "    Statut socket : Écoute active et réactive sur $BIND:$PORT."
+        echo -e "\n=== Diagnostic Multi-Niveaux CodeStation ==="
+        if check_port_listening "$PORT"; then
+            echo "  [✓] Niveau 1 (Socket Loopback) : Écoute active et réactive sur $BIND:$PORT"
+            HEALTH=$(curl -s -m 2 "http://$BIND:$PORT/health" 2>/dev/null || echo "")
+            if [ -n "$HEALTH" ]; then
+                echo "  [✓] Niveau 2 (Host HTTP / SQLite) : Opérationnel ($HEALTH)"
+            else
+                echo "  [!] Niveau 2 (Host HTTP) : Port ouvert mais aucune réponse sur /health"
             fi
         else
-            echo -e "\n[-] CodeStation Host n'est pas actif."
+            echo "  [-] Niveau 1 (Socket Loopback) : Inaccessible sur $BIND:$PORT"
         fi
+
+        echo "  [+] Niveau 3 (Santé des Runners et Processus Bots) :"
+        for bot_dir in "$SCRIPT_DIR"/environments/bot-*; do
+            if [ -d "$bot_dir" ]; then
+                b_name="$(basename "$bot_dir")"
+                b_status="IDLE"
+                if pgrep -f "$b_name" >/dev/null 2>&1 || pgrep -f "agy_acp_bridge.*$b_name" >/dev/null 2>&1; then
+                    b_status="RUNNING"
+                fi
+                echo "      • $b_name : $b_status (runner: $bot_dir/run.sh)"
+            fi
+        done
         ;;
 
     *)

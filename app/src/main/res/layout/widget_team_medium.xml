@@ -11,6 +11,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <TextView
@@ -18,8 +19,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Roster Équipe IA"
-            android:textColor="#9CA3AF"
-            android:textSize="12sp"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
             android:textStyle="bold" />
 
         <TextView
@@ -37,78 +38,116 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Two-column team breakdown -->
+    <!-- Two-column team breakdown with Avatars -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="10dp"
         android:layout_weight="1"
         android:orientation="horizontal">
 
+        <!-- Agent 1 Card -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_marginEnd="6dp"
             android:layout_weight="1"
             android:background="@drawable/widget_card_item_bg"
-            android:orientation="vertical"
-            android:padding="8dp">
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="10dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Antigravity"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+            <ImageView
+                android:id="@+id/iv_agent1_avatar"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:contentDescription="Agent 1" />
 
-            <TextView
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="Agent Principal (Lead)"
-                android:textColor="#438DFF"
-                android:textSize="11sp" />
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Statut : Prêt"
-                android:textColor="#10B981"
-                android:textSize="10sp" />
+                <TextView
+                    android:id="@+id/tv_agent1_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Antigravity"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_agent1_role"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:text="Lead Agent"
+                    android:textColor="#38BDF8"
+                    android:textSize="10sp" />
+
+                <TextView
+                    android:id="@+id/tv_agent1_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Statut : Prêt"
+                    android:textColor="#10B981"
+                    android:textSize="9sp" />
+            </LinearLayout>
         </LinearLayout>
 
+        <!-- Agent 2 Card -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_marginStart="6dp"
             android:layout_weight="1"
             android:background="@drawable/widget_card_item_bg"
-            android:orientation="vertical"
-            android:padding="8dp">
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="10dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="OpenCode GLM"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+            <ImageView
+                android:id="@+id/iv_agent2_avatar"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:contentDescription="Agent 2" />
 
-            <TextView
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="Spécialiste Code &amp; GLM"
-                android:textColor="#10B981"
-                android:textSize="11sp" />
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Statut : Prêt"
-                android:textColor="#10B981"
-                android:textSize="10sp" />
+                <TextView
+                    android:id="@+id/tv_agent2_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="OpenCode GLM"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_agent2_role"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:text="Spécialiste Code"
+                    android:textColor="#10B981"
+                    android:textSize="10sp" />
+
+                <TextView
+                    android:id="@+id/tv_agent2_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Statut : Prêt"
+                    android:textColor="#10B981"
+                    android:textSize="9sp" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 

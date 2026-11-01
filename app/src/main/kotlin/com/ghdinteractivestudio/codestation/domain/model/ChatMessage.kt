@@ -25,7 +25,9 @@ data class FileAttachment(
     val name: String,
     val sizeBytes: Long,
     val mimeType: String,
-    val localUri: String? = null
+    val localUri: String? = null,
+    val isArtifact: Boolean = false,
+    val artifactTitle: String? = null
 )
 
 data class ArtifactMetadata(

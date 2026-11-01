@@ -118,6 +118,7 @@ pub fn spawn(hub: Arc<Hub>, base: BotConfig) -> BotHandle {
         sent: Vec::new(),
         reacted: Reacted::No,
         files: files::FileShares::default(),
+        turn_started_time: None,
         perms: HashMap::new(),
         stop_requested: false,
         cancel_deadline: None,
@@ -285,6 +286,7 @@ struct Actor {
     /// The bot's `react` this turn; with no message sent, it is the reply.
     reacted: Reacted,
     files: files::FileShares,
+    turn_started_time: Option<std::time::SystemTime>,
     /// permission entry id -> who waits for the answer
     perms: HashMap<String, updates::Answer>,
     stop_requested: bool,
@@ -320,7 +322,7 @@ impl Actor {
     /// `interrupted`: the previous host process stopped a turn in the bot's chat; resume it first.
     async fn run(mut self, mut rx: mpsc::UnboundedReceiver<Cmd>, interrupted: Option<Lane>) {
         let (done_tx, mut done_rx) = mpsc::unbounded_channel::<Done>();
-        let mut flush_tick = tokio::time::interval(Duration::from_millis(300));
+        let mut flush_tick = tokio::time::interval(Duration::from_millis(100));
         if let Some(run) = self.hub.routines.recovery(&self.cfg.id) {
             self.active_routine = Some(run.id.clone());
             self.routine_deadline = Some(Instant::now() + self.hub.routines.timeout(&run.id));

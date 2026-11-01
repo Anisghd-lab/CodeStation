@@ -108,6 +108,7 @@ impl Actor {
         let opens = self.prompt_call.take().filter(|call| crate::chat::calls::is_live(&self.hub.store, call));
         self.turn_call = crate::chat::calls::of_turn(&self.hub.store, answered).or(opens);
         self.turn_memory_revision.clear();
+        self.turn_started_time = Some(std::time::SystemTime::now());
         self.announce = None;
         self.stop_requested = false;
         self.cancel_deadline = None;
@@ -216,9 +217,45 @@ impl Actor {
             if std::mem::take(&mut self.raw_prompt) { text.to_owned() } else { self.compose(&sid, text).await? };
         self.hub.set_runtime(&self.id(), |r| r.activity = "Thinking…".into());
         let acp = self.conn.as_ref().ok_or_else(|| anyhow!("agent not running"))?.acp.clone();
+        let mut prompt_content = vec![json!({"type": "text", "text": prompt})];
+        let upload_root = crate::chat::uploads::root(&self.cfg);
+        for entry_id in &self.turn_entries {
+            if let Some(entry) = self.hub.store.entry(entry_id) {
+                if let Some(attachments) = entry.data["attachments"].as_array() {
+                    for att in attachments {
+                        if let Some(path) = crate::chat::uploads::path_of(&upload_root, att) {
+                            if let Ok(meta) = std::fs::metadata(&path) {
+                                if meta.is_file() && meta.len() <= 10 * 1024 * 1024 {
+                                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or_default().to_lowercase();
+                                    let mime = match ext.as_str() {
+                                        "png" => Some("image/png"),
+                                        "jpg" | "jpeg" => Some("image/jpeg"),
+                                        "webp" => Some("image/webp"),
+                                        "gif" => Some("image/gif"),
+                                        "svg" => Some("image/svg+xml"),
+                                        _ => None,
+                                    };
+                                    if let Some(mime) = mime {
+                                        if let Ok(bytes) = std::fs::read(&path) {
+                                            use base64::Engine as _;
+                                            let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                                            prompt_content.push(json!({
+                                                "type": "image",
+                                                "data": b64,
+                                                "mimeType": mime,
+                                            }));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         let params = json!({
             "sessionId": sid,
-            "prompt": [{"type": "text", "text": prompt}],
+            "prompt": prompt_content,
         });
         if let Some(id) = &self.active_routine {
             self.hub.routines.mark_started(&self.hub.store, id)?;
@@ -234,8 +271,18 @@ impl Actor {
             tracing::warn!(%error, "could not acknowledge memory update notice");
         }
         let done_tx = done_tx.clone();
+        let acp_for_timeout = acp.clone();
         tokio::spawn(async move {
-            let _ = done_tx.send(answer.response().await.and_then(acp::codebuddy::prompt_result));
+            let timeout_duration = Duration::from_secs(360);
+            let res = match tokio::time::timeout(timeout_duration, answer.response()).await {
+                Ok(resp) => resp.and_then(acp::codebuddy::prompt_result),
+                Err(_) => {
+                    tracing::warn!("turn prompt timed out after {}s; terminating agent", timeout_duration.as_secs());
+                    acp_for_timeout.kill().await;
+                    Err(anyhow!("The agent turn timed out after {}s without completing", timeout_duration.as_secs()))
+                }
+            };
+            let _ = done_tx.send(res);
         });
         Ok(())
     }
@@ -254,6 +301,36 @@ impl Actor {
         }
         let stopped = self.stop_requested || matches!(&done, Ok(v) if v["stopReason"] == "cancelled");
         self.close_attempt(stopped || done.is_err());
+
+        // Automatic detection of media files generated during this turn
+        if let Some(started) = self.turn_started_time.take() {
+            let root = crate::chat::files::root(&self.cfg.id);
+            let cwd = std::path::PathBuf::from(&self.cfg.cwd);
+            let auto_snaps = scan_new_media_files(&root, &cwd, started);
+            for mut snap in auto_snaps {
+                snap.commit();
+                let file_name = snap.meta.name.clone();
+                let file_size = snap.meta.size;
+                let summary_line = format!("{file_name} ({file_size} bytes)");
+                if let Some(id) = self.last_text.as_ref() {
+                    if let Some(mut e) = self.hub.store.entry(id) {
+                        let mut files = e.data["files"].as_array().cloned().unwrap_or_default();
+                        if !files.iter().any(|f| f["name"] == file_name) {
+                            files.push(json!(snap.meta));
+                            e.data["files"] = json!(files);
+                            self.hub.set_entry(id, &e.data);
+                        }
+                    }
+                } else if let Some(turn_num) = self.turn {
+                    self.add(EntryKind::Agent, turn_num, json!({
+                        "text": summary_line,
+                        "final": true,
+                        "files": [snap.meta]
+                    }));
+                }
+            }
+        }
+
         let mut final_text = None;
         let routine = self.active_routine.is_some();
         let delegated = self.active_request.is_some();
@@ -427,4 +504,38 @@ impl Actor {
             TurnSource::User
         }
     }
+}
+
+fn scan_new_media_files(
+    root: &std::path::Path,
+    cwd: &std::path::Path,
+    since: std::time::SystemTime,
+) -> Vec<crate::chat::files::Snapshot> {
+    let mut results = Vec::new();
+    let Ok(entries) = std::fs::read_dir(cwd) else { return results };
+    let threshold = since.checked_sub(Duration::from_secs(3)).unwrap_or(since);
+    let cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(file_name) = path.file_name().and_then(|n| n.to_str()) else { continue };
+        if file_name.starts_with('.') {
+            continue;
+        }
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or_default().to_lowercase();
+        if !matches!(ext.as_str(), "svg" | "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp") {
+            continue;
+        }
+        let Ok(meta) = entry.metadata() else { continue };
+        let Ok(modified) = meta.modified() else { continue };
+        if modified >= threshold && meta.len() <= 50 * 1024 * 1024 {
+            if let Ok(snap) = crate::chat::files::snapshot(root, cwd, file_name, Some(file_name), &cancelled) {
+                results.push(snap);
+            }
+        }
+    }
+    results
 }

@@ -32,6 +32,9 @@ pub fn router(hub: Arc<Hub>) -> Router {
         .route("/ingest/statusline", post(statusline))
         .route("/channel", get(channel))
         .route("/oauth/callback", get(oauth_callback))
+        .route("/media/upload/{bot_id}/{upload_id}", get(media_upload))
+        .route("/media/file/{bot_id}/{file_id}", get(media_file))
+        .route("/media/artifact/{bot_id}/{artifact_id}", get(media_artifact))
         .with_state(hub)
 }
 
@@ -245,6 +248,148 @@ async fn routine_hook(
         };
         ApiError(status, e.to_string())
     })
+}
+
+#[derive(Deserialize)]
+struct MediaAuthQuery {
+    token: Option<String>,
+}
+
+fn check_media_auth(hub: &Hub, headers: &HeaderMap, query_token: Option<&str>, peer: SocketAddr) -> bool {
+    if !is_loopback(peer.ip()) {
+        return false;
+    }
+    if let Some(auth) = headers.get("authorization").and_then(|v| v.to_str().ok()) {
+        if let Some(given) = auth.strip_prefix("Bearer ") {
+            if crypto::ct_eq(given.as_bytes(), hub.token.as_bytes()) {
+                return true;
+            }
+        }
+    }
+    if let Some(q) = query_token {
+        if crypto::ct_eq(q.as_bytes(), hub.token.as_bytes()) {
+            return true;
+        }
+    }
+    false
+}
+
+fn detect_mime(bytes: &[u8], name: Option<&str>) -> &'static str {
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        return "image/png";
+    }
+    if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+        return "image/jpeg";
+    }
+    if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+        return "image/gif";
+    }
+    if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        return "image/webp";
+    }
+    if bytes.starts_with(b"<?xml") || bytes.starts_with(b"<svg") || (bytes.len() > 10 && std::str::from_utf8(&bytes[..bytes.len().min(512)]).is_ok_and(|s| s.contains("<svg"))) {
+        return "image/svg+xml";
+    }
+    if let Some(ext) = name.and_then(|n| n.rsplit('.').next()) {
+        match ext.to_lowercase().as_str() {
+            "png" => return "image/png",
+            "jpg" | "jpeg" => return "image/jpeg",
+            "svg" => return "image/svg+xml",
+            "webp" => return "image/webp",
+            "gif" => return "image/gif",
+            "html" | "htm" => return "text/html; charset=utf-8",
+            "json" => return "application/json",
+            "pdf" => return "application/pdf",
+            _ => {}
+        }
+    }
+    "application/octet-stream"
+}
+
+async fn media_upload(
+    State(hub): State<Arc<Hub>>,
+    Path((bot_id, upload_id)): Path<(String, String)>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Query(q): Query<MediaAuthQuery>,
+) -> Response {
+    if !check_media_auth(&hub, &headers, q.token.as_deref(), peer) {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    let row = match hub.store.resolve_bot(&bot_id) {
+        Ok(Some(r)) => r,
+        _ => return StatusCode::NOT_FOUND.into_response(),
+    };
+    let root = crate::chat::uploads::root(&row.config);
+    match crate::chat::uploads::resolve(&root, &upload_id) {
+        Ok((path, meta)) => match tokio::fs::read(&path).await {
+            Ok(bytes) => {
+                let name = meta["name"].as_str();
+                let mime = detect_mime(&bytes, name);
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header(axum::http::header::CONTENT_TYPE, mime)
+                    .header(axum::http::header::CACHE_CONTROL, "public, max-age=86400")
+                    .body(axum::body::Body::from(bytes))
+                    .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
+            }
+            Err(_) => StatusCode::NOT_FOUND.into_response(),
+        },
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn media_file(
+    State(hub): State<Arc<Hub>>,
+    Path((bot_id, file_id)): Path<(String, String)>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Query(q): Query<MediaAuthQuery>,
+) -> Response {
+    if !check_media_auth(&hub, &headers, q.token.as_deref(), peer) {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    let Ok(uuid) = uuid::Uuid::parse_str(&file_id) else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    let root = crate::chat::files::root(&bot_id);
+    let path = root.join(uuid.to_string());
+    match tokio::fs::read(&path).await {
+        Ok(bytes) => {
+            let mime = detect_mime(&bytes, None);
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(axum::http::header::CONTENT_TYPE, mime)
+                .header(axum::http::header::CACHE_CONTROL, "public, max-age=86400")
+                .body(axum::body::Body::from(bytes))
+                .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
+        }
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn media_artifact(
+    State(hub): State<Arc<Hub>>,
+    Path((bot_id, artifact_id)): Path<(String, String)>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Query(q): Query<MediaAuthQuery>,
+) -> Response {
+    if !check_media_auth(&hub, &headers, q.token.as_deref(), peer) {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    let Ok(path) = crate::chat::artifacts::html_path(&bot_id, &artifact_id) else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    match tokio::fs::read(&path).await {
+        Ok(bytes) => Response::builder()
+            .status(StatusCode::OK)
+            .header(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")
+            .header(axum::http::header::CACHE_CONTROL, "no-cache")
+            .body(axum::body::Body::from(bytes))
+            .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response()),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 #[cfg(test)]

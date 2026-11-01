@@ -23,6 +23,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import com.ghdinteractivestudio.codestation.data.local.FileAttachmentDto
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonObject
@@ -170,9 +173,6 @@ class CodeStationEventStreamClient(
                 }
                 "hello" -> {
                     android.util.Log.i(TAG, "Handshake hello received: rev=$rev")
-                    if (lastRev == 0L && rev != null && rev > 0) {
-                        lastRev = rev
-                    }
                     initialSyncCompleted = true
                 }
                 "bot" -> {
@@ -358,13 +358,65 @@ class CodeStationEventStreamClient(
                         }
                     }
 
+                    // Extraction exhaustive des pièces jointes, fichiers générés et artefacts
+                    val parsedAttachments = mutableListOf<FileAttachmentDto>()
+
+                    // 1. Pièces jointes utilisateur
+                    dataObj["attachments"]?.jsonArray?.forEach { item ->
+                        val obj = item.jsonObject
+                        val id = obj["id"]?.jsonPrimitive?.content ?: ""
+                        val name = obj["name"]?.jsonPrimitive?.content ?: "fichier"
+                        val size = obj["size"]?.jsonPrimitive?.longOrNull ?: 0L
+                        if (id.isNotBlank()) {
+                            parsedAttachments.add(FileAttachmentDto(id, name, size, detectMimeType(name)))
+                        }
+                    }
+
+                    // 2. Fichiers générés par l'agent (send_file ou détection auto workspace)
+                    dataObj["files"]?.jsonArray?.forEach { item ->
+                        val obj = item.jsonObject
+                        val id = obj["id"]?.jsonPrimitive?.content ?: ""
+                        val name = obj["name"]?.jsonPrimitive?.content ?: "fichier"
+                        val size = obj["size"]?.jsonPrimitive?.longOrNull ?: 0L
+                        if (id.isNotBlank()) {
+                            parsedAttachments.add(FileAttachmentDto(id, name, size, detectMimeType(name)))
+                        }
+                    }
+
+                    // 3. Artefacts interactifs publiés
+                    dataObj["artifact"]?.jsonObject?.let { artObj ->
+                        val artId = artObj["id"]?.jsonPrimitive?.content ?: ""
+                        val title = artObj["title"]?.jsonPrimitive?.content ?: "Artifact"
+                        if (artId.isNotBlank()) {
+                            parsedAttachments.add(
+                                FileAttachmentDto(
+                                    id = artId,
+                                    name = "$title.html",
+                                    sizeBytes = 0L,
+                                    mimeType = "text/html",
+                                    isArtifact = true,
+                                    artifactTitle = title
+                                )
+                            )
+                        }
+                    }
+
+                    val attachmentsJsonStr = if (parsedAttachments.isNotEmpty()) {
+                        try {
+                            Json.encodeToString(parsedAttachments)
+                        } catch (_: Exception) { null }
+                    } else null
+
                     // Mise à jour de l'historique dans Room (inclut "agent", "assistant", "notice", "user")
                     // On filtre les messages de complétion silencieuse interne comme "(pass)"
-                    if (text.isNotBlank() && text.trim() != "(pass)" && (isAgent || isNotice || isUser)) {
+                    if ((text.isNotBlank() || parsedAttachments.isNotEmpty()) && text.trim() != "(pass)" && (isAgent || isNotice || isUser)) {
                         val authorType = if (isUser) MessageAuthorType.USER else MessageAuthorType.BOT
-                        val displayText = if (isNotice && (text.contains("Couldn't select model", ignoreCase = true) || text.contains("Insufficient credits", ignoreCase = true))) {
-                            "$text\n\n💡 Modèles gratuits OpenCode disponibles sans crédit :\n• opencode/glm-5.3-flash-free (GLM-5.3-Flash Free)\n• opencode/deepseek-v4.1-flash-free\n• opencode/beam-free"
+                        val effectiveText = if (text.isBlank() && parsedAttachments.isNotEmpty()) {
+                            parsedAttachments.first().name
                         } else text
+                        val displayText = if (isNotice && (effectiveText.contains("Couldn't select model", ignoreCase = true) || effectiveText.contains("Insufficient credits", ignoreCase = true))) {
+                            "$effectiveText\n\n💡 Modèles gratuits OpenCode disponibles sans crédit :\n• opencode/glm-5.3-flash-free (GLM-5.3-Flash Free)\n• opencode/deepseek-v4.1-flash-free\n• opencode/beam-free"
+                        } else effectiveText
 
                         val botName = botDao.getBotById(botId)?.name ?: if (isUser) "Moi" else "CodeStation Agent"
 
@@ -379,7 +431,8 @@ class CodeStationEventStreamClient(
                             isFinal = isFinal || isNotice || isUser,
                             replyToMessageId = null,
                             replyToAuthor = null,
-                            replyToText = null
+                            replyToText = null,
+                            attachmentsJson = attachmentsJsonStr
                         )
                         if (isUser) {
                             val clientNonce = dataObj["clientNonce"]?.jsonPrimitive?.content
@@ -388,7 +441,9 @@ class CodeStationEventStreamClient(
                         } else {
                             messageDao.insertMessage(entity)
                         }
-                        botDao.updateLastMessage(botId, displayText, entity.timestamp)
+                        if (isFinal || isUser || isNotice) {
+                            botDao.updateLastMessage(botId, displayText, entity.timestamp)
+                        }
                         android.util.Log.i(TAG, "Saved chat message id=$entryId botId=$botId isFinal=$isFinal author=$authorType textLen=${text.length}")
 
                         val formattedBotName = CodeStationNotificationManager.formatAgentDisplayName(botId, botName)
@@ -466,6 +521,25 @@ class CodeStationEventStreamClient(
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Failed to parse/process event payload: ${e.message}", e)
             return true
+        }
+    }
+
+    private fun detectMimeType(fileName: String): String {
+        val ext = fileName.substringAfterLast('.', "").lowercase()
+        return when (ext) {
+            "png" -> "image/png"
+            "jpg", "jpeg" -> "image/jpeg"
+            "webp" -> "image/webp"
+            "svg" -> "image/svg+xml"
+            "gif" -> "image/gif"
+            "bmp" -> "image/bmp"
+            "html", "htm" -> "text/html"
+            "json" -> "application/json"
+            "pdf" -> "application/pdf"
+            "mp4" -> "video/mp4"
+            "mp3" -> "audio/mp3"
+            "wav" -> "audio/wav"
+            else -> "application/octet-stream"
         }
     }
 }

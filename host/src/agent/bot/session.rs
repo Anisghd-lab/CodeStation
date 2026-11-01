@@ -284,5 +284,5 @@ impl Actor {
     }
 }
 
-/// How long `session/new` and `session/load` may take.
-const SESSION_TIMEOUT: Duration = Duration::from_mins(3);
+/// How long `session/new` and `session/load` may take before restarting the agent.
+const SESSION_TIMEOUT: Duration = Duration::from_secs(45);
