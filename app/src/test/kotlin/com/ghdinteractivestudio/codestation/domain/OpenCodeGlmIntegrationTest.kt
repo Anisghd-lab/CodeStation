@@ -47,6 +47,8 @@ class OpenCodeGlmIntegrationTest {
         )
         every { chatRepository.getMessagesStream(any()) } returns flowOf(emptyList())
         every { chatRepository.getPendingApprovalsStream(any()) } returns flowOf(emptyList())
+        every { chatRepository.getConversationsStream(any()) } returns flowOf(emptyList())
+        every { chatRepository.getMessagesByConversationStream(any(), any()) } returns flowOf(emptyList())
     }
 
     @After
@@ -98,7 +100,7 @@ class OpenCodeGlmIntegrationTest {
     @Test
     fun `test ChatViewModel propagates real transmission error without fake fallback`() = runTest(testDispatcher) {
         val expectedError = "Le serveur a refusé le message (HTTP 401 Unauthorized)"
-        coEvery { chatRepository.sendMessage("bot-opencode-glm", "Test prompt", null) } returns
+        coEvery { chatRepository.sendMessage(any(), any(), any(), any()) } returns
             Result.failure(IllegalStateException(expectedError))
 
         val viewModel = ChatViewModel("bot-opencode-glm", botRepository, chatRepository)
@@ -109,7 +111,7 @@ class OpenCodeGlmIntegrationTest {
         viewModel.sendMessage()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        coVerify { chatRepository.sendMessage("bot-opencode-glm", "Test prompt", null) }
+        coVerify { chatRepository.sendMessage("bot-opencode-glm", "Test prompt", any(), any()) }
         assertEquals(expectedError, viewModel.uiState.value.errorMessage)
         assertFalse(viewModel.uiState.value.isBotWorking)
     }

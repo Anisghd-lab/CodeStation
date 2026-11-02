@@ -53,6 +53,8 @@ class ChatViewModelTest {
         coEvery { botRepository.updateBotStatus(any(), any()) } returns Result.success(Unit)
         every { chatRepository.getMessagesStream("bot-1") } returns flowOf(testMessages)
         every { chatRepository.getPendingApprovalsStream("bot-1") } returns flowOf(emptyList())
+        every { chatRepository.getConversationsStream(any()) } returns flowOf(emptyList())
+        every { chatRepository.getMessagesByConversationStream(any(), any()) } returns flowOf(testMessages)
         coEvery { chatRepository.sendMessage(any(), any(), any(), any()) } returns Result.success(testMessages.first())
         coEvery { chatRepository.respondApproval(any(), any(), any()) } returns Result.success(Unit)
     }
@@ -84,7 +86,7 @@ class ChatViewModelTest {
         viewModel.sendMessage()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        coVerify { chatRepository.sendMessage("bot-1", "Nouvelle tâche", null, any()) }
+        coVerify { chatRepository.sendMessage("bot-1", "Nouvelle tâche", any(), any()) }
         assertEquals("", viewModel.uiState.value.inputDraft)
     }
 
@@ -154,7 +156,7 @@ class ChatViewModelTest {
         viewModel.confirmEditAndSend("Bonjour modifié")
         testDispatcher.scheduler.advanceUntilIdle()
 
-        coVerify { chatRepository.sendMessage("bot-1", "Bonjour modifié", null, any()) }
+        coVerify { chatRepository.sendMessage("bot-1", "Bonjour modifié", any(), any()) }
         assertEquals(null, viewModel.uiState.value.editingMessage)
         assertEquals("", viewModel.uiState.value.inputDraft)
     }
@@ -169,6 +171,7 @@ class ChatViewModelTest {
             isFinal = true
         )
         every { chatRepository.getMessagesStream("bot-1") } returns flowOf(listOf(testMessages.first(), botReply))
+        every { chatRepository.getMessagesByConversationStream(any(), any()) } returns flowOf(listOf(testMessages.first(), botReply))
 
         val viewModel = ChatViewModel("bot-1", botRepository, chatRepository)
         backgroundScope.launch(testDispatcher) { viewModel.uiState.collect() }
@@ -178,7 +181,7 @@ class ChatViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         // Verifies the user prompt was retrieved and re-sent
-        coVerify { chatRepository.sendMessage("bot-1", "Bonjour", null, any()) }
+        coVerify { chatRepository.sendMessage("bot-1", "Bonjour", any(), any()) }
         // Verify deleteMessage was NOT called (preserving history)
         coVerify(exactly = 0) { chatRepository.deleteMessage("bot-msg-1") }
     }
