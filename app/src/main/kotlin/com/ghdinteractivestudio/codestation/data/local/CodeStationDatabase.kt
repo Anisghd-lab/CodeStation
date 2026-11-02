@@ -27,26 +27,145 @@ abstract class CodeStationDatabase : RoomDatabase() {
 
         val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE chat_messages ADD COLUMN conversationId TEXT NOT NULL DEFAULT ''")
-                db.execSQL("UPDATE chat_messages SET conversationId = botId WHERE conversationId = ''")
+                applyMigration2To3(db)
+            }
+        }
+
+        val MIGRATION_1_3 = object : androidx.room.migration.Migration(1, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                applyMigration2To3(db)
+            }
+        }
+
+        private fun applyMigration2To3(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+            try {
+                // 1. Recréer la table chat_messages selon le schéma exact attendu par Room
                 db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS conversations (
-                        id TEXT PRIMARY KEY NOT NULL,
-                        botId TEXT NOT NULL,
-                        title TEXT NOT NULL,
-                        cliId TEXT,
-                        runnerId TEXT,
-                        cliSessionId TEXT,
-                        createdAt INTEGER NOT NULL,
-                        updatedAt INTEGER NOT NULL,
-                        status TEXT NOT NULL,
-                        lastMessageText TEXT NOT NULL DEFAULT '',
-                        messageCount INTEGER NOT NULL DEFAULT 0
+                    CREATE TABLE IF NOT EXISTS `chat_messages_new` (
+                        `id` TEXT NOT NULL,
+                        `botId` TEXT NOT NULL,
+                        `authorType` TEXT NOT NULL,
+                        `authorId` TEXT NOT NULL,
+                        `authorName` TEXT NOT NULL,
+                        `text` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        `isFinal` INTEGER NOT NULL,
+                        `replyToMessageId` TEXT,
+                        `replyToAuthor` TEXT,
+                        `replyToText` TEXT,
+                        `attachmentsJson` TEXT,
+                        `conversationId` TEXT NOT NULL,
+                        PRIMARY KEY(`id`)
                     )
                 """.trimIndent())
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_conversations_botId ON conversations(botId)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_conversations_updatedAt ON conversations(updatedAt)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_chat_messages_conversationId ON chat_messages(conversationId)")
+
+                var hasConversationId = false
+                val cursor = db.query("PRAGMA table_info(chat_messages)")
+                while (cursor.moveToNext()) {
+                    val nameIndex = cursor.getColumnIndex("name")
+                    if (nameIndex != -1 && cursor.getString(nameIndex) == "conversationId") {
+                        hasConversationId = true
+                        break
+                    }
+                }
+                cursor.close()
+
+                if (hasConversationId) {
+                    db.execSQL("""
+                        INSERT OR REPLACE INTO `chat_messages_new` (
+                            `id`, `botId`, `authorType`, `authorId`, `authorName`, `text`,
+                            `timestamp`, `isFinal`, `replyToMessageId`, `replyToAuthor`,
+                            `replyToText`, `attachmentsJson`, `conversationId`
+                        )
+                        SELECT 
+                            `id`, `botId`, `authorType`, `authorId`, `authorName`, `text`,
+                            `timestamp`, `isFinal`, `replyToMessageId`, `replyToAuthor`,
+                            `replyToText`, `attachmentsJson`, COALESCE(NULLIF(`conversationId`, ''), `botId`)
+                        FROM `chat_messages`
+                    """.trimIndent())
+                } else {
+                    db.execSQL("""
+                        INSERT OR REPLACE INTO `chat_messages_new` (
+                            `id`, `botId`, `authorType`, `authorId`, `authorName`, `text`,
+                            `timestamp`, `isFinal`, `replyToMessageId`, `replyToAuthor`,
+                            `replyToText`, `attachmentsJson`, `conversationId`
+                        )
+                        SELECT 
+                            `id`, `botId`, `authorType`, `authorId`, `authorName`, `text`,
+                            `timestamp`, `isFinal`, `replyToMessageId`, `replyToAuthor`,
+                            `replyToText`, `attachmentsJson`, `botId`
+                        FROM `chat_messages`
+                    """.trimIndent())
+                }
+
+                db.execSQL("DROP TABLE `chat_messages`")
+                db.execSQL("ALTER TABLE `chat_messages_new` RENAME TO `chat_messages`")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_chat_messages_botId` ON `chat_messages` (`botId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_chat_messages_conversationId` ON `chat_messages` (`conversationId`)")
+
+                // 2. Créer la table conversations et ses index
+                db.execSQL("DROP TABLE IF EXISTS `conversations`")
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `conversations` (
+                        `id` TEXT NOT NULL,
+                        `botId` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `cliId` TEXT,
+                        `runnerId` TEXT,
+                        `cliSessionId` TEXT,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `lastMessageText` TEXT NOT NULL,
+                        `messageCount` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_conversations_botId` ON `conversations` (`botId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_conversations_updatedAt` ON `conversations` (`updatedAt`)")
+            } catch (_: Exception) {
+                // Fallback de sécurité : recréer les tables proprement si altération impossible
+                db.execSQL("DROP TABLE IF EXISTS `chat_messages`")
+                db.execSQL("DROP TABLE IF EXISTS `conversations`")
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `chat_messages` (
+                        `id` TEXT NOT NULL,
+                        `botId` TEXT NOT NULL,
+                        `authorType` TEXT NOT NULL,
+                        `authorId` TEXT NOT NULL,
+                        `authorName` TEXT NOT NULL,
+                        `text` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        `isFinal` INTEGER NOT NULL,
+                        `replyToMessageId` TEXT,
+                        `replyToAuthor` TEXT,
+                        `replyToText` TEXT,
+                        `attachmentsJson` TEXT,
+                        `conversationId` TEXT NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_chat_messages_botId` ON `chat_messages` (`botId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_chat_messages_conversationId` ON `chat_messages` (`conversationId`)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `conversations` (
+                        `id` TEXT NOT NULL,
+                        `botId` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `cliId` TEXT,
+                        `runnerId` TEXT,
+                        `cliSessionId` TEXT,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `lastMessageText` TEXT NOT NULL,
+                        `messageCount` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_conversations_botId` ON `conversations` (`botId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_conversations_updatedAt` ON `conversations` (`updatedAt`)")
             }
         }
 
@@ -66,7 +185,7 @@ abstract class CodeStationDatabase : RoomDatabase() {
                     CodeStationDatabase::class.java,
                     "codestation.db"
                 )
-                    .addMigrations(MIGRATION_2_3)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_1_3)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
