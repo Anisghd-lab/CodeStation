@@ -43,7 +43,7 @@ class CliRegistry:
             return self._runners.get("omnirush")
         elif normalized in ("freebuff",):
             return self._runners.get("freebuff")
-        return None
+        return self._runners.get(normalized, None)
 
     def check_cli_health(self, cli_id: str, force_refresh: bool = False) -> Tuple[bool, str, str]:
         now = time.time()
