@@ -64,6 +64,8 @@ import com.ghdinteractivestudio.codestation.domain.model.CamcsDeliverable
 import com.ghdinteractivestudio.codestation.domain.model.CamcsDeliverablesResponse
 import com.ghdinteractivestudio.codestation.domain.model.CamcsDiffResponse
 import com.ghdinteractivestudio.codestation.domain.model.CamcsEvent
+import com.ghdinteractivestudio.codestation.domain.model.CamcsExternalAction
+import com.ghdinteractivestudio.codestation.domain.model.CamcsExternalService
 import com.ghdinteractivestudio.codestation.domain.model.CamcsFileResponse
 import com.ghdinteractivestudio.codestation.domain.model.CamcsMission
 import com.ghdinteractivestudio.codestation.domain.model.CamcsMissionsResponse
@@ -73,6 +75,7 @@ import com.ghdinteractivestudio.codestation.domain.model.CamcsProviderStatus
 import com.ghdinteractivestudio.codestation.domain.model.CamcsProvidersResponse
 import com.ghdinteractivestudio.codestation.domain.model.CamcsReport
 import com.ghdinteractivestudio.codestation.domain.model.CamcsReportResponse
+import com.ghdinteractivestudio.codestation.domain.model.CamcsServicesResponse
 import com.ghdinteractivestudio.codestation.domain.model.CamcsSubtask
 import com.ghdinteractivestudio.codestation.ui.components.BackButton
 import com.ghdinteractivestudio.codestation.ui.components.CharacterAvatar
@@ -126,6 +129,7 @@ fun CamcsControlCenterScreen(
     var missions by remember { mutableStateOf<List<CamcsMission>>(emptyList()) }
     var providers by remember { mutableStateOf<List<CamcsProviderStatus>>(emptyList()) }
     var clis by remember { mutableStateOf<List<CamcsCliStatus>>(emptyList()) }
+    var externalServices by remember { mutableStateOf<List<CamcsExternalService>>(emptyList()) }
     val liveEvents = remember { mutableStateListOf<CamcsEvent>() }
 
     var activeTab by remember { mutableIntStateOf(0) } // 0: Orchestration, 1: Journal Live, 2: Providers & CLIs, 3: Résultats & Livrables
@@ -259,6 +263,17 @@ fun CamcsControlCenterScreen(
                         }
                     }
                     pResp.close()
+
+                    try {
+                        val sReq = Request.Builder().url("http://127.0.0.1:19223/api/camcs/services").build()
+                        val sResp = httpClient.newCall(sReq).execute()
+                        if (sResp.isSuccessful) {
+                            val sBody = sResp.body?.string() ?: ""
+                            val sParsed = jsonParser.decodeFromString<CamcsServicesResponse>(sBody)
+                            externalServices = sParsed.services
+                        }
+                        sResp.close()
+                    } catch (_: Exception) {}
 
                     // Poll mission deliverables, communications, proofs and report
                     val currMid = selectedMissionId
@@ -631,7 +646,7 @@ fun CamcsControlCenterScreen(
             val tabs = listOf(
                 Pair("Orchestration & Dispatching", 0),
                 Pair("Journal Live (${liveEvents.size})", 1),
-                Pair("Providers & CLIs (${providers.size + clis.size})", 2),
+                Pair("Providers, CLIs & Services (${providers.size + clis.size + externalServices.size})", 2),
                 Pair("Résultats & Livrables (${deliverables.size})", 3)
             )
 
@@ -707,6 +722,11 @@ fun CamcsControlCenterScreen(
                         // Visual Dispatching Workflow Pipeline with real states
                         DispatchingPipelineCard(mission = activeMission)
 
+                        // External Actions & Remote Services Integrity
+                        if (activeMission.externalActions.isNotEmpty()) {
+                            ExternalActionsIntegrityCard(actions = activeMission.externalActions)
+                        }
+
                         // Individual Live Agent Cards
                         Text(
                             text = "AGENTS MOBILISÉS & SUPERVISION PARALLÈLE",
@@ -744,10 +764,11 @@ fun CamcsControlCenterScreen(
                     )
                 }
                 2 -> {
-                    // TAB 3: Providers, Models & PRoot CLI Registry
+                    // TAB 3: Providers, Models, PRoot CLIs & External Connected Services
                     ProvidersAndClisView(
                         providers = providers,
                         clis = clis,
+                        externalServices = externalServices,
                         onCliClick = { selectedCliForDetail = it }
                     )
                 }
@@ -2057,6 +2078,7 @@ private fun LiveEventsStreamView(
 private fun ProvidersAndClisView(
     providers: List<CamcsProviderStatus>,
     clis: List<CamcsCliStatus>,
+    externalServices: List<CamcsExternalService> = emptyList(),
     onCliClick: (CamcsCliStatus) -> Unit
 ) {
     val dark = LocalDark.current
@@ -2203,6 +2225,236 @@ private fun ProvidersAndClisView(
                             style = Type.caption.semibold.copy(fontSize = 10.sp),
                             color = if (cli.status == "ACTIVE") electricGreen else Palette.emeraldAccent
                         )
+                    }
+                }
+            }
+        }
+
+        // SECTION 3: SUPERVISION DES SERVICES EXTERNES & CONNECTIVITÉ API RÉELLE
+        if (externalServices.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "SERVICES EXTERNES & CONNECTIVITÉ API RÉELLE",
+                    style = Type.caption.semibold.copy(fontSize = 11.sp, letterSpacing = 0.5.sp),
+                    color = Palette.secondary,
+                    modifier = Modifier.padding(start = 4.dp, top = 6.dp)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(electricGreen.copy(alpha = 0.15f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    val connectedCount = externalServices.count { it.status == "CONNECTED" }
+                    Text(
+                        text = "$connectedCount/${externalServices.size} OPÉRATIONNELS",
+                        style = Type.caption.semibold.copy(fontSize = 9.sp),
+                        color = electricGreen
+                    )
+                }
+            }
+
+            externalServices.forEach { svc ->
+                val isConnected = svc.status == "CONNECTED"
+                val badgeColor = when (svc.status) {
+                    "CONNECTED" -> electricGreen
+                    "AUTH_FAILED" -> Palette.danger
+                    "RATE_LIMITED" -> Palette.warning
+                    else -> Palette.secondary
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Palette.surface.copy(alpha = 0.7f))
+                        .border(0.5.dp, if (isConnected) electricGreen.copy(alpha = 0.4f) else Palette.glassBorder, RoundedCornerShape(16.dp))
+                        .padding(14.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = svc.name, style = Type.subheadline.semibold, color = Palette.text)
+                                Text(text = svc.endpoint, style = Type.caption.copy(fontSize = 10.5.sp), color = Palette.secondary)
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(badgeColor.copy(alpha = 0.2f))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = svc.status,
+                                    style = Type.caption.semibold.copy(fontSize = 10.sp),
+                                    color = badgeColor
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            MetricCapsule(label = "Auth", value = svc.authType, modifier = Modifier.weight(1f))
+                            MetricCapsule(label = "Latence", value = "${svc.latencyMs.toInt()} ms", modifier = Modifier.weight(1f))
+                            if (svc.rateLimitLimit != null) {
+                                MetricCapsule(
+                                    label = "Quota",
+                                    value = "${svc.rateLimitRemaining ?: 0}/${svc.rateLimitLimit}",
+                                    modifier = Modifier.weight(1.2f),
+                                    isSuccess = (svc.rateLimitRemaining ?: 0) > 0
+                                )
+                            }
+                        }
+
+                        if (svc.detectedScopes.isNotEmpty()) {
+                            Text(
+                                text = "Permissions vérifiées : ${svc.detectedScopes.joinToString(", ")}",
+                                style = Type.caption.copy(fontSize = 10.5.sp),
+                                color = Palette.secondary
+                            )
+                        }
+
+                        if (svc.accessibleFreeModels.isNotEmpty()) {
+                            Text(
+                                text = "Modèles gratuits certifiés : ${svc.accessibleFreeModels.joinToString(", ")}",
+                                style = Type.caption.copy(fontSize = 10.5.sp),
+                                color = electricGreen
+                            )
+                        }
+
+                        if (svc.lastError != null) {
+                            Text(
+                                text = "Diagnostic d'erreur : ${svc.lastError}",
+                                style = Type.caption.copy(fontSize = 10.5.sp),
+                                color = Palette.danger
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExternalActionsIntegrityCard(actions: List<CamcsExternalAction>) {
+    val dark = LocalDark.current
+    val electricGreen = if (dark) Color(0xFF00E676) else Color(0xFF059669)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Palette.surface.copy(alpha = 0.75f))
+            .border(0.5.dp, electricGreen.copy(alpha = 0.4f), RoundedCornerShape(18.dp))
+            .padding(14.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Symbol("globe", size = 18.dp, tint = electricGreen)
+                    Text(
+                        text = "VÉRIFICATION DES ACTIONS EXTERNES & INTÉGRITÉ",
+                        style = Type.caption.semibold.copy(fontSize = 11.sp, letterSpacing = 0.5.sp),
+                        color = Palette.secondary
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(electricGreen.copy(alpha = 0.18f))
+                        .padding(horizontal = 7.dp, vertical = 2.dp)
+                ) {
+                    val confirmedCount = actions.count { it.status == "CONFIRMED" }
+                    Text(
+                        text = "$confirmedCount/${actions.size} CONFIRMÉES",
+                        style = Type.caption.semibold.copy(fontSize = 9.5.sp),
+                        color = electricGreen
+                    )
+                }
+            }
+
+            actions.forEach { action ->
+                val statusColor = when (action.status) {
+                    "CONFIRMED" -> electricGreen
+                    "VERIFYING" -> Palette.electricBlue
+                    "SUBMITTED" -> Color(0xFFA855F7)
+                    "IN_PROGRESS" -> Palette.warning
+                    "BLOCKED", "FAILED" -> Palette.danger
+                    else -> Palette.secondary
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Palette.surface.copy(alpha = 0.5f))
+                        .border(0.5.dp, statusColor.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                        .padding(10.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = action.actionType,
+                                style = Type.footnote.semibold,
+                                color = Palette.text
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(statusColor.copy(alpha = 0.2f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = action.status,
+                                    style = Type.caption.semibold.copy(fontSize = 9.sp),
+                                    color = statusColor
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = "Ressource distante : ${action.targetResource} (${action.targetService})",
+                            style = Type.caption.copy(fontSize = 10.5.sp),
+                            color = Palette.secondary
+                        )
+
+                        Text(
+                            text = "Protocole de contrôle : ${action.verificationMethod}",
+                            style = Type.caption.copy(fontSize = 10.sp),
+                            color = Palette.secondary
+                        )
+
+                        if (action.errorMessage != null) {
+                            Text(
+                                text = "Diagnostic d'erreur : ${action.errorMessage}",
+                                style = Type.caption.copy(fontSize = 10.sp),
+                                color = Palette.danger
+                            )
+                        }
                     }
                 }
             }

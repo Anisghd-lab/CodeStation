@@ -107,7 +107,21 @@ data class CamcsMission(
     @SerialName("lastTransitionReason") val lastTransitionReason: String? = null,
     @SerialName("lastTransitionTime") val lastTransitionTime: Double? = null,
     @SerialName("blockedReason") val blockedReason: String? = null,
-    @SerialName("agents") val agents: List<CamcsAgent> = emptyList()
+    @SerialName("agents") val agents: List<CamcsAgent> = emptyList(),
+    @SerialName("externalActions") val externalActions: List<CamcsExternalAction> = emptyList()
+)
+
+@Serializable
+data class CamcsExternalAction(
+    @SerialName("id") val id: String = "",
+    @SerialName("action_type") val actionType: String = "",
+    @SerialName("target_service") val targetService: String = "",
+    @SerialName("target_resource") val targetResource: String = "",
+    @SerialName("status") val status: String = "PLANNED",
+    @SerialName("is_mandatory") val isMandatory: Boolean = true,
+    @SerialName("verification_method") val verificationMethod: String = "",
+    @SerialName("verified_at") val verifiedAt: Double? = null,
+    @SerialName("error_message") val errorMessage: String? = null
 )
 
 @Serializable
@@ -324,4 +338,28 @@ data class CamcsFileResponse(
     @SerialName("content") val content: String = "",
     @SerialName("sizeBytes") val sizeBytes: Long = 0L,
     @SerialName("sha256") val sha256: String = ""
+)
+
+@Serializable
+data class CamcsExternalService(
+    @SerialName("service_id") val serviceId: String = "",
+    @SerialName("name") val name: String = "",
+    @SerialName("endpoint") val endpoint: String = "",
+    @SerialName("auth_type") val authType: String = "",
+    @SerialName("status") val status: String = "NOT_TESTED",
+    @SerialName("is_authenticated") val isAuthenticated: Boolean = false,
+    @SerialName("detected_scopes") val detectedScopes: List<String> = emptyList(),
+    @SerialName("rate_limit_remaining") val rateLimitRemaining: Int? = null,
+    @SerialName("rate_limit_limit") val rateLimitLimit: Int? = null,
+    @SerialName("latency_ms") val latencyMs: Double = 0.0,
+    @SerialName("last_checked") val lastChecked: Double = 0.0,
+    @SerialName("last_error") val lastError: String? = null,
+    @SerialName("capabilities") val capabilities: List<String> = emptyList(),
+    @SerialName("accessible_free_models") val accessibleFreeModels: List<String> = emptyList()
+)
+
+@Serializable
+data class CamcsServicesResponse(
+    @SerialName("ok") val ok: Boolean = true,
+    @SerialName("services") val services: List<CamcsExternalService> = emptyList()
 )

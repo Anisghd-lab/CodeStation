@@ -41,6 +41,13 @@ from camcs.quality_auditor import QualityAuditor
 from camcs.collaboration_hub import CollaborationHub
 from camcs.collective_memory_client import CollectiveMemoryClient
 from camcs.runners.base_runner import CliExecutionResult, BaseCliRunner
+from camcs.external_action_verifier import (
+    ExternalActionVerifier, ExternalActionStatus, DeliverableType, ExternalAction
+)
+from camcs.github_workflow import GitHubWorkflowExecutor
+from camcs.credential_registry import CredentialRegistry
+from camcs.external_service_registry import ExternalServiceRegistry
+from camcs.external_action_executor import ExternalActionExecutor
 
 # Database for CAMCS persistence
 DB_PATH = os.path.expanduser("/root/.codestation/camcs.db")
@@ -343,6 +350,12 @@ class CamcsMission:
         self.blocked_reason: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
+        ext_actions = []
+        try:
+            from camcs.external_action_verifier import ExternalActionVerifier
+            ext_actions = [a.to_dict() for a in ExternalActionVerifier(DB_PATH).get_mission_actions(self.id)]
+        except Exception:
+            pass
         return {
             "id": self.id,
             "title": self.title,
@@ -358,7 +371,8 @@ class CamcsMission:
             "lastTransitionTime": self.last_transition_time,
             "blockedReason": self.blocked_reason,
             "agents": [a.to_dict() for a in self.agents],
-            "tasks": [t.to_dict() for t in self.tasks]
+            "tasks": [t.to_dict() for t in self.tasks],
+            "externalActions": ext_actions
         }
 
 
@@ -374,6 +388,11 @@ class CamcsOrchestrationEngine:
         self.quality_auditor = QualityAuditor(DB_PATH)
         self.collab_hub = CollaborationHub(DB_PATH)
         self.memory_client = CollectiveMemoryClient()
+        self.external_verifier = ExternalActionVerifier(DB_PATH)
+        self.github_executor = GitHubWorkflowExecutor(self.external_verifier)
+        self.credential_registry = CredentialRegistry()
+        self.external_services = ExternalServiceRegistry(DB_PATH)
+        self.external_executor = ExternalActionExecutor(DB_PATH)
         self.active_missions: Dict[str, CamcsMission] = {}
         self.event_subscribers: List[queue.Queue] = []
         self._lock = threading.RLock()
@@ -1106,6 +1125,59 @@ class CamcsOrchestrationEngine:
                     agent.pid = pid
                     self.emit_event(mission.id, "cli.started", f"Processus démarré (PID: {pid})", agent_id=agent.id, task_id=task.id, payload={"pid": pid})
 
+                # Check if this task is an External Action (e.g. GitHub Repository, Remote API, Cloudflare)
+                ext_type = getattr(task, "external_action_type", None)
+                deliv_type = getattr(task, "deliverable_type", "")
+                if ext_type or deliv_type in ("REMOTE_REPOSITORY", "API_RESOURCE", "DEPLOYMENT"):
+                    action_type = ext_type or ("GITHUB_CREATE_REPO" if deliv_type == "REMOTE_REPOSITORY" else "OPENROUTER_GENERATE_FREE")
+                    target_res = getattr(task, "external_target", None) or "CAMCS"
+                    svc = "github" if "GITHUB" in action_type else ("openrouter" if "OPENROUTER" in action_type else "cloudflare_r2")
+
+                    self.emit_event(
+                        mission.id, "external_action.started",
+                        f"Démarrage de l'action externe {action_type} pour {target_res}...",
+                        agent_id=agent.id, task_id=task.id
+                    )
+
+                    ext_act = self.external_verifier.register_action(
+                        mission_id=mission.id,
+                        task_id=task.id,
+                        action_type=action_type,
+                        target_service=svc,
+                        target_resource=target_res,
+                        is_mandatory=True,
+                        parameters={"repo_name": target_res, "workspace_dir": mission_dir}
+                    )
+
+                    ok_act, act_details, act_err = self.external_executor.execute(ext_act, context={"workspace_dir": mission_dir})
+                    if not ok_act:
+                        err_msg = f"Échec action externe {action_type} : {act_err}"
+                        self.record_task_transition(mission.id, task.id, TaskState.FAILED, error_message=err_msg)
+                        self.emit_event(mission.id, "external_action.failed", err_msg, agent_id=agent.id, task_id=task.id)
+                        self.record_mission_transition(mission.id, MissionState.BLOCKED, f"Action externe obligatoire bloquée : {act_err}", orchestration_phase="BLOCKED")
+                        return
+
+                    self.emit_event(
+                        mission.id, "external_action.confirmed",
+                        f"Action externe {action_type} confirmée sur {target_res}",
+                        agent_id=agent.id, task_id=task.id, payload=act_details
+                    )
+                    self.deliverable_mgr.register_deliverable(
+                        mission_id=mission.id,
+                        task_id=task.id,
+                        agent_id=agent.id,
+                        agent_name=agent.name,
+                        file_path=act_details.get("url") or act_details.get("endpoint") or target_res,
+                        doc_type=f"external_action:{action_type}",
+                        description=f"Action externe certifiée {target_res}",
+                        producing_cli="external_api_executor",
+                        validation_status="VERIFIED",
+                        validation_details=json.dumps(act_details)
+                    )
+                    self.record_task_transition(mission.id, task.id, TaskState.COMPLETED, progress=100, result_summary=f"Action externe {target_res} confirmée")
+                    completed_task_ids.add(task.id)
+                    continue
+
                 res, engine_name = self.execute_with_failover(
                     mission=mission,
                     agent=agent,
@@ -1227,6 +1299,19 @@ class CamcsOrchestrationEngine:
             ag.active_task_id = None
             ag.current_subtask = "Mission accomplie avec succès"
             self._save_agent(ag)
+
+        # Double gate: TASK_COMPLETED vs OBJECTIVE_COMPLETED
+        # Invariant: All mandatory external actions must be CONFIRMED on remote service
+        all_ext_ok, unconfirmed = self.external_verifier.are_all_mandatory_actions_confirmed(mission.id)
+        if not all_ext_ok:
+            reason = f"OBJECTIVE_NOT_COMPLETED : Actions externes obligatoires non confirmées sur le service distant : {unconfirmed}"
+            self.record_mission_transition(
+                mission.id, MissionState.BLOCKED,
+                reason,
+                orchestration_phase="BLOCKED"
+            )
+            self.emit_event(mission.id, "mission.blocked", reason, payload={"unconfirmed": unconfirmed})
+            return
 
         # Invariant: COMPLETED strictly sets progress = 100
         self.record_mission_transition(
@@ -1565,6 +1650,40 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
                 query = urllib.parse.unquote(self.path.split("?q=")[1].split("&")[0])
             results = ENGINE.query_collective_memory(query)
             self._send_json(200, {"ok": True, "query": query, "count": len(results), "results": results})
+        elif self.path == "/api/camcs/services" or self.path == "/api/camcs/services/":
+            services = ENGINE.external_services.get_services_status(force_refresh=False)
+            self._send_json(200, {"ok": True, "services": services})
+        elif self.path == "/api/camcs/services/probe":
+            services = ENGINE.external_services.get_services_status(force_refresh=True)
+            self._send_json(200, {"ok": True, "services": services, "refreshed": True})
+        elif self.path == "/api/camcs/credentials":
+            creds = ENGINE.credential_registry.list_safe_credentials()
+            self._send_json(200, {"ok": True, "credentials": creds})
+        elif self.path == "/api/camcs/actions" or self.path.startswith("/api/camcs/actions?"):
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            m_id = params.get("missionId", [None])[0]
+            if m_id:
+                actions = [a.to_dict() for a in ENGINE.external_verifier.get_mission_actions(m_id)]
+            else:
+                conn = sqlite3.connect(DB_PATH)
+                cur = conn.cursor()
+                cur.execute("SELECT * FROM external_actions ORDER BY created_at DESC")
+                rows = cur.fetchall()
+                conn.close()
+                actions = []
+                for r in rows:
+                    act = ExternalAction(
+                        id=r[0], mission_id=r[1], task_id=r[2], action_type=r[3],
+                        target_service=r[4], target_resource=r[5],
+                        status=ExternalActionStatus(r[6]) if r[6] in ExternalActionStatus._value2member_map_ else ExternalActionStatus.NOT_VERIFIED,
+                        is_mandatory=bool(r[7]), parameters=json.loads(r[8] or "{}"),
+                        execution_command=r[9], exit_code=r[10], verification_method=r[11],
+                        verified_at=r[12], verification_details=json.loads(r[13] or "{}"),
+                        error_message=r[14], created_at=r[15], updated_at=r[16]
+                    )
+                    actions.append(act.to_dict())
+            self._send_json(200, {"ok": True, "actions": actions})
         else:
             self._send_json(404, {"error": "Endpoint non trouvé"})
 
@@ -1613,6 +1732,35 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
         elif self.path in ["/api/camcs/missions/clear", "/api/camcs/missions/delete_all"]:
             ok = ENGINE.delete_all_missions()
             self._send_json(200, {"ok": ok, "message": "Toutes les missions précédentes ont été supprimées avec succès."})
+        elif self.path == "/api/camcs/services/probe":
+            services = ENGINE.external_services.get_services_status(force_refresh=True)
+            self._send_json(200, {"ok": True, "services": services, "refreshed": True})
+        elif self.path == "/api/camcs/actions/execute":
+            action_id = data.get("actionId")
+            action_type = data.get("actionType", "GITHUB_CREATE_REPO")
+            mission_id = data.get("missionId", "manual")
+            task_id = data.get("taskId", "manual")
+            target_service = data.get("targetService", "github")
+            target_resource = data.get("targetResource", "CAMCS")
+            parameters = data.get("parameters", {})
+
+            act = ExternalAction(
+                id=action_id or f"ext-{uuid.uuid4().hex[:8]}",
+                mission_id=mission_id,
+                task_id=task_id,
+                action_type=action_type,
+                target_service=target_service,
+                target_resource=target_resource,
+                parameters=parameters
+            )
+            ENGINE.external_verifier.save_action(act)
+            ok, details, err = ENGINE.external_executor.execute(act, context=data.get("context", {}))
+            self._send_json(200 if ok else 400, {
+                "ok": ok,
+                "action": act.to_dict(),
+                "details": details,
+                "error": err
+            })
         else:
             self._send_json(404, {"error": "Endpoint non trouvé"})
 

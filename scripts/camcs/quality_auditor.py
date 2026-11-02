@@ -32,19 +32,38 @@ class QualityAuditor:
         cur = conn.cursor()
 
         for d in deliverables:
-            fpath = d.get("filePath", "")
+            doc_type = d.get("docType", "") or d.get("doc_type", "")
+            fpath = d.get("filePath", "") or d.get("file_path", "")
             expected_sha = d.get("sha256", "")
-            exists = os.path.isfile(fpath)
-            size = os.path.getsize(fpath) if exists else 0
-            cur_sha = compute_file_sha256(fpath) if exists else ""
+            
+            # Special Handling for REMOTE_REPOSITORY: Must be verified remotely on GitHub
+            if doc_type.startswith("github_repo:") or "remote_repo" in doc_type.lower():
+                repo_target = doc_type.split(":", 1)[1] if ":" in doc_type else "CAMCS"
+                if "/" not in repo_target:
+                    repo_target = f"Anisghd-lab/{repo_target}"
+                from .external_action_verifier import ExternalActionVerifier
+                ext_verifier = ExternalActionVerifier(self.db_path)
+                is_valid, repo_meta, err = ext_verifier.verify_github_repo(repo_target)
+                status = "VERIFIED" if is_valid else "REJECTED"
+                details = (
+                    f"Validation distante GitHub réussie : {repo_meta.get('url')} (visibilité: {repo_meta.get('visibility')}, branche: {repo_meta.get('defaultBranch')})"
+                    if is_valid else
+                    f"Échec de validation distante GitHub : {err}"
+                )
+                size = 0
+                cur_sha = repo_meta.get("url", "")
+            else:
+                exists = os.path.isfile(fpath) or os.path.isdir(fpath)
+                size = os.path.getsize(fpath) if os.path.isfile(fpath) else 0
+                cur_sha = compute_file_sha256(fpath) if os.path.isfile(fpath) else ""
 
-            is_valid = exists and size > 0 and (cur_sha == expected_sha or not expected_sha)
-            status = "VERIFIED" if is_valid else "REJECTED"
-            details = (
-                f"Validation physique réussie : {size} octets, SHA-256: {cur_sha[:16]}..."
-                if is_valid else
-                f"Échec d'intégrité : fichier manquant ou SHA-256 discordant ({cur_sha} vs {expected_sha})"
-            )
+                is_valid = exists and (size > 0 or os.path.isdir(fpath)) and (cur_sha == expected_sha or not expected_sha or os.path.isdir(fpath))
+                status = "VERIFIED" if is_valid else "REJECTED"
+                details = (
+                    f"Validation physique réussie : {size} octets, SHA-256: {cur_sha[:16]}..."
+                    if is_valid else
+                    f"Échec d'intégrité : fichier manquant ou SHA-256 discordant ({cur_sha} vs {expected_sha})"
+                )
 
             if is_valid:
                 verified_count += 1
