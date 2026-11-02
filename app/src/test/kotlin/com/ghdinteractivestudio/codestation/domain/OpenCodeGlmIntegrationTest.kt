@@ -2,6 +2,7 @@ package com.ghdinteractivestudio.codestation.domain
 
 import com.ghdinteractivestudio.codestation.domain.model.Bot
 import com.ghdinteractivestudio.codestation.domain.model.BotStatus
+import com.ghdinteractivestudio.codestation.domain.model.Conversation
 import com.ghdinteractivestudio.codestation.domain.model.ProviderType
 import com.ghdinteractivestudio.codestation.domain.repository.BotRepository
 import com.ghdinteractivestudio.codestation.domain.repository.ChatRepository
