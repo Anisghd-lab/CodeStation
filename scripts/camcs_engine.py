@@ -871,7 +871,7 @@ class CamcsOrchestrationEngine:
         self.memory_client = CollectiveMemoryClient()
         self.active_missions: Dict[str, CamcsMission] = {}
         self.event_subscribers: List[queue.Queue] = []
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._load_missions_from_db()
 
     def _load_missions_from_db(self):
