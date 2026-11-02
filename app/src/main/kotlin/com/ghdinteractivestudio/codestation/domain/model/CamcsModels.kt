@@ -100,6 +100,7 @@ data class CamcsMission(
     @SerialName("governanceMode") val governanceMode: String = "HYBRID",
     @SerialName("status") val status: String = "INITIALIZING",
     @SerialName("progress") val progress: Int = 0,
+    @SerialName("orchestrationPhase") val orchestrationPhase: String = "PLANNING",
     @SerialName("createdAt") val createdAt: Double = 0.0,
     @SerialName("startedAt") val startedAt: Double? = null,
     @SerialName("completedAt") val completedAt: Double? = null,

@@ -1,6 +1,13 @@
+import os
+import sys
 import time
 import unittest
-from scripts.camcs_engine import CamcsMission, CamcsEngine
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from camcs_engine import CamcsMission, CamcsEngine
+except ImportError:
+    from scripts.camcs_engine import CamcsMission, CamcsEngine
 
 class TestMissionOrdering(unittest.TestCase):
     def test_missions_sorted_descending(self):

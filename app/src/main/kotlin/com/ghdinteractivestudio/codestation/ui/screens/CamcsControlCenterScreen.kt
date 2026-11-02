@@ -1124,19 +1124,24 @@ private fun MissionMasterCard(
                 }
             }
 
-            // Detailed Metrics Grid (Agents, Sous-tâches, En cours, En attente)
+            // Detailed Metrics Grid (Agents actifs/terminés, Tâches terminées, En cours, En attente)
             val totalSubtasks = mission.agents.sumOf { it.tasks.size }
             val completedSubtasks = mission.agents.sumOf { ag -> ag.tasks.count { it.status == "COMPLETED" } }
             val workingSubtasks = mission.agents.sumOf { ag -> ag.tasks.count { it.status == "WORKING" || it.status == "RUNNING" } }
-            val pendingSubtasks = mission.agents.sumOf { ag -> ag.tasks.count { it.status == "PENDING" || it.status == "QUEUED" } }
+            val pendingSubtasks = mission.agents.sumOf { ag -> ag.tasks.count { it.status == "PENDING" || it.status == "QUEUED" || it.status == "WAITING_FOR_DEPENDENCY" } }
             val activeAgentsCount = mission.agents.count { it.status in listOf("WORKING", "RUNNING", "STREAMING", "ANALYZING", "VALIDATING") }
+            val completedAgentsCount = mission.agents.count { it.status == "COMPLETED" }
+            val isMissionDone = mission.status == "COMPLETED" || mission.progress == 100
+
+            val agentsMetricLabel = if (isMissionDone) "Agents prêts" else "Agents actifs"
+            val agentsMetricValue = if (isMissionDone) "$completedAgentsCount/${mission.agents.size}" else "$activeAgentsCount/${mission.agents.size}"
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                MetricCapsule(label = "Agents", value = "$activeAgentsCount/${mission.agents.size}", modifier = Modifier.weight(1f))
-                MetricCapsule(label = "Terminées", value = "$completedSubtasks/$totalSubtasks", modifier = Modifier.weight(1f), isSuccess = completedSubtasks == totalSubtasks && totalSubtasks > 0)
+                MetricCapsule(label = agentsMetricLabel, value = agentsMetricValue, modifier = Modifier.weight(1f), isSuccess = isMissionDone && completedAgentsCount == mission.agents.size)
+                MetricCapsule(label = "Tâches", value = "$completedSubtasks/$totalSubtasks", modifier = Modifier.weight(1f), isSuccess = completedSubtasks == totalSubtasks && totalSubtasks > 0)
                 MetricCapsule(label = "En cours", value = "$workingSubtasks", modifier = Modifier.weight(1f))
                 MetricCapsule(label = "En attente", value = "$pendingSubtasks", modifier = Modifier.weight(1f))
             }
@@ -1239,25 +1244,26 @@ private fun DispatchingPipelineCard(mission: CamcsMission) {
     val dark = LocalDark.current
     val electricGreen = if (dark) Color(0xFF00E676) else Color(0xFF059669)
 
-    val isPlanDone = mission.status !in listOf("CREATED", "PLANNING") && mission.status != "FAILED" && mission.status != "CANCELLED" || mission.progress >= 30
-    val isPlanActive = mission.status == "PLANNING"
+    val phase = mission.orchestrationPhase.uppercase()
 
-    val isDispatchDone = mission.status !in listOf("CREATED", "PLANNING", "DISPATCHING") && mission.status != "FAILED" && mission.status != "CANCELLED" || mission.progress >= 60
-    val isDispatchActive = mission.status == "DISPATCHING"
+    val isPlanDone = phase in listOf("DISPATCHING", "EXECUTION", "VALIDATION", "COMPLETED")
+    val isPlanActive = phase == "PLANNING" || mission.status == "PLANNING"
 
-    val isExecDone = mission.status in listOf("VALIDATING", "COMPLETED") || mission.progress >= 95
-    val isExecActive = mission.status in listOf("QUEUED", "STARTING", "RUNNING", "STREAMING", "WAITING_FOR_AGENT", "WAITING_FOR_APPROVAL", "WORKING") || (mission.progress in 31..94 && mission.status != "DISPATCHING" && mission.status != "PLANNING")
+    val isDispatchDone = phase in listOf("EXECUTION", "VALIDATION", "COMPLETED")
+    val isDispatchActive = phase == "DISPATCHING" || mission.status == "DISPATCHING"
 
-    val isResultDone = mission.status == "COMPLETED" || mission.progress == 100
-    val isResultActive = mission.status == "VALIDATING" || (mission.progress in 95..99)
+    val isExecDone = phase in listOf("VALIDATION", "COMPLETED")
+    val isExecActive = phase == "EXECUTION" || mission.status in listOf("RUNNING", "STREAMING", "WORKING")
+
+    val isResultDone = phase == "COMPLETED" && mission.status == "COMPLETED" && mission.progress == 100
+    val isResultActive = phase == "VALIDATION" || mission.status == "VALIDATING"
 
     val phaseSubtitle = when {
-        mission.status == "COMPLETED" || mission.progress == 100 -> "Validation finale"
-        mission.status == "VALIDATING" -> "Contrôle qualité & validation"
-        mission.status in listOf("RUNNING", "STREAMING", "WORKING") -> "Phase exécution réelle"
-        mission.status in listOf("STARTING", "QUEUED") -> "Initialisation agents"
-        mission.status == "DISPATCHING" -> "Affectation des tâches"
-        mission.status == "PLANNING" -> "Génération DAG & Planification"
+        mission.status == "COMPLETED" && mission.progress == 100 -> "Mission 100% validée"
+        phase == "VALIDATION" || mission.status == "VALIDATING" -> "Contrôle qualité & validation"
+        phase == "EXECUTION" || mission.status in listOf("RUNNING", "STREAMING", "WORKING") -> "Exécution réelle des tâches DAG"
+        phase == "DISPATCHING" || mission.status == "DISPATCHING" -> "Affectation des tâches DAG"
+        phase == "PLANNING" || mission.status == "PLANNING" -> "Génération DAG & Planification"
         mission.status == "PAUSED" -> "Mission en pause"
         mission.status == "CANCELLED" -> "Mission interrompue"
         mission.status == "FAILED" -> "Erreur d'exécution"
@@ -1471,7 +1477,8 @@ private fun LiveAgentCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        val isAgentCancellable = isCancellableState(agent.status) && !isTerminalState(agent.status)
+                        val isAgentCancellable = agent.status in listOf("RUNNING", "STREAMING", "STARTING", "WORKING") &&
+                                (agent.pid != null || agent.activeTaskId != null) && !isTerminalState(agent.status)
                         if (isAgentCancellable) {
                             Box(
                                 modifier = Modifier
@@ -2280,7 +2287,7 @@ private fun getStatusVisual(status: String, dark: Boolean): StatusVisual {
     val cyanColor = Color(0xFF06B6D4)
 
     return when (status.uppercase()) {
-        "CREATED" -> StatusVisual("CRÉÉ", Palette.secondary, Palette.surface)
+        "CREATED", "INITIALIZING", "ASSIGNED" -> StatusVisual("INITIALISATION", Palette.secondary, Palette.surface)
         "PLANNING" -> StatusVisual("PLANIFICATION", cyanColor, cyanColor.copy(alpha = 0.16f))
         "DISPATCHING" -> StatusVisual("DISPATCHING", purpleColor, purpleColor.copy(alpha = 0.16f))
         "QUEUED" -> StatusVisual("EN FILE", Palette.secondary, Palette.surface)
@@ -2288,8 +2295,11 @@ private fun getStatusVisual(status: String, dark: Boolean): StatusVisual {
         "RUNNING", "WORKING" -> StatusVisual("EN COURS", electricGreen, electricGreen.copy(alpha = 0.16f))
         "STREAMING" -> StatusVisual("STREAMING", electricBlue, electricBlue.copy(alpha = 0.2f))
         "WAITING_FOR_AGENT" -> StatusVisual("ATTENTE AGENT", warningColor, warningColor.copy(alpha = 0.16f))
+        "WAITING_FOR_DEPENDENCY" -> StatusVisual("ATTENTE DÉPENDANCES", warningColor, warningColor.copy(alpha = 0.16f))
+        "WAITING_FOR_INPUT" -> StatusVisual("ATTENTE ENTRÉE", warningColor, warningColor.copy(alpha = 0.16f))
         "WAITING_FOR_APPROVAL" -> StatusVisual("ATTENTE VALIDATION", warningColor, warningColor.copy(alpha = 0.22f))
         "VALIDATING", "ANALYZING" -> StatusVisual("VALIDATION", purpleColor, purpleColor.copy(alpha = 0.16f))
+        "CANCEL_REQUESTED" -> StatusVisual("ANNULATION...", dangerColor, dangerColor.copy(alpha = 0.22f))
         "COMPLETED" -> StatusVisual("TERMINÉ", electricGreen, electricGreen.copy(alpha = 0.2f))
         "FAILED" -> StatusVisual("ÉCHEC", dangerColor, dangerColor.copy(alpha = 0.2f))
         "BLOCKED" -> StatusVisual("BLOQUÉ", dangerColor, dangerColor.copy(alpha = 0.22f))
@@ -2303,6 +2313,8 @@ private fun isCancellableState(status: String?): Boolean {
     if (status == null) return false
     return status.uppercase() in listOf(
         "CREATED",
+        "INITIALIZING",
+        "ASSIGNED",
         "PLANNING",
         "DISPATCHING",
         "QUEUED",
@@ -2310,6 +2322,8 @@ private fun isCancellableState(status: String?): Boolean {
         "RUNNING",
         "STREAMING",
         "WAITING_FOR_AGENT",
+        "WAITING_FOR_DEPENDENCY",
+        "WAITING_FOR_INPUT",
         "WAITING_FOR_APPROVAL",
         "VALIDATING",
         "ANALYZING",
