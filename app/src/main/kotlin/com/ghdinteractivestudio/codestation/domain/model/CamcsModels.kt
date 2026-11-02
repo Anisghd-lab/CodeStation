@@ -31,7 +31,11 @@ data class CamcsSubtask(
     @SerialName("title") val title: String,
     @SerialName("status") val status: String = "PENDING",
     @SerialName("weight") val weight: Int = 25,
-    @SerialName("criteria") val criteria: String? = null
+    @SerialName("criteria") val criteria: String? = null,
+    @SerialName("agentId") val agentId: String? = null,
+    @SerialName("pid") val pid: Int? = null,
+    @SerialName("startedAt") val startedAt: Double? = null,
+    @SerialName("completedAt") val completedAt: Double? = null
 )
 
 @Serializable
@@ -48,6 +52,11 @@ data class CamcsAgent(
     @SerialName("currentSubtask") val currentSubtask: String = "Initialisation",
     @SerialName("progress") val progress: Int = 0,
     @SerialName("status") val status: String = "INITIALIZING",
+    @SerialName("pid") val pid: Int? = null,
+    @SerialName("startedAt") val startedAt: Double? = null,
+    @SerialName("lastActivityAt") val lastActivityAt: Double? = null,
+    @SerialName("lastOutput") val lastOutput: String? = null,
+    @SerialName("activeTaskId") val activeTaskId: String? = null,
     @SerialName("tasks") val tasks: List<CamcsSubtask> = emptyList()
 )
 
@@ -92,8 +101,39 @@ data class CamcsMission(
     @SerialName("status") val status: String = "INITIALIZING",
     @SerialName("progress") val progress: Int = 0,
     @SerialName("createdAt") val createdAt: Double = 0.0,
+    @SerialName("startedAt") val startedAt: Double? = null,
     @SerialName("completedAt") val completedAt: Double? = null,
+    @SerialName("lastTransitionReason") val lastTransitionReason: String? = null,
+    @SerialName("lastTransitionTime") val lastTransitionTime: Double? = null,
+    @SerialName("blockedReason") val blockedReason: String? = null,
     @SerialName("agents") val agents: List<CamcsAgent> = emptyList()
+)
+
+@Serializable
+data class CamcsStopTaskRequest(
+    @SerialName("missionId") val missionId: String,
+    @SerialName("taskId") val taskId: String? = null,
+    @SerialName("agentId") val agentId: String? = null
+)
+
+@Serializable
+data class CamcsStateTransition(
+    @SerialName("id") val id: Long = 0,
+    @SerialName("agentId") val agentId: String? = null,
+    @SerialName("taskId") val taskId: String? = null,
+    @SerialName("previousState") val previousState: String = "",
+    @SerialName("currentState") val currentState: String = "",
+    @SerialName("eventSource") val eventSource: String = "",
+    @SerialName("reason") val reason: String = "",
+    @SerialName("durationMs") val durationMs: Long = 0,
+    @SerialName("createdAt") val createdAt: Double = 0.0
+)
+
+@Serializable
+data class CamcsTransitionsResponse(
+    @SerialName("ok") val ok: Boolean = true,
+    @SerialName("missionId") val missionId: String = "",
+    @SerialName("transitions") val transitions: List<CamcsStateTransition> = emptyList()
 )
 
 @Serializable

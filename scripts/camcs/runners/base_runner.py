@@ -72,7 +72,8 @@ class BaseCliRunner(ABC):
         prompt: str,
         cwd: str,
         timeout: int = 120,
-        output_callback: Optional[Callable[[str, str], None]] = None
+        output_callback: Optional[Callable[[str, str], None]] = None,
+        pid_callback: Optional[Callable[[int], None]] = None
     ) -> CliExecutionResult:
         """Execute a task non-interactively using real OS process."""
         pass

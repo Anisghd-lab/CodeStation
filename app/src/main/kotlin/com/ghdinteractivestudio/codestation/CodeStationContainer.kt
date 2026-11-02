@@ -32,6 +32,7 @@ interface AppContainer {
     val eventStreamClient: com.ghdinteractivestudio.codestation.data.remote.CodeStationEventStreamClient
     val approvalDao: com.ghdinteractivestudio.codestation.data.local.ApprovalDao
     val memoryRepository: MemoryRepository
+    val camcsRepository: com.ghdinteractivestudio.codestation.domain.repository.CamcsRepository
 }
 
 class CodeStationContainer(override val context: Context) : AppContainer {
@@ -138,6 +139,10 @@ class CodeStationContainer(override val context: Context) : AppContainer {
             },
             serverRepository = serverRepository
         )
+    }
+
+    override val camcsRepository: com.ghdinteractivestudio.codestation.domain.repository.CamcsRepository by lazy {
+        com.ghdinteractivestudio.codestation.data.local.CamcsRepositoryImpl()
     }
 
     override val eventStreamClient: com.ghdinteractivestudio.codestation.data.remote.CodeStationEventStreamClient by lazy {

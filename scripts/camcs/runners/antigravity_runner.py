@@ -58,7 +58,8 @@ class AntigravityRunner(BaseCliRunner):
         prompt: str,
         cwd: str,
         timeout: int = 150,
-        output_callback: Optional[Callable[[str, str], None]] = None
+        output_callback: Optional[Callable[[str, str], None]] = None,
+        pid_callback: Optional[Callable[[int], None]] = None
     ) -> CliExecutionResult:
         os.makedirs(cwd, exist_ok=True)
         snapshot_before = self.take_directory_snapshot(cwd)
@@ -85,6 +86,11 @@ class AntigravityRunner(BaseCliRunner):
                 bufsize=1
             )
             self.active_processes[task_id] = proc
+            if pid_callback:
+                try:
+                    pid_callback(proc.pid)
+                except Exception:
+                    pass
 
             def read_stream(stream, target_list, stream_type):
                 if not stream:

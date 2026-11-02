@@ -122,6 +122,10 @@ class MainActivity : ComponentActivity() {
             if (botId != null) {
                 currentNavController?.navigate(Screen.Chat.createRoute(botId))
             }
+        } else if (dataUri.startsWith("codestation://camcs")) {
+            val missionId = intent.getStringExtra("missionId")
+                ?: android.net.Uri.parse(dataUri).getQueryParameter("missionId")
+            currentNavController?.navigate(Screen.CamcsControlCenter.createRoute(missionId))
         }
     }
 }

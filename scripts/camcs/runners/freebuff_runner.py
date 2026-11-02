@@ -57,7 +57,8 @@ class FreebuffRunner(BaseCliRunner):
         prompt: str,
         cwd: str,
         timeout: int = 30,
-        output_callback: Optional[Callable[[str, str], None]] = None
+        output_callback: Optional[Callable[[str, str], None]] = None,
+        pid_callback: Optional[Callable[[int], None]] = None
     ) -> CliExecutionResult:
         # Freebuff v0.2.35 lacks non-interactive execution flag
         msg = (

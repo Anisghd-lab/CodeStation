@@ -195,6 +195,21 @@ def init_db():
             FOREIGN KEY(mission_id) REFERENCES missions(id)
         )
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS state_transitions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mission_id TEXT,
+            agent_id TEXT,
+            task_id TEXT,
+            previous_state TEXT,
+            current_state TEXT,
+            event_source TEXT,
+            reason TEXT,
+            duration_in_prev_state_ms INTEGER,
+            created_at REAL,
+            FOREIGN KEY(mission_id) REFERENCES missions(id)
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -203,6 +218,35 @@ init_db()
 # ==============================================================================
 # 0. PERSISTENCE & DELIVERABLES HELPERS
 # ==============================================================================
+
+def get_mission_state_transitions(mission_id: str) -> List[Dict[str, Any]]:
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, agent_id, task_id, previous_state, current_state, event_source, reason, duration_in_prev_state_ms, created_at
+            FROM state_transitions
+            WHERE mission_id = ?
+            ORDER BY created_at ASC
+        """, (mission_id,))
+        rows = cur.fetchall()
+        transitions = []
+        for r in rows:
+            transitions.append({
+                "id": r[0],
+                "agentId": r[1],
+                "taskId": r[2],
+                "previousState": r[3],
+                "currentState": r[4],
+                "eventSource": r[5],
+                "reason": r[6],
+                "durationMs": r[7],
+                "createdAt": r[8]
+            })
+        conn.close()
+        return transitions
+    except Exception:
+        return []
 
 def compute_file_sha256(file_path: str) -> str:
     if not os.path.exists(file_path) or not os.path.isfile(file_path):
@@ -785,7 +829,12 @@ class CamcsAgent:
         self.objective = objective
         self.current_subtask = "Initialisation du contexte de travail"
         self.progress = 0
-        self.status = "INITIALIZING"  # INITIALIZING, ANALYZING, WORKING, VALIDATING, COMPLETED, FAILED
+        self.status = "CREATED"  # Real state: CREATED, PLANNING, DISPATCHING, QUEUED, STARTING, RUNNING, STREAMING, WAITING_FOR_AGENT, WAITING_FOR_APPROVAL, VALIDATING, COMPLETED, FAILED, BLOCKED, CANCELLED
+        self.pid: Optional[int] = None
+        self.started_at: Optional[float] = None
+        self.last_activity_at: float = time.time()
+        self.last_output: str = ""
+        self.active_task_id: Optional[str] = None
         self.tasks: List[Dict[str, Any]] = []
 
 
@@ -795,11 +844,15 @@ class CamcsMission:
         self.title = title
         self.objective = objective
         self.governance_mode = governance_mode
-        self.status = "INITIALIZING"  # INITIALIZING, WORKING, PAUSED, COMPLETED, FAILED
+        self.status = "CREATED"  # Real state: CREATED, PLANNING, DISPATCHING, QUEUED, STARTING, RUNNING, STREAMING, WAITING_FOR_AGENT, WAITING_FOR_APPROVAL, VALIDATING, COMPLETED, FAILED, BLOCKED, CANCELLED
         self.progress = 0
         self.agents: List[CamcsAgent] = []
         self.created_at = time.time()
-        self.completed_at = None
+        self.started_at: Optional[float] = None
+        self.completed_at: Optional[float] = None
+        self.last_transition_reason: str = "Mission créée"
+        self.last_transition_time: float = time.time()
+        self.blocked_reason: Optional[str] = None
 
 
 class CamcsOrchestrationEngine:
@@ -844,6 +897,15 @@ class CamcsOrchestrationEngine:
                 m.progress = prog
                 m.created_at = created_at
                 m.completed_at = comp_at
+                if cfg:
+                    try:
+                        cfg_dict = json.loads(cfg)
+                        m.started_at = cfg_dict.get("startedAt")
+                        m.last_transition_reason = cfg_dict.get("lastTransitionReason", "État restauré")
+                        m.last_transition_time = cfg_dict.get("lastTransitionTime", created_at)
+                        m.blocked_reason = cfg_dict.get("blockedReason")
+                    except Exception:
+                        pass
 
                 cur.execute("""
                     SELECT id, name, role, shape, color, cli_id, provider_id, model_id, objective, current_subtask, progress, status
@@ -856,7 +918,7 @@ class CamcsOrchestrationEngine:
                     ag = CamcsAgent(ag_id, m_id, name, role, shape, color, cli_id, prov_id, mod_id, ag_obj)
                     ag.current_subtask = cur_sub or ""
                     ag.progress = ag_prog or (100 if m.status == "COMPLETED" else 0)
-                    ag.status = ag_stat or ("COMPLETED" if m.status == "COMPLETED" else "INITIALIZING")
+                    ag.status = ag_stat or ("COMPLETED" if m.status == "COMPLETED" else "CREATED")
                     if "Analyse" in role or "Architecte" in name:
                         ag.tasks = [
                             {"id": f"{ag_id}-1", "title": "Analyse de la demande utilisateur", "status": "COMPLETED" if ag.progress >= 30 else "PENDING", "weight": 30, "criteria": "Rapport architectural validé"},
@@ -931,6 +993,118 @@ class CamcsOrchestrationEngine:
             for d in dead:
                 self.event_subscribers.remove(d)
 
+    def record_state_transition(
+        self,
+        mission_id: str,
+        new_state: str,
+        reason: str,
+        agent_id: Optional[str] = None,
+        task_id: Optional[str] = None,
+        event_source: str = "CAMCS_ENGINE"
+    ):
+        target_agent = None
+        with self._lock:
+            m = self.active_missions.get(mission_id)
+            if not m:
+                return
+
+            now = time.time()
+            prev_state = m.status
+            prev_time = getattr(m, "last_transition_time", m.created_at) or m.created_at
+            duration_ms = int((now - prev_time) * 1000)
+
+            # Update mission state
+            m.status = new_state
+            m.last_transition_reason = reason
+            m.last_transition_time = now
+            if new_state in ["STARTING", "RUNNING"] and not getattr(m, "started_at", None):
+                m.started_at = now
+            if new_state in ["COMPLETED", "FAILED", "CANCELLED"]:
+                m.completed_at = now
+
+            if agent_id:
+                for ag in m.agents:
+                    if ag.id == agent_id:
+                        ag.status = new_state
+                        ag.last_activity_at = now
+                        if new_state in ["STARTING", "RUNNING"] and not getattr(ag, "started_at", None):
+                            ag.started_at = now
+                        target_agent = ag
+                        break
+
+            # Persist to state_transitions
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                cur = conn.cursor()
+                cur.execute("""
+                    INSERT INTO state_transitions (mission_id, agent_id, task_id, previous_state, current_state, event_source, reason, duration_in_prev_state_ms, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (mission_id, agent_id, task_id, prev_state, new_state, event_source, reason, duration_ms, now))
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+
+            self._save_mission_state(m)
+
+        # Emit real-time SSE event
+        payload = {
+            "missionId": mission_id,
+            "agentId": agent_id,
+            "taskId": task_id,
+            "previousState": prev_state,
+            "currentState": new_state,
+            "reason": reason,
+            "durationMs": duration_ms,
+            "eventSource": event_source,
+            "progress": m.progress
+        }
+        if target_agent and getattr(target_agent, "pid", None):
+            payload["pid"] = target_agent.pid
+
+        self.emit_event(
+            mission_id=mission_id,
+            event_type="agent.status_changed" if agent_id else "mission.status_changed",
+            message=f"[{new_state}] {reason}",
+            agent_id=agent_id,
+            payload=payload
+        )
+
+    def stop_task(self, mission_id: str, task_id: Optional[str] = None, agent_id: Optional[str] = None) -> bool:
+        """
+        Immediately stops a running task or agent and terminates its OS process tree.
+        """
+        with self._lock:
+            m = self.active_missions.get(mission_id)
+            if not m:
+                return False
+
+            if task_id:
+                self.process_manager.cancel_task(task_id)
+
+            for ag in m.agents:
+                if (agent_id and ag.id == agent_id) or (ag.active_task_id and ag.active_task_id == task_id):
+                    ag.status = "CANCELLED"
+                    ag.current_subtask = f"Tâche {task_id or 'active'} arrêtée par l'utilisateur."
+                    if ag.active_task_id:
+                        self.process_manager.cancel_task(ag.active_task_id)
+                    ag.pid = None
+                    for t in ag.tasks:
+                        if task_id and t.get("id") == task_id:
+                            t["status"] = "CANCELLED"
+                        elif not task_id and t.get("status") in ["RUNNING", "WORKING", "STARTING"]:
+                            t["status"] = "CANCELLED"
+
+            active_running = [ag for ag in m.agents if ag.status in ["STARTING", "RUNNING", "STREAMING", "VALIDATING", "ANALYZING", "WORKING"]]
+            if not active_running:
+                m.status = "CANCELLED"
+                self.record_state_transition(mission_id, "CANCELLED", f"Arrêt de la tâche {task_id or agent_id} — aucune tâche active restante.", agent_id=agent_id, task_id=task_id)
+            else:
+                self.record_state_transition(mission_id, m.status, f"Tâche {task_id or agent_id} arrêtée par l'utilisateur", agent_id=agent_id, task_id=task_id)
+
+            self.emit_event(mission_id, "task.cancelled", f"Tâche arrêtée : {task_id or agent_id}", agent_id=agent_id, payload={"taskId": task_id, "agentId": agent_id})
+            return True
+
     def create_mission(self, title: str, objective: str, governance_mode: str = "HYBRID") -> CamcsMission:
         mission_id = str(uuid.uuid4())
         mission = CamcsMission(mission_id, title, objective, governance_mode)
@@ -961,7 +1135,7 @@ class CamcsOrchestrationEngine:
         # Persist mission and agents
         self._save_mission_state(mission)
 
-        self.emit_event(mission_id, "mission.created", f"Mission créée : {title}")
+        self.record_state_transition(mission_id, "CREATED", f"Mission créée : {title}")
         for ag in mission.agents:
             self.emit_event(
                 mission_id,
@@ -980,7 +1154,11 @@ class CamcsOrchestrationEngine:
             conn = sqlite3.connect(DB_PATH)
             cur = conn.cursor()
             config_data = {
-                "governanceMode": getattr(mission, "governance_mode", "HYBRID")
+                "governanceMode": getattr(mission, "governance_mode", "HYBRID"),
+                "startedAt": getattr(mission, "started_at", None),
+                "lastTransitionReason": getattr(mission, "last_transition_reason", None),
+                "lastTransitionTime": getattr(mission, "last_transition_time", None),
+                "blockedReason": getattr(mission, "blocked_reason", None)
             }
             cur.execute("""
                 INSERT OR REPLACE INTO missions (id, title, objective, status, progress, created_at, updated_at, completed_at, config_json)
@@ -1040,7 +1218,8 @@ class CamcsOrchestrationEngine:
         5. Generates comprehensive final report in markdown and persists to DB and deliverables.
         6. Ingests learned experiences and solutions into CodeStation Continuous Memory.
         """
-        mission.status = "WORKING"
+        if mission.status == "CANCELLED":
+            return
         gov_mode = getattr(mission, "governance_mode", "HYBRID")
 
         mission_dir = f"/root/.codestation/missions/{mission.id}"
@@ -1058,6 +1237,7 @@ class CamcsOrchestrationEngine:
         else:
             gov_desc = "Gouvernance : Mode hybride actif (tâches courantes autonomes, validation sur opérations sensibles)."
 
+        self.record_state_transition(mission.id, "PLANNING", "Interrogation de la mémoire collective et planification DAG")
         self.emit_event(mission.id, "mission.started", "Démarrage de l'orchestration multi-agents réelle")
         self.emit_event(mission.id, "governance.applied", gov_desc, payload={"mode": gov_mode})
 
@@ -1076,31 +1256,53 @@ class CamcsOrchestrationEngine:
                 payload={"count": len(mem_results), "topKnowledge": top_titles[0]}
             )
 
+        if mission.status == "CANCELLED":
+            return
+
         # Retrieve dynamic agents
         agents = mission.agents
         if not agents:
-            mission.status = "FAILED"
-            self.emit_event(mission.id, "mission.failed", "Aucun agent mobilisé pour cette mission.")
+            self.record_state_transition(mission.id, "FAILED", "Aucun agent mobilisé pour cette mission.")
             return
 
         arch = agents[0]
         dev = agents[1] if len(agents) > 1 else agents[0]
         qa = agents[-1] if len(agents) > 2 else agents[-1]
 
+        self.record_state_transition(
+            mission.id,
+            "DISPATCHING",
+            f"Affectation des tâches aux agents spécialisés ({arch.name}, {dev.name}, {qa.name})"
+        )
+
+        if mission.status == "CANCELLED":
+            return
+
         # ======================================================================
         # PHASE 1: Lead Architect (Real CLI Execution)
         # ======================================================================
-        arch.status = "ANALYZING"
-        arch.current_subtask = "Analyse structurelle et élaboration de la spécification technique"
-        self.emit_event(mission.id, "agent.status_changed", f"{arch.name} commence l'analyse structurelle", agent_id=arch.id)
-
         arch_runner = self.cli_registry.get_runner(arch.cli_id) or self.cli_registry.get_runner("antigravity")
         arch_prompt = f"Tu es l'Architecte Système CAMCS. Analyse l'objectif donné et rédige une synthèse d'architecture technique claire : {mission.objective}{mem_context}"
 
-        def arch_output_cb(stype, line):
-            self.emit_event(mission.id, "cli.output", line.strip(), agent_id=arch.id, payload={"cli": arch_runner.cli_id, "stream": stype})
+        arch.active_task_id = "t1-1"
+        arch.current_subtask = "Analyse structurelle et élaboration de la spécification technique"
+        self.record_state_transition(mission.id, "STARTING", f"Lancement de {arch_runner.name} pour {arch.name}", agent_id=arch.id, task_id="t1-1")
 
-        self.emit_event(mission.id, "cli.started", f"Lancement réel du runner CLI {arch_runner.name} pour {arch.name}", agent_id=arch.id)
+        def arch_output_cb(stype, line):
+            arch.last_output = line.strip()
+            arch.last_activity_at = time.time()
+            if arch.status != "STREAMING":
+                self.record_state_transition(mission.id, "STREAMING", f"Réception du flux CLI de {arch.name}", agent_id=arch.id, task_id="t1-1")
+            self.emit_event(mission.id, "cli.output", line.strip(), agent_id=arch.id, payload={"cli": arch_runner.cli_id, "stream": stype, "pid": arch.pid})
+
+        def arch_pid_cb(pid):
+            arch.pid = pid
+            arch.started_at = time.time()
+            arch.last_activity_at = time.time()
+            self.emit_event(mission.id, "cli.started", f"Processus {arch_runner.name} démarré (PID: {pid})", agent_id=arch.id, payload={"pid": pid, "cli": arch_runner.cli_id})
+
+        self.record_state_transition(mission.id, "RUNNING", f"Exécution CLI réelle par {arch.name} ({arch_runner.name})", agent_id=arch.id, task_id="t1-1")
+
         arch_res = self.process_manager.execute_with_guard(
             runner=arch_runner,
             task_id="t1-1",
@@ -1108,8 +1310,12 @@ class CamcsOrchestrationEngine:
             prompt=arch_prompt,
             cwd=docs_dir,
             timeout=120,
-            output_callback=arch_output_cb
+            output_callback=arch_output_cb,
+            pid_callback=arch_pid_cb
         )
+        arch.pid = None
+        if mission.status == "CANCELLED":
+            return
         self.emit_event(mission.id, "cli.finished", f"Exécution CLI {arch_runner.name} terminée (code {arch_res.exit_code})", agent_id=arch.id)
 
         arch_analysis = arch_res.stdout if arch_res.stdout else (arch_res.stderr or "Spécification technique établie par le runner CLI.")
@@ -1175,6 +1381,7 @@ class CamcsOrchestrationEngine:
         arch.status = "COMPLETED"
         arch.current_subtask = "Spécification technique validée et transmise"
         self._update_progress(mission)
+        self.record_state_transition(mission.id, "WAITING_FOR_AGENT", f"Spécification transmise par {arch.name}. En attente du Développeur", agent_id=arch.id, task_id="t1-1")
 
         # Inter-agent communication: Architect -> Dev
         comm_arch_dev = self.collab_hub.record_communication(
@@ -1188,17 +1395,48 @@ class CamcsOrchestrationEngine:
         # ======================================================================
         # PHASE 2: Implementation (Specialist Real CLI Execution)
         # ======================================================================
-        dev.status = "WORKING"
-        dev.current_subtask = "Implémentation réelle du code et des livrables"
-        self.emit_event(mission.id, "agent.status_changed", f"{dev.name} commence l'implémentation", agent_id=dev.id)
+        if mission.status == "CANCELLED":
+            return
 
         dev_runner = self.cli_registry.get_runner(dev.cli_id) or self.cli_registry.get_runner("codebuddy")
-        dev_prompt = f"Génère la solution technique pour : {mission.objective}. Spécification: {arch_analysis[:300]}"
+
+        # Query perpetual memory for developer task to apply past lessons and avoid known pitfalls
+        dev_mem = self.memory_client.query_knowledge(f"{mission.objective} {dev_runner.cli_id}", limit=3)
+        dev_mem_guidance = ""
+        if dev_mem:
+            guidelines = []
+            for k in dev_mem:
+                title = k.get("title", "")
+                content = k.get("content", "")
+                guidelines.append(f"• {title}: {content[:200]}")
+            dev_mem_guidance = f"\n\n[MÉMOIRE PERPÉTUELLE — RÈGLES VALIDÉES & ANTI-RÉGRESSION] :\n" + "\n".join(guidelines)
+            self.emit_event(
+                mission.id, "memory.guidance_applied",
+                f"Mémoire appliquée à {dev.name} : {len(dev_mem)} connaissances injectées pour efficacité optimale.",
+                agent_id=dev.id, payload={"count": len(dev_mem), "titles": [k.get("title") for k in dev_mem]}
+            )
+
+        dev_prompt = f"Génère la solution technique pour : {mission.objective}. Spécification: {arch_analysis[:300]}{dev_mem_guidance}"
+
+        dev.active_task_id = "t2-1"
+        dev.current_subtask = "Implémentation réelle du code et des livrables"
+        self.record_state_transition(mission.id, "STARTING", f"Lancement de {dev_runner.name} pour {dev.name}", agent_id=dev.id, task_id="t2-1")
 
         def dev_output_cb(stype, line):
-            self.emit_event(mission.id, "cli.output", line.strip(), agent_id=dev.id, payload={"cli": dev_runner.cli_id, "stream": stype})
+            dev.last_output = line.strip()
+            dev.last_activity_at = time.time()
+            if dev.status != "STREAMING":
+                self.record_state_transition(mission.id, "STREAMING", f"Génération du code source par {dev.name}", agent_id=dev.id, task_id="t2-1")
+            self.emit_event(mission.id, "cli.output", line.strip(), agent_id=dev.id, payload={"cli": dev_runner.cli_id, "stream": stype, "pid": dev.pid})
 
-        self.emit_event(mission.id, "cli.started", f"Lancement réel du runner CLI {dev_runner.name} pour {dev.name}", agent_id=dev.id)
+        def dev_pid_cb(pid):
+            dev.pid = pid
+            dev.started_at = time.time()
+            dev.last_activity_at = time.time()
+            self.emit_event(mission.id, "cli.started", f"Processus {dev_runner.name} démarré (PID: {pid})", agent_id=dev.id, payload={"pid": pid, "cli": dev_runner.cli_id})
+
+        self.record_state_transition(mission.id, "RUNNING", f"Développement réel de la solution par {dev.name} ({dev_runner.name})", agent_id=dev.id, task_id="t2-1")
+
         dev_res = self.process_manager.execute_with_guard(
             runner=dev_runner,
             task_id="t2-1",
@@ -1206,8 +1444,12 @@ class CamcsOrchestrationEngine:
             prompt=dev_prompt,
             cwd=src_dir,
             timeout=120,
-            output_callback=dev_output_cb
+            output_callback=dev_output_cb,
+            pid_callback=dev_pid_cb
         )
+        dev.pid = None
+        if mission.status == "CANCELLED":
+            return
         self.emit_event(mission.id, "cli.finished", f"Exécution CLI {dev_runner.name} terminée (code {dev_res.exit_code})", agent_id=dev.id)
 
         # Write real solution code file
@@ -1283,6 +1525,16 @@ if __name__ == "__main__":
             agent_id=dev.id, payload=deliv_dev
         )
 
+        # Perpetual learning: Record developer experience into memory
+        self.memory_client.record_learning(
+            title=f"Code validé [{dev_runner.cli_id}] : {mission.title}",
+            problem=mission.objective,
+            solution=f"Module autonome validé généré dans src/{deliv_dev['fileName']} (SHA: {deliv_dev['sha256'][:8]}).",
+            context=f"Développeur {dev.name} ({dev_runner.name})",
+            tags=["camcs", dev_runner.cli_id, "solution", "source_code"],
+            author=dev.id
+        )
+
         if dev.tasks:
             for t in dev.tasks:
                 t["status"] = "COMPLETED"
@@ -1290,6 +1542,7 @@ if __name__ == "__main__":
         dev.status = "COMPLETED"
         dev.current_subtask = "Code source implémenté et soumis à l'auditeur"
         self._update_progress(mission)
+        self.record_state_transition(mission.id, "WAITING_FOR_AGENT", f"Code source soumis par {dev.name}. En attente de l'Auditeur", agent_id=dev.id, task_id="t2-1")
 
         # Inter-agent communication: Dev -> QA
         comm_dev_qa = self.collab_hub.record_communication(
@@ -1303,9 +1556,12 @@ if __name__ == "__main__":
         # ======================================================================
         # PHASE 3: Quality Auditor (Independent Real CLI Audit & Unit Tests)
         # ======================================================================
-        qa.status = "VALIDATING"
+        if mission.status == "CANCELLED":
+            return
+
+        qa.active_task_id = "t3-1"
         qa.current_subtask = "Audit indépendant des livrables et exécution des tests unitaires"
-        self.emit_event(mission.id, "agent.status_changed", f"{qa.name} lance l'audit qualité indépendant et les tests", agent_id=qa.id)
+        self.record_state_transition(mission.id, "VALIDATING", f"Audit indépendant et tests unitaires par {qa.name}", agent_id=qa.id, task_id="t3-1")
 
         qa_runner = self.cli_registry.get_runner(qa.cli_id) or self.cli_registry.get_runner("clixad")
 
@@ -1496,12 +1752,16 @@ Cette mission a été analysée et indexée dans **CodeStation-Memory** sous la 
             payload={"missionId": mission.id, "verified": passed}
         )
 
-        mission.status = "COMPLETED"
+        if mission.status == "CANCELLED":
+            return
+
         mission.progress = 100
         mission.completed_at = time.time()
-        self._update_progress(mission)
-        self.emit_event(mission.id, "mission.completed", f"Mission terminée avec succès : {mission.title}")
-        mission.completed_at = time.time()
+        self.record_state_transition(
+            mission.id,
+            "COMPLETED",
+            f"Mission « {mission.title} » terminée avec succès. 100% des livrables vérifiés."
+        )
         self._update_progress(mission)
         self.emit_event(mission.id, "mission.completed", f"Mission « {mission.title} » terminée avec succès. 100% des livrables vérifiés.")
 
@@ -1515,16 +1775,14 @@ Cette mission a été analysée et indexée dans **CodeStation-Memory** sous la 
             mission.id,
             "mission.progress",
             f"Progression globale de la mission : {mission.progress}%",
-            payload={"progress": mission.progress}
+            payload={"progress": mission.progress, "status": mission.status}
         )
 
     def pause_mission(self, mission_id: str) -> bool:
         with self._lock:
             m = self.active_missions.get(mission_id)
-            if m and m.status == "WORKING":
-                m.status = "PAUSED"
-                self._save_mission_state(m)
-                self.emit_event(mission_id, "mission.paused", "Mission mise en pause")
+            if m and m.status in ["RUNNING", "STREAMING", "STARTING", "PLANNING", "DISPATCHING", "WORKING"]:
+                self.record_state_transition(mission_id, "PAUSED", "Mission mise en pause par l'utilisateur")
                 return True
         return False
 
@@ -1532,21 +1790,26 @@ Cette mission a été analysée et indexée dans **CodeStation-Memory** sous la 
         with self._lock:
             m = self.active_missions.get(mission_id)
             if m and m.status == "PAUSED":
-                m.status = "WORKING"
-                self._save_mission_state(m)
-                self.emit_event(mission_id, "mission.started", "Reprise de la mission")
+                self.record_state_transition(mission_id, "RUNNING", "Reprise de la mission")
                 return True
         return False
 
     def cancel_mission(self, mission_id: str) -> bool:
         with self._lock:
             m = self.active_missions.get(mission_id)
-            if m:
-                m.status = "FAILED"
-                self._save_mission_state(m)
-                self.emit_event(mission_id, "mission.completed", "Mission annulée par l'utilisateur")
-                return True
-        return False
+            if not m:
+                return False
+            self.process_manager.cancel_mission_tasks(mission_id)
+            for ag in m.agents:
+                if ag.status not in ["COMPLETED", "FAILED"]:
+                    ag.status = "CANCELLED"
+                    ag.current_subtask = "Mission arrêtée par l'utilisateur."
+                    ag.pid = None
+                for t in ag.tasks:
+                    if t.get("status") in ["RUNNING", "WORKING", "STARTING", "PENDING"]:
+                        t["status"] = "CANCELLED"
+            self.record_state_transition(mission_id, "CANCELLED", "Mission arrêtée complètement par l'utilisateur")
+            return True
 
     def get_providers_status(self) -> List[Dict[str, Any]]:
         # Update provider stats table
@@ -1709,7 +1972,11 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
                         "status": m.status,
                         "progress": m.progress,
                         "createdAt": getattr(m, "created_at", 0),
+                        "startedAt": getattr(m, "started_at", None),
                         "completedAt": getattr(m, "completed_at", None),
+                        "lastTransitionReason": getattr(m, "last_transition_reason", None),
+                        "lastTransitionTime": getattr(m, "last_transition_time", None),
+                        "blockedReason": getattr(m, "blocked_reason", None),
                         "agents": [
                             {
                                 "id": ag.id,
@@ -1724,6 +1991,11 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
                                 "currentSubtask": ag.current_subtask,
                                 "progress": ag.progress,
                                 "status": ag.status,
+                                "pid": getattr(ag, "pid", None),
+                                "startedAt": getattr(ag, "started_at", None),
+                                "lastActivityAt": getattr(ag, "last_activity_at", None),
+                                "lastOutput": getattr(ag, "last_output", ""),
+                                "activeTaskId": getattr(ag, "active_task_id", None),
                                 "tasks": ag.tasks
                             } for ag in m.agents
                         ]
@@ -1746,6 +2018,9 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
             elif sub_resource == "report":
                 report = get_mission_report(mission_id)
                 self._send_json(200, {"ok": True, "missionId": mission_id, "report": report})
+            elif sub_resource == "transitions":
+                transitions = get_mission_state_transitions(mission_id)
+                self._send_json(200, {"ok": True, "missionId": mission_id, "transitions": transitions})
             elif sub_resource == "diff":
                 proofs = get_mission_proofs(mission_id)
                 diffs = [p.get("gitDiff", "") for p in proofs if p.get("gitDiff")]
@@ -1783,7 +2058,11 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
                             "status": m.status,
                             "progress": m.progress,
                             "createdAt": getattr(m, "created_at", 0),
+                            "startedAt": getattr(m, "started_at", None),
                             "completedAt": getattr(m, "completed_at", None),
+                            "lastTransitionReason": getattr(m, "last_transition_reason", None),
+                            "lastTransitionTime": getattr(m, "last_transition_time", None),
+                            "blockedReason": getattr(m, "blocked_reason", None),
                             "agents": [
                                 {
                                     "id": ag.id,
@@ -1798,6 +2077,11 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
                                     "currentSubtask": ag.current_subtask,
                                     "progress": ag.progress,
                                     "status": ag.status,
+                                    "pid": getattr(ag, "pid", None),
+                                    "startedAt": getattr(ag, "started_at", None),
+                                    "lastActivityAt": getattr(ag, "last_activity_at", None),
+                                    "lastOutput": getattr(ag, "last_output", ""),
+                                    "activeTaskId": getattr(ag, "active_task_id", None),
                                     "tasks": ag.tasks
                                 } for ag in m.agents
                             ],
@@ -1883,7 +2167,13 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/camcs/missions/cancel":
             mission_id = data.get("missionId", "")
             ok = ENGINE.cancel_mission(mission_id)
-            self._send_json(200, {"ok": ok})
+            self._send_json(200, {"ok": ok, "status": "CANCELLED"})
+        elif self.path in ["/api/camcs/tasks/stop", "/api/camcs/tasks/cancel"]:
+            mission_id = data.get("missionId", "")
+            task_id = data.get("taskId")
+            agent_id = data.get("agentId")
+            ok = ENGINE.stop_task(mission_id, task_id=task_id, agent_id=agent_id)
+            self._send_json(200, {"ok": ok, "status": "CANCELLED", "taskId": task_id, "agentId": agent_id})
         else:
             self._send_json(404, {"error": "Endpoint not found"})
 

@@ -597,6 +597,70 @@ class ContinuousMemoryEngine:
         self._save_state()
         return new_items
 
+    def learn_direct(
+        self,
+        title: str,
+        problem: str,
+        solution: str,
+        context: str = "CodeStation Runtime / PRoot ARM64",
+        error_avoidance: str = "",
+        tags: Optional[List[str]] = None,
+        author: str = "camcs-agent",
+        category: str = "solution"
+    ) -> Tuple[Optional[str], Optional[str]]:
+        now_iso = get_iso_now()
+        uid = uuid.uuid4().hex[:6]
+        exp_id = f"exp-cs-{uid}"
+        knw_id = f"knw-cs-{uid}"
+
+        final_tags = tags or ["camcs", "learning", "runtime"]
+        if error_avoidance and "error_avoidance" not in final_tags:
+            final_tags.append("error_avoidance")
+
+        full_content = solution
+        if error_avoidance:
+            full_content += f"\n\n[PIÈGE À ÉVITER / REGRESSION PRÉVENUE] : {error_avoidance}"
+
+        experience = {
+            "id": exp_id,
+            "title": sanitize_text(title),
+            "project_id": "prj-codestation",
+            "author_agent": author,
+            "created_at": now_iso,
+            "updated_at": now_iso,
+            "problem": sanitize_text(problem),
+            "context": sanitize_text(context),
+            "attempts": ["Exécution avec vérification en temps réel et injection des règles mémoire"],
+            "observed_results": ["Résultat validé et conforme aux critères"],
+            "errors_encountered": [sanitize_text(error_avoidance)] if error_avoidance else [],
+            "solution_proposed": sanitize_text(full_content),
+            "validation_status": "validated_solution",
+            "tags": final_tags,
+            "relations": [knw_id, author, "prj-codestation"]
+        }
+
+        knowledge = {
+            "id": knw_id,
+            "type": category,
+            "title": sanitize_text(title),
+            "content": sanitize_text(full_content),
+            "project_id": "prj-codestation",
+            "source": f"Apprentissage perpétuel validé par {author}",
+            "author": author,
+            "created_at": now_iso,
+            "updated_at": now_iso,
+            "tags": final_tags,
+            "confidence": 1.0,
+            "validation_status": "validated_solution",
+            "relations": [exp_id, author, "prj-codestation"],
+            "version": 1
+        }
+
+        if self.curator.persist(experience, knowledge):
+            self.analyzed_sessions_count += 1
+            return exp_id, knw_id
+        return None, None
+
     def get_status(self) -> Dict[str, Any]:
         exp_count = len(glob.glob(os.path.join(MEMORY_REPO_PATH, "experiences", "*.json")))
         knw_count = len(glob.glob(os.path.join(MEMORY_REPO_PATH, "knowledge", "*.json")))
@@ -640,7 +704,56 @@ class MemoryHttpHandler(BaseHTTPRequestHandler):
             self._send_json(404, {"error": "Not found"})
 
     def do_POST(self):
-        if self.path == "/api/memory/collect":
+        content_len = int(self.headers.get("Content-Length", 0))
+        post_body = self.rfile.read(content_len).decode("utf-8") if content_len > 0 else "{}"
+        try:
+            body = json.loads(post_body)
+        except Exception:
+            body = {}
+
+        if self.path == "/api/memory/search":
+            query = body.get("query") or body.get("q", "")
+            limit = int(body.get("limit", 5))
+            results = ENGINE.retriever.search(query, limit=limit)
+            self._send_json(200, {"results": results, "count": len(results)})
+        elif self.path == "/api/memory/learn":
+            title = body.get("title", "Nouvelle connaissance acquise")
+            problem = body.get("problem", "")
+            solution = body.get("solution", "")
+            context = body.get("context", "")
+            error_avoidance = body.get("error_avoidance", "")
+            tags = body.get("tags", [])
+            author = body.get("author", "camcs-agent")
+            category = body.get("type", "solution")
+            exp_id, knw_id = ENGINE.learn_direct(
+                title=title,
+                problem=problem,
+                solution=solution,
+                context=context,
+                error_avoidance=error_avoidance,
+                tags=tags,
+                author=author,
+                category=category
+            )
+            if knw_id:
+                self._send_json(200, {"ok": True, "knowledgeId": knw_id, "experienceId": exp_id})
+            else:
+                self._send_json(400, {"ok": False, "error": "Échec de l'enregistrement ou doublon"})
+        elif self.path == "/api/memory/collect":
+            if "missionId" in body:
+                # Direct ingestion from CAMCS mission outcome
+                title = body.get("title", "Mission CAMCS")
+                obj = body.get("objective", "")
+                success = body.get("verified", True)
+                if success:
+                    ENGINE.learn_direct(
+                        title=f"Mission Validée : {title}",
+                        problem=obj,
+                        solution=f"Objectif validé avec {body.get('deliverablesCount', 0)} livrables et {body.get('proofsCount', 0)} preuves vérifiées.",
+                        context="CAMCS Autonomous Multi-Agent Coordination",
+                        tags=["camcs", "mission-experience", "verified"],
+                        author="camcs-orchestrator"
+                    )
             added = ENGINE.run_collection_cycle()
             self._send_json(200, {"ok": True, "newKnowledgeCount": added, "status": ENGINE.get_status()})
         elif self.path == "/api/memory/sync":

@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -90,6 +91,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import okhttp3.MediaType.Companion.toMediaType
@@ -128,6 +130,7 @@ fun CamcsControlCenterScreen(
     var activeTab by remember { mutableIntStateOf(0) } // 0: Orchestration, 1: Journal Live, 2: Providers & CLIs, 3: Résultats & Livrables
     var selectedMissionId by remember { mutableStateOf(initialMissionId) }
     var isEngineConnected by remember { mutableStateOf(false) }
+    var currentClockTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     // Real Execution Deliverables, Communications, Proofs & Reports
     var deliverables by remember { mutableStateOf<List<CamcsDeliverable>>(emptyList()) }
@@ -159,6 +162,14 @@ fun CamcsControlCenterScreen(
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.MILLISECONDS) // SSE stream infinite timeout
             .build()
+    }
+
+    // 0. Non-freezing live monotonic clock tick
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            delay(1000)
+            currentClockTick = System.currentTimeMillis()
+        }
     }
 
     // 1. Polling loop for missions, providers, CLIs and active mission deliverables/proofs
@@ -299,27 +310,149 @@ fun CamcsControlCenterScreen(
                                         }
 
                                         // CRITICAL SYNCHRONIZATION:
-                                        // Update mission state in memory immediately upon receiving progress/completed events!
+                                        // Update mission state and agent execution in memory immediately upon receiving events!
                                         if (ev.missionId != null) {
                                             if (selectedMissionId == null) {
                                                 selectedMissionId = ev.missionId
                                             }
-                                            if (ev.type == "mission.progress") {
-                                                try {
-                                                    val raw = jsonParser.parseToJsonElement(dataJson).jsonObject
-                                                    val payload = raw["payload"]?.jsonObject
-                                                    val prog = payload?.get("progress")?.let { (it as? JsonPrimitive)?.intOrNull }
-                                                    if (prog != null) {
-                                                        missions = missions.map {
-                                                            if (it.id == ev.missionId) it.copy(progress = prog) else it
+                                            try {
+                                                val raw = jsonParser.parseToJsonElement(dataJson).jsonObject
+                                                val payload = raw["payload"]?.jsonObject
+
+                                                when (ev.type) {
+                                                    "mission.status_changed" -> {
+                                                        val newStatus = payload?.get("status")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        val prog = payload?.get("progress")?.let { (it as? JsonPrimitive)?.intOrNull }
+                                                        val reason = payload?.get("reason")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        if (newStatus != null) {
+                                                            missions = missions.map { m ->
+                                                                if (m.id == ev.missionId) {
+                                                                    m.copy(
+                                                                        status = newStatus,
+                                                                        progress = prog ?: m.progress,
+                                                                        lastTransitionReason = reason ?: m.lastTransitionReason
+                                                                    )
+                                                                } else m
+                                                            }
                                                         }
                                                     }
-                                                } catch (_: Exception) {}
-                                            } else if (ev.type == "mission.completed") {
-                                                missions = missions.map {
-                                                    if (it.id == ev.missionId) it.copy(status = "COMPLETED", progress = 100) else it
+                                                    "mission.progress" -> {
+                                                        val prog = payload?.get("progress")?.let { (it as? JsonPrimitive)?.intOrNull }
+                                                        if (prog != null) {
+                                                            missions = missions.map { m ->
+                                                                if (m.id == ev.missionId) m.copy(progress = prog) else m
+                                                            }
+                                                        }
+                                                    }
+                                                    "mission.completed" -> {
+                                                        missions = missions.map { m ->
+                                                            if (m.id == ev.missionId) m.copy(status = "COMPLETED", progress = 100) else m
+                                                        }
+                                                    }
+                                                    "mission.cancelled" -> {
+                                                        missions = missions.map { m ->
+                                                            if (m.id == ev.missionId) m.copy(status = "CANCELLED") else m
+                                                        }
+                                                    }
+                                                    "agent.status_changed" -> {
+                                                        val aId = ev.agentId ?: payload?.get("agentId")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        val aStatus = payload?.get("status")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        val aProg = payload?.get("progress")?.let { (it as? JsonPrimitive)?.intOrNull }
+                                                        val aSubtask = payload?.get("subtask")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        val aPid = payload?.get("pid")?.let { (it as? JsonPrimitive)?.intOrNull }
+
+                                                        if (aId != null && aStatus != null) {
+                                                            missions = missions.map { m ->
+                                                                if (m.id == ev.missionId) {
+                                                                    m.copy(agents = m.agents.map { ag ->
+                                                                        if (ag.id == aId) {
+                                                                            ag.copy(
+                                                                                status = aStatus,
+                                                                                progress = aProg ?: ag.progress,
+                                                                                currentSubtask = aSubtask ?: ag.currentSubtask,
+                                                                                pid = aPid ?: ag.pid
+                                                                            )
+                                                                        } else ag
+                                                                    })
+                                                                } else m
+                                                            }
+                                                        }
+                                                    }
+                                                    "cli.started" -> {
+                                                        val aId = ev.agentId ?: payload?.get("agentId")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        val pid = payload?.get("pid")?.let { (it as? JsonPrimitive)?.intOrNull }
+                                                        val taskId = payload?.get("taskId")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        if (aId != null && pid != null) {
+                                                            missions = missions.map { m ->
+                                                                if (m.id == ev.missionId) {
+                                                                    m.copy(agents = m.agents.map { ag ->
+                                                                        if (ag.id == aId) {
+                                                                            ag.copy(
+                                                                                pid = pid,
+                                                                                activeTaskId = taskId ?: ag.activeTaskId,
+                                                                                status = "WORKING",
+                                                                                tasks = ag.tasks.map { t ->
+                                                                                    if (t.id == taskId) t.copy(pid = pid, status = "WORKING") else t
+                                                                                }
+                                                                            )
+                                                                        } else ag
+                                                                    })
+                                                                } else m
+                                                            }
+                                                        }
+                                                    }
+                                                    "cli.output" -> {
+                                                        val aId = ev.agentId ?: payload?.get("agentId")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        val output = payload?.get("output")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        if (aId != null && output != null) {
+                                                            missions = missions.map { m ->
+                                                                if (m.id == ev.missionId) {
+                                                                    m.copy(agents = m.agents.map { ag ->
+                                                                        if (ag.id == aId) {
+                                                                            ag.copy(lastOutput = output)
+                                                                        } else ag
+                                                                    })
+                                                                } else m
+                                                            }
+                                                        }
+                                                    }
+                                                    "task.cancelled" -> {
+                                                        val taskId = payload?.get("taskId")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        val aId = ev.agentId ?: payload?.get("agentId")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        missions = missions.map { m ->
+                                                            if (m.id == ev.missionId) {
+                                                                m.copy(agents = m.agents.map { ag ->
+                                                                    if (aId == null || ag.id == aId) {
+                                                                        ag.copy(
+                                                                            status = if (ag.status in listOf("WORKING", "RUNNING", "STREAMING")) "CANCELLED" else ag.status,
+                                                                            tasks = ag.tasks.map { t ->
+                                                                                if (taskId == null || t.id == taskId) t.copy(status = "CANCELLED") else t
+                                                                            }
+                                                                        )
+                                                                    } else ag
+                                                                })
+                                                            } else m
+                                                        }
+                                                    }
+                                                    "task.completed" -> {
+                                                        val taskId = payload?.get("taskId")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        val aId = ev.agentId ?: payload?.get("agentId")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        missions = missions.map { m ->
+                                                            if (m.id == ev.missionId) {
+                                                                m.copy(agents = m.agents.map { ag ->
+                                                                    if (aId == null || ag.id == aId) {
+                                                                        ag.copy(
+                                                                            tasks = ag.tasks.map { t ->
+                                                                                if (taskId == null || t.id == taskId) t.copy(status = "COMPLETED") else t
+                                                                            }
+                                                                        )
+                                                                    } else ag
+                                                                })
+                                                            } else m
+                                                        }
+                                                    }
                                                 }
-                                            }
+                                            } catch (_: Exception) {}
                                         }
                                     }
                                 } catch (_: Exception) {}
@@ -476,6 +609,7 @@ fun CamcsControlCenterScreen(
 
                         MissionMasterCard(
                             mission = activeMission,
+                            currentClockTick = currentClockTick,
                             onPause = {
                                 executeAction(httpClient, "http://127.0.0.1:19223/api/camcs/missions/pause", activeMission.id)
                             },
@@ -499,7 +633,19 @@ fun CamcsControlCenterScreen(
                         )
 
                         activeMission.agents.forEach { agent ->
-                            LiveAgentCard(agent = agent)
+                            LiveAgentCard(
+                                agent = agent,
+                                missionId = activeMission.id,
+                                currentClockTick = currentClockTick,
+                                onStopTask = { taskId ->
+                                    executeStopTask(
+                                        httpClient,
+                                        activeMission.id,
+                                        taskId = taskId,
+                                        agentId = agent.id
+                                    )
+                                }
+                            )
                         }
 
                         // Real Inter-Agent Communications Card
@@ -715,6 +861,7 @@ private fun MissionSelectorRow(
 @Composable
 private fun MissionMasterCard(
     mission: CamcsMission,
+    currentClockTick: Long,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onCancel: () -> Unit
@@ -727,11 +874,12 @@ private fun MissionMasterCard(
     )
 
     val electricGreen = if (dark) Color(0xFF00E676) else Color(0xFF059669)
+    val statusVisual = getStatusVisual(mission.status, dark)
 
-    // Format elapsed duration
-    val elapsedStr = remember(mission.createdAt, mission.completedAt) {
+    // Format elapsed duration linked to monotonic ticker
+    val elapsedStr = remember(mission.createdAt, mission.completedAt, currentClockTick) {
         val start = mission.createdAt
-        val end = mission.completedAt ?: (System.currentTimeMillis() / 1000.0)
+        val end = mission.completedAt ?: (currentClockTick / 1000.0)
         val sec = (end - start).coerceAtLeast(0.0).toLong()
         val m = sec / 60
         val s = sec % 60
@@ -774,6 +922,16 @@ private fun MissionMasterCard(
                         maxLines = 3,
                         softWrap = true
                     )
+                    if (!mission.lastTransitionReason.isNullOrBlank()) {
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            text = "⚡ ${mission.lastTransitionReason}",
+                            style = Type.caption.copy(fontSize = 10.5.sp),
+                            color = Palette.tertiary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
 
                 // Governance & Status Chip
@@ -784,30 +942,13 @@ private fun MissionMasterCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                when (mission.status) {
-                                    "COMPLETED" -> Palette.emeraldAccent.copy(alpha = 0.2f)
-                                    "WORKING" -> Palette.electricBlue.copy(alpha = 0.2f)
-                                    "PAUSED" -> Palette.warning.copy(alpha = 0.2f)
-                                    else -> Palette.surface
-                                }
-                            )
+                            .background(statusVisual.bg)
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            text = when (mission.status) {
-                                "COMPLETED" -> "TERMINÉ"
-                                "WORKING" -> "EN COURS"
-                                "PAUSED" -> "EN PAUSE"
-                                else -> mission.status
-                            },
+                            text = statusVisual.label,
                             style = Type.caption.semibold.copy(fontSize = 10.5.sp),
-                            color = when (mission.status) {
-                                "COMPLETED" -> electricGreen
-                                "WORKING" -> Palette.electricBlue
-                                "PAUSED" -> Palette.warning
-                                else -> Palette.secondary
-                            }
+                            color = statusVisual.color
                         )
                     }
 
@@ -862,9 +1003,9 @@ private fun MissionMasterCard(
             // Detailed Metrics Grid (Agents, Sous-tâches, En cours, En attente)
             val totalSubtasks = mission.agents.sumOf { it.tasks.size }
             val completedSubtasks = mission.agents.sumOf { ag -> ag.tasks.count { it.status == "COMPLETED" } }
-            val workingSubtasks = mission.agents.sumOf { ag -> ag.tasks.count { it.status == "WORKING" } }
-            val pendingSubtasks = mission.agents.sumOf { ag -> ag.tasks.count { it.status == "PENDING" } }
-            val activeAgentsCount = mission.agents.count { it.status == "WORKING" || it.status == "ANALYZING" || it.status == "VALIDATING" }
+            val workingSubtasks = mission.agents.sumOf { ag -> ag.tasks.count { it.status == "WORKING" || it.status == "RUNNING" } }
+            val pendingSubtasks = mission.agents.sumOf { ag -> ag.tasks.count { it.status == "PENDING" || it.status == "QUEUED" } }
+            val activeAgentsCount = mission.agents.count { it.status in listOf("WORKING", "RUNNING", "STREAMING", "ANALYZING", "VALIDATING") }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -876,12 +1017,13 @@ private fun MissionMasterCard(
                 MetricCapsule(label = "En attente", value = "$pendingSubtasks", modifier = Modifier.weight(1f))
             }
 
-            // Action Buttons (Pause / Resume / Cancel)
+            // Action Buttons (Pause / Resume / Cancel Mission)
+            val isMissionRunning = mission.status in listOf("WORKING", "RUNNING", "STREAMING", "STARTING", "PLANNING", "DISPATCHING", "QUEUED", "WAITING_FOR_AGENT", "WAITING_FOR_APPROVAL", "VALIDATING")
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (mission.status == "WORKING") {
+                if (mission.status in listOf("WORKING", "RUNNING", "STREAMING")) {
                     SecondaryButton(
                         title = "Mettre en pause",
                         action = onPause,
@@ -894,11 +1036,11 @@ private fun MissionMasterCard(
                         modifier = Modifier.weight(1f)
                     )
                 }
-                if (mission.status != "COMPLETED") {
+                if (isMissionRunning || mission.status == "PAUSED") {
                     SecondaryButton(
-                        title = "Annuler",
+                        title = "Arrêter la mission",
                         action = onCancel,
-                        modifier = Modifier.weight(0.7f)
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
@@ -943,6 +1085,32 @@ private fun DispatchingPipelineCard(mission: CamcsMission) {
     val dark = LocalDark.current
     val electricGreen = if (dark) Color(0xFF00E676) else Color(0xFF059669)
 
+    val isPlanDone = mission.status !in listOf("CREATED", "PLANNING") && mission.status != "FAILED" && mission.status != "CANCELLED" || mission.progress >= 30
+    val isPlanActive = mission.status == "PLANNING"
+
+    val isDispatchDone = mission.status !in listOf("CREATED", "PLANNING", "DISPATCHING") && mission.status != "FAILED" && mission.status != "CANCELLED" || mission.progress >= 60
+    val isDispatchActive = mission.status == "DISPATCHING"
+
+    val isExecDone = mission.status in listOf("VALIDATING", "COMPLETED") || mission.progress >= 95
+    val isExecActive = mission.status in listOf("QUEUED", "STARTING", "RUNNING", "STREAMING", "WAITING_FOR_AGENT", "WAITING_FOR_APPROVAL", "WORKING") || (mission.progress in 31..94 && mission.status != "DISPATCHING" && mission.status != "PLANNING")
+
+    val isResultDone = mission.status == "COMPLETED" || mission.progress == 100
+    val isResultActive = mission.status == "VALIDATING" || (mission.progress in 95..99)
+
+    val phaseSubtitle = when {
+        mission.status == "COMPLETED" || mission.progress == 100 -> "Validation finale"
+        mission.status == "VALIDATING" -> "Contrôle qualité & validation"
+        mission.status in listOf("RUNNING", "STREAMING", "WORKING") -> "Phase exécution réelle"
+        mission.status in listOf("STARTING", "QUEUED") -> "Initialisation agents"
+        mission.status == "DISPATCHING" -> "Affectation des tâches"
+        mission.status == "PLANNING" -> "Génération DAG & Planification"
+        mission.status == "PAUSED" -> "Mission en pause"
+        mission.status == "CANCELLED" -> "Mission interrompue"
+        mission.status == "FAILED" -> "Erreur d'exécution"
+        mission.status == "BLOCKED" -> "Exécution bloquée"
+        else -> mission.lastTransitionReason ?: "Phase ${mission.status.lowercase()}"
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -964,29 +1132,18 @@ private fun DispatchingPipelineCard(mission: CamcsMission) {
                 )
 
                 Text(
-                    text = when {
-                        mission.progress == 100 -> "Validation finale"
-                        mission.progress >= 70 -> "Phase exécution"
-                        mission.progress >= 30 -> "Phase dispatching"
-                        else -> "Phase planification"
-                    },
+                    text = phaseSubtitle,
                     style = Type.caption.copy(fontSize = 10.5.sp),
                     color = electricGreen
                 )
             }
 
-            // Real State calculation per step
-            // Step 1: CAMCS Orchestrator (Done if mission started)
-            // Step 2: Planification DAG (Done if progress >= 30%)
-            // Step 3: Dispatching (Done if progress >= 60%)
-            // Step 4: Exécution Parallèle (Done if progress >= 85%)
-            // Step 5: Résultat Final (Done if progress == 100%)
             val steps = listOf(
                 StepInfo("CAMCS", isDone = true, isActive = false),
-                StepInfo("Planification", isDone = mission.progress >= 30, isActive = mission.progress in 1..29),
-                StepInfo("Dispatching", isDone = mission.progress >= 60, isActive = mission.progress in 30..59),
-                StepInfo("Exécution", isDone = mission.progress >= 85, isActive = mission.progress in 60..84),
-                StepInfo("Résultat", isDone = mission.progress == 100, isActive = mission.progress in 85..99)
+                StepInfo("Planification", isDone = isPlanDone, isActive = isPlanActive),
+                StepInfo("Dispatching", isDone = isDispatchDone, isActive = isDispatchActive),
+                StepInfo("Exécution", isDone = isExecDone, isActive = isExecActive),
+                StepInfo("Résultat", isDone = isResultDone, isActive = isResultActive)
             )
 
             Row(
@@ -1083,15 +1240,39 @@ private data class StepInfo(val name: String, val isDone: Boolean, val isActive:
  * - Dynamic height fitting content naturally (no empty void).
  */
 @Composable
-private fun LiveAgentCard(agent: CamcsAgent) {
+private fun LiveAgentCard(
+    agent: CamcsAgent,
+    missionId: String,
+    currentClockTick: Long,
+    onStopTask: (taskId: String?) -> Unit
+) {
     val dark = LocalDark.current
     val electricGreen = if (dark) Color(0xFF00E676) else Color(0xFF059669)
+    val statusVisual = getStatusVisual(agent.status, dark)
 
     val progressAnimated by animateFloatAsState(
         targetValue = agent.progress / 100f,
         animationSpec = tween(durationMillis = 400),
         label = "agentProgress"
     )
+
+    // Elapsed calculation for this agent
+    val agentElapsedSec = remember(agent.startedAt, agent.status, currentClockTick) {
+        val start = agent.startedAt ?: 0.0
+        if (start > 0) {
+            val end = if (agent.status in listOf("COMPLETED", "FAILED", "CANCELLED")) {
+                agent.lastActivityAt ?: (currentClockTick / 1000.0)
+            } else {
+                currentClockTick / 1000.0
+            }
+            (end - start).coerceAtLeast(0.0).toLong()
+        } else 0L
+    }
+    val agentElapsedStr = if (agentElapsedSec > 0) {
+        String.format(Locale.getDefault(), "%02d:%02d", agentElapsedSec / 60, agentElapsedSec % 60)
+    } else null
+
+    val isAgentActive = agent.status in listOf("WORKING", "RUNNING", "STREAMING", "STARTING", "WAITING_FOR_AGENT", "WAITING_FOR_APPROVAL", "VALIDATING") || (agent.pid != null && agent.pid > 0)
 
     Box(
         modifier = Modifier
@@ -1100,7 +1281,7 @@ private fun LiveAgentCard(agent: CamcsAgent) {
             .background(Palette.surface.copy(alpha = 0.7f))
             .border(
                 0.5.dp,
-                if (agent.status == "WORKING") electricGreen.copy(alpha = 0.5f) else Palette.glassBorder,
+                if (isAgentActive) electricGreen.copy(alpha = 0.5f) else Palette.glassBorder,
                 RoundedCornerShape(18.dp)
             )
             .padding(14.dp)
@@ -1127,38 +1308,50 @@ private fun LiveAgentCard(agent: CamcsAgent) {
                     )
                 }
 
-                // Status chip
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            when (agent.status) {
-                                "COMPLETED" -> Palette.emeraldAccent.copy(alpha = 0.18f)
-                                "WORKING" -> Palette.electricBlue.copy(alpha = 0.18f)
-                                "ANALYZING" -> Color(0xFF8B5CF6).copy(alpha = 0.18f)
-                                "VALIDATING" -> electricGreen.copy(alpha = 0.18f)
-                                else -> Palette.surface
-                            }
-                        )
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                // Status chip & PID/Time Column
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    Text(
-                        text = when (agent.status) {
-                            "COMPLETED" -> "TERMINÉ"
-                            "WORKING" -> "EN COURS"
-                            "ANALYZING" -> "ANALYSE"
-                            "VALIDATING" -> "VALIDATION"
-                            else -> agent.status
-                        },
-                        style = Type.caption.semibold.copy(fontSize = 10.sp),
-                        color = when (agent.status) {
-                            "COMPLETED" -> electricGreen
-                            "WORKING" -> Palette.electricBlue
-                            "ANALYZING" -> Color(0xFF8B5CF6)
-                            "VALIDATING" -> electricGreen
-                            else -> Palette.secondary
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(statusVisual.bg)
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = statusVisual.label,
+                            style = Type.caption.semibold.copy(fontSize = 10.sp),
+                            color = statusVisual.color
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (agent.pid != null && agent.pid > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(if (dark) Color(0xFF0F172A) else Color(0xFFE2E8F0))
+                                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "PID ${agent.pid}",
+                                    style = Type.caption.copy(fontSize = 9.sp, fontFamily = FontFamily.Monospace),
+                                    color = Palette.secondary
+                                )
+                            }
                         }
-                    )
+                        if (agentElapsedStr != null) {
+                            Text(
+                                text = "⏱ $agentElapsedStr",
+                                style = Type.caption.copy(fontSize = 9.5.sp),
+                                color = Palette.tertiary
+                            )
+                        }
+                    }
                 }
             }
 
@@ -1239,6 +1432,37 @@ private fun LiveAgentCard(agent: CamcsAgent) {
                 )
             }
 
+            // Real-time CLI Output Terminal Snippet
+            if (!agent.lastOutput.isNullOrBlank()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (dark) Color(0xFF090D16) else Color(0xFF1E293B))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(Palette.electricBlue))
+                        Text(
+                            text = "SORTIE CLI EN TEMPS RÉEL :",
+                            style = Type.caption.semibold.copy(fontSize = 8.5.sp, letterSpacing = 0.5.sp, fontFamily = FontFamily.Monospace),
+                            color = Palette.electricBlue
+                        )
+                    }
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        text = agent.lastOutput.takeLast(160),
+                        style = Type.caption.copy(fontSize = 10.sp, fontFamily = FontFamily.Monospace, lineHeight = 13.sp),
+                        color = Color(0xFFE2E8F0),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
             // Agent Progress Bar
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(
@@ -1266,7 +1490,7 @@ private fun LiveAgentCard(agent: CamcsAgent) {
                 }
             }
 
-            // Subtasks Checklist (Fully legible without truncation)
+            // Subtasks Checklist with Individual Stop Buttons
             if (agent.tasks.isNotEmpty()) {
                 Column(
                     modifier = Modifier
@@ -1299,7 +1523,8 @@ private fun LiveAgentCard(agent: CamcsAgent) {
                                         .background(
                                             when (subtask.status) {
                                                 "COMPLETED" -> electricGreen.copy(alpha = 0.2f)
-                                                "WORKING" -> Palette.electricBlue.copy(alpha = 0.2f)
+                                                "WORKING", "RUNNING" -> Palette.electricBlue.copy(alpha = 0.2f)
+                                                "CANCELLED" -> Palette.danger.copy(alpha = 0.15f)
                                                 else -> Palette.surface
                                             }
                                         ),
@@ -1307,8 +1532,10 @@ private fun LiveAgentCard(agent: CamcsAgent) {
                                 ) {
                                     if (subtask.status == "COMPLETED") {
                                         Symbol("checkmark", size = 10.dp, tint = electricGreen)
-                                    } else if (subtask.status == "WORKING") {
+                                    } else if (subtask.status == "WORKING" || subtask.status == "RUNNING") {
                                         Symbol("arrow.triangle.2.circlepath", size = 10.dp, tint = Palette.electricBlue)
+                                    } else if (subtask.status == "CANCELLED") {
+                                        Symbol("xmark", size = 8.dp, tint = Palette.danger)
                                     } else {
                                         Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(Palette.secondary))
                                     }
@@ -1321,6 +1548,19 @@ private fun LiveAgentCard(agent: CamcsAgent) {
                                     modifier = Modifier.weight(1f),
                                     softWrap = true
                                 )
+
+                                if (subtask.status in listOf("WORKING", "RUNNING")) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(Palette.danger.copy(alpha = 0.15f))
+                                            .clickable { onStopTask(subtask.id) },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Symbol("stop.fill", size = 8.dp, tint = Palette.danger)
+                                    }
+                                }
 
                                 Text(
                                     text = "${subtask.weight}%",
@@ -1359,6 +1599,36 @@ private fun LiveAgentCard(agent: CamcsAgent) {
                         color = electricGreen,
                         softWrap = true
                     )
+                }
+            }
+
+            // STOP TASK BUTTON ON RUNNING AGENT
+            if (isAgentActive && agent.status != "COMPLETED" && agent.status != "CANCELLED") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Palette.danger.copy(alpha = 0.12f))
+                            .border(0.5.dp, Palette.danger.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                            .clickable { onStopTask(agent.activeTaskId) }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Symbol("stop.fill", size = 9.dp, tint = Palette.danger)
+                            Text(
+                                text = "Arrêter la tâche",
+                                style = Type.caption.semibold.copy(fontSize = 10.5.sp),
+                                color = Palette.danger
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1787,6 +2057,61 @@ private fun executeAction(client: OkHttpClient, url: String, missionId: String) 
                 .build()
             client.newCall(req).execute().close()
         } catch (_: Exception) {}
+    }
+}
+
+private fun executeStopTask(
+    client: OkHttpClient,
+    missionId: String,
+    taskId: String? = null,
+    agentId: String? = null
+) {
+    CoroutineScope(Dispatchers.IO).launch {
+        try {
+            val taskPart = if (taskId != null) "\"taskId\": \"$taskId\", " else ""
+            val agentPart = if (agentId != null) "\"agentId\": \"$agentId\", " else ""
+            val json = "{$taskPart$agentPart\"missionId\": \"$missionId\"}"
+            val req = Request.Builder()
+                .url("http://127.0.0.1:19223/api/camcs/tasks/stop")
+                .post(json.toRequestBody("application/json".toMediaType()))
+                .build()
+            client.newCall(req).execute().close()
+        } catch (_: Exception) {}
+    }
+}
+
+private data class StatusVisual(
+    val label: String,
+    val color: Color,
+    val bg: Color
+)
+
+@Composable
+private fun getStatusVisual(status: String, dark: Boolean): StatusVisual {
+    val electricGreen = if (dark) Color(0xFF00E676) else Color(0xFF059669)
+    val electricBlue = Palette.electricBlue
+    val warningColor = Palette.warning
+    val dangerColor = Palette.danger
+    val purpleColor = Color(0xFF8B5CF6)
+    val cyanColor = Color(0xFF06B6D4)
+
+    return when (status.uppercase()) {
+        "CREATED" -> StatusVisual("CRÉÉ", Palette.secondary, Palette.surface)
+        "PLANNING" -> StatusVisual("PLANIFICATION", cyanColor, cyanColor.copy(alpha = 0.16f))
+        "DISPATCHING" -> StatusVisual("DISPATCHING", purpleColor, purpleColor.copy(alpha = 0.16f))
+        "QUEUED" -> StatusVisual("EN FILE", Palette.secondary, Palette.surface)
+        "STARTING" -> StatusVisual("DÉMARRAGE", electricBlue, electricBlue.copy(alpha = 0.16f))
+        "RUNNING", "WORKING" -> StatusVisual("EN COURS", electricGreen, electricGreen.copy(alpha = 0.16f))
+        "STREAMING" -> StatusVisual("STREAMING", electricBlue, electricBlue.copy(alpha = 0.2f))
+        "WAITING_FOR_AGENT" -> StatusVisual("ATTENTE AGENT", warningColor, warningColor.copy(alpha = 0.16f))
+        "WAITING_FOR_APPROVAL" -> StatusVisual("ATTENTE VALIDATION", warningColor, warningColor.copy(alpha = 0.22f))
+        "VALIDATING", "ANALYZING" -> StatusVisual("VALIDATION", purpleColor, purpleColor.copy(alpha = 0.16f))
+        "COMPLETED" -> StatusVisual("TERMINÉ", electricGreen, electricGreen.copy(alpha = 0.2f))
+        "FAILED" -> StatusVisual("ÉCHEC", dangerColor, dangerColor.copy(alpha = 0.2f))
+        "BLOCKED" -> StatusVisual("BLOQUÉ", dangerColor, dangerColor.copy(alpha = 0.22f))
+        "CANCELLED", "STOPPED" -> StatusVisual("ARRÊTÉ", Palette.tertiary, Palette.surface)
+        "PAUSED" -> StatusVisual("EN PAUSE", warningColor, warningColor.copy(alpha = 0.16f))
+        else -> StatusVisual(status, Palette.secondary, Palette.surface)
     }
 }
 

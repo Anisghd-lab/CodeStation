@@ -69,6 +69,8 @@ import com.ghdinteractivestudio.codestation.MainActivity
 import com.ghdinteractivestudio.codestation.data.local.ApprovalEntity
 import com.ghdinteractivestudio.codestation.domain.model.Bot
 import com.ghdinteractivestudio.codestation.domain.model.BotStatus
+import com.ghdinteractivestudio.codestation.domain.model.CamcsMission
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.ghdinteractivestudio.codestation.ui.components.CharacterAvatar
 import com.ghdinteractivestudio.codestation.ui.components.IslandPhase
 import com.ghdinteractivestudio.codestation.ui.components.Symbol
@@ -177,19 +179,28 @@ class DynamicIslandOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
         val app = application as? CodeStationApplication ?: return
         val container = app.container
 
+        data class IslandInputs(
+            val isEnabled: Boolean,
+            val bots: List<Bot>,
+            val approvals: List<ApprovalEntity>,
+            val camcsMission: CamcsMission?
+        )
+
         observerJob?.cancel()
         observerJob = scope.launch {
             combine(
                 container.preferencesRepository.dynamicIslandOverlayEnabledStream,
                 container.botRepository.getBotsStream(),
-                container.approvalDao.getAllPendingApprovalsStream()
-            ) { isEnabled, bots, approvals ->
-                Triple(isEnabled, bots, approvals)
-            }.collect { (isEnabled, bots, approvals) ->
+                container.approvalDao.getAllPendingApprovalsStream(),
+                container.camcsRepository.activeMissionStream
+            ) { isEnabled, bots, approvals, camcsMission ->
+                IslandInputs(isEnabled, bots, approvals, camcsMission)
+            }.collect { (isEnabled, bots, approvals, camcsMission) ->
                 val hasPermission = OverlayPermissionHelper.canDrawOverlays(this@DynamicIslandOverlayService)
                 val hasWorkingBot = bots.any { it.status == BotStatus.WORKING || it.status == BotStatus.BUSY }
                 val hasApproval = approvals.isNotEmpty()
-                val currentlyActive = hasWorkingBot || hasApproval
+                val hasActiveCamcs = camcsMission != null && camcsMission.status !in listOf("CANCELLED", "FAILED")
+                val currentlyActive = hasWorkingBot || hasApproval || hasActiveCamcs
 
                 val shouldShow = isEnabled && hasPermission && (currentlyActive || wasActive)
 
@@ -389,6 +400,15 @@ class DynamicIslandOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
                             }
                             startActivity(intent)
                         },
+                        onOpenCamcs = { missionId ->
+                            val intent = Intent(this@DynamicIslandOverlayService, MainActivity::class.java).apply {
+                                action = Intent.ACTION_VIEW
+                                data = Uri.parse("codestation://camcs?missionId=$missionId")
+                                putExtra("missionId", missionId)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            }
+                            startActivity(intent)
+                        },
                         onToggleExpand = { expanded ->
                             updateOverlayExpansion(expanded)
                         }
@@ -435,12 +455,14 @@ private fun OverlayIslandContent(
     isExpandedState: androidx.compose.runtime.MutableState<Boolean>,
     metrics: CutoutMetrics,
     onOpenBot: (String) -> Unit,
+    onOpenCamcs: (String) -> Unit = {},
     onToggleExpand: (Boolean) -> Unit = {}
 ) {
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
     val bots by container.botRepository.getBotsStream().collectAsState(initial = emptyList())
     val approvals by container.approvalDao.getAllPendingApprovalsStream().collectAsState(initial = emptyList())
     val streamingEvent by container.eventStreamClient.streamingFlow.collectAsState(initial = null)
+    val camcsMission by container.camcsRepository.activeMissionStream.collectAsState(initial = null)
 
     val streamingBots = remember { mutableStateMapOf<String, Boolean>() }
     LaunchedEffect(streamingEvent) {
@@ -457,37 +479,51 @@ private fun OverlayIslandContent(
         bots.filter { it.status == BotStatus.WORKING || it.status == BotStatus.BUSY }
     }
 
+    val isCamcsActive = camcsMission != null && camcsMission?.status in listOf(
+        "WORKING", "RUNNING", "STREAMING", "PLANNING", "DISPATCHING",
+        "STARTING", "QUEUED", "WAITING_FOR_AGENT", "WAITING_FOR_APPROVAL", "VALIDATING"
+    )
+    val isCamcsStreaming = camcsMission?.status == "STREAMING"
+    val isCamcsNeedsApproval = camcsMission?.status == "WAITING_FOR_APPROVAL"
+    val isCamcsError = camcsMission?.status in listOf("FAILED", "BLOCKED")
+    val isCamcsCompleted = camcsMission?.status == "COMPLETED"
+    val isCamcsPaused = camcsMission?.status == "PAUSED"
+
     var lastCompletedBotName by remember { mutableStateOf<String?>(null) }
     var showCompletedBanner by remember { mutableStateOf(false) }
     var previousWorkingBotIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var startedAt by remember { mutableLongStateOf(0L) }
 
-    LaunchedEffect(activeBots) {
+    LaunchedEffect(activeBots, camcsMission?.id, camcsMission?.status) {
         val currentIds = activeBots.map { it.id }.toSet()
-        if (activeBots.isNotEmpty()) {
-            if (previousWorkingBotIds.isEmpty()) {
-                val oldestActivity = activeBots.map { it.lastActivityAt }.filter { it > 0 }.minOrNull()
-                startedAt = oldestActivity ?: System.currentTimeMillis()
+        if (activeBots.isNotEmpty() || isCamcsActive) {
+            if (previousWorkingBotIds.isEmpty() && startedAt == 0L) {
+                val oldestBot = activeBots.map { it.lastActivityAt }.filter { it > 0 }.minOrNull()
+                val camcsStart = camcsMission?.let { (it.createdAt * 1000).toLong() }
+                startedAt = listOfNotNull(oldestBot, camcsStart).minOrNull() ?: System.currentTimeMillis()
             }
             showCompletedBanner = false
-        } else if (previousWorkingBotIds.isNotEmpty()) {
+        } else if (previousWorkingBotIds.isNotEmpty() || isCamcsCompleted) {
             val completedBot = bots.firstOrNull { it.id in previousWorkingBotIds }
-            lastCompletedBotName = completedBot?.name ?: "Agent"
+            lastCompletedBotName = completedBot?.name ?: camcsMission?.title ?: "Tâche CAMCS"
             showCompletedBanner = true
             delay(4000)
             showCompletedBanner = false
+            startedAt = 0L
         }
         previousWorkingBotIds = currentIds
     }
 
-    // Machine à états avec respect strict des priorités :
-    // NEEDS_APPROVAL > ERROR > STREAMING > WORKING > COMPLETED > IDLE / READY
-    val isStreamingActive = activeBots.any { streamingBots[it.id] == true }
+    // Machine à états unifiée bots + CAMCS avec priorités :
+    // NEEDS_APPROVAL > ERROR > STREAMING > WORKING > COMPLETED > PAUSED > IDLE / READY
+    val isStreamingActive = activeBots.any { streamingBots[it.id] == true } || isCamcsStreaming
     val phase = when {
-        approvals.isNotEmpty() -> IslandPhase.NEEDS_APPROVAL
+        approvals.isNotEmpty() || isCamcsNeedsApproval -> IslandPhase.NEEDS_APPROVAL
+        isCamcsError -> IslandPhase.ERROR
         isStreamingActive -> IslandPhase.STREAMING
-        activeBots.isNotEmpty() -> IslandPhase.WORKING
-        showCompletedBanner -> IslandPhase.COMPLETED
+        activeBots.isNotEmpty() || isCamcsActive -> IslandPhase.WORKING
+        isCamcsPaused -> IslandPhase.PAUSED
+        showCompletedBanner || isCamcsCompleted -> IslandPhase.COMPLETED
         bots.any { it.status == BotStatus.IDLE } -> IslandPhase.IDLE
         else -> IslandPhase.READY
     }
@@ -536,7 +572,13 @@ private fun OverlayIslandContent(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            if (activeBots.size == 1) {
+                            if (camcsMission != null && activeBots.isEmpty()) {
+                                Symbol("bolt.fill", size = 18.dp, tint = Palette.electricBlue)
+                                Column {
+                                    Text(camcsMission!!.title, style = Type.body.bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("Mission CAMCS (${camcsMission!!.status})", style = Type.system(10f), color = Palette.electricBlue)
+                                }
+                            } else if (activeBots.size == 1 && camcsMission == null) {
                                 val single = activeBots.first()
                                 CharacterAvatar(shape = single.avatarGlyph, color = single.avatarColorHex, size = 26.dp)
                                 Column {
@@ -547,9 +589,10 @@ private fun OverlayIslandContent(
                                         color = if (streamingBots[single.id] == true) Palette.electricBlue else Palette.emeraldAccent
                                     )
                                 }
-                            } else if (activeBots.size > 1) {
+                            } else if (activeBots.isNotEmpty() || camcsMission != null) {
+                                val count = activeBots.size + (if (camcsMission != null) 1 else 0)
                                 Symbol("sparkles", size = 18.dp, tint = Palette.electricBlue)
-                                Text("${activeBots.size} Agents mobilisés", style = Type.body.bold, color = Color.White)
+                                Text("$count Tâches & Agents mobilisés", style = Type.body.bold, color = Color.White)
                             } else if (phase == IslandPhase.NEEDS_APPROVAL) {
                                 Symbol("exclamationmark.triangle.fill", size = 18.dp, tint = Palette.warning)
                                 Text("${approvals.size} Action(s) requise(s)", style = Type.body.bold, color = Color.White)
@@ -573,6 +616,143 @@ private fun OverlayIslandContent(
                             contentAlignment = Alignment.Center
                         ) {
                             Symbol("chevron.up", size = 12.dp, tint = Color.White)
+                        }
+                    }
+
+                    // Section CAMCS Mission Supervision en temps réel
+                    if (camcsMission != null) {
+                        val m = camcsMission!!
+                        val activeAgent = m.agents.firstOrNull {
+                            it.status in listOf("WORKING", "RUNNING", "STREAMING", "STARTING", "VALIDATING")
+                        } ?: m.agents.firstOrNull()
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White.copy(alpha = 0.06f), RoundedRectangle(12.dp))
+                                .border(0.5.dp, Palette.electricBlue.copy(alpha = 0.35f), RoundedRectangle(12.dp))
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(Palette.electricBlue.copy(alpha = 0.2f))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text("CAMCS", style = Type.caption2.bold, color = Palette.electricBlue)
+                                    }
+                                    Text(
+                                        text = m.title,
+                                        style = Type.caption.bold,
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Text(
+                                    text = "${m.progress}%",
+                                    style = Type.caption2.bold,
+                                    color = Palette.emeraldAccent
+                                )
+                            }
+
+                            if (activeAgent != null) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    CharacterAvatar(shape = activeAgent.shape, color = activeAgent.color, size = 22.dp)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "${activeAgent.name} (${activeAgent.role})",
+                                            style = Type.caption.bold,
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            text = activeAgent.currentSubtask,
+                                            style = Type.caption2,
+                                            color = Color.White.copy(alpha = 0.75f),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    if (activeAgent.pid != null && activeAgent.pid > 0) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(Color.White.copy(alpha = 0.1f))
+                                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = "PID ${activeAgent.pid}",
+                                                style = Type.caption2.monospaced,
+                                                color = Palette.secondary
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (!activeAgent.lastOutput.isNullOrBlank()) {
+                                    Text(
+                                        text = "> ${activeAgent.lastOutput.takeLast(100)}",
+                                        style = Type.caption2.monospaced,
+                                        color = Color(0xFF93C5FD),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+
+                            // Boutons d'action pour la tâche CAMCS en cours
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (m.status in listOf("WORKING", "RUNNING", "STREAMING", "STARTING", "PLANNING", "DISPATCHING")) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .background(Palette.danger.copy(alpha = 0.2f), Capsule())
+                                            .clip(Capsule())
+                                            .clickable {
+                                                coroutineScope.launch {
+                                                    container.camcsRepository.stopTask(m.id, activeAgent?.activeTaskId, activeAgent?.id)
+                                                }
+                                            }
+                                            .padding(vertical = 5.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("Arrêter tâche", style = Type.caption2.bold, color = Palette.danger)
+                                    }
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(Palette.electricBlue.copy(alpha = 0.25f), Capsule())
+                                        .clip(Capsule())
+                                        .clickable {
+                                            onToggleExpand(false)
+                                            onOpenCamcs(m.id)
+                                        }
+                                        .padding(vertical = 5.dp),
+                                        contentAlignment = Alignment.Center
+                                ) {
+                                    Text("Centre CAMCS", style = Type.caption2.bold, color = Palette.electricBlue)
+                                }
+                            }
                         }
                     }
 
@@ -684,7 +864,7 @@ private fun OverlayIslandContent(
                                 }
                             }
                         }
-                    } else if (activeBots.size == 1 && approvals.isEmpty()) {
+                    } else if (activeBots.size == 1 && approvals.isEmpty() && camcsMission == null) {
                         val single = activeBots.first()
                         val activityText = single.lastMessage?.takeIf { it.isNotBlank() } ?: single.description.takeIf { it.isNotBlank() } ?: "Traitement CLI en cours..."
                         Text(
@@ -705,7 +885,9 @@ private fun OverlayIslandContent(
                             .clip(Capsule())
                             .clickable {
                                 onToggleExpand(false)
-                                if (targetBotId.isNotEmpty()) {
+                                if (camcsMission != null) {
+                                    onOpenCamcs(camcsMission!!.id)
+                                } else if (targetBotId.isNotEmpty()) {
                                     onOpenBot(targetBotId)
                                 }
                             }
@@ -713,7 +895,11 @@ private fun OverlayIslandContent(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            if (targetBotId.isNotEmpty()) "Accéder à l'Agent" else "Ouvrir CodeStation",
+                            when {
+                                camcsMission != null -> "Ouvrir Centre de Contrôle CAMCS"
+                                targetBotId.isNotEmpty() -> "Accéder à l'Agent"
+                                else -> "Ouvrir CodeStation"
+                            },
                             style = Type.caption.bold,
                             color = Color.White
                         )
@@ -787,8 +973,16 @@ private fun OverlayIslandContent(
                     Text(
                         text = when (phase) {
                             IslandPhase.WORKING, IslandPhase.STREAMING -> {
-                                if (activeBots.size > 1) {
-                                    "${activeBots.size}b · ${formatIslandElapsed(startedAt)}"
+                                val activeCount = activeBots.size + (if (isCamcsActive) 1 else 0)
+                                if (activeCount > 1) {
+                                    "${activeCount}act · ${formatIslandElapsed(startedAt)}"
+                                } else if (isCamcsActive) {
+                                    val activeAgent = camcsMission?.agents?.firstOrNull { it.status in listOf("WORKING", "RUNNING", "STREAMING") }
+                                    if (activeAgent != null) {
+                                        "${activeAgent.name.take(5)} · ${formatIslandElapsed(startedAt)}"
+                                    } else {
+                                        formatIslandElapsed(startedAt)
+                                    }
                                 } else {
                                     formatIslandElapsed(startedAt)
                                 }
