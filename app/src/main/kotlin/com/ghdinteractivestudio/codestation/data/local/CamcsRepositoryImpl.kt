@@ -148,7 +148,7 @@ class CamcsRepositoryImpl : CamcsRepository {
 
             when (ev.type) {
                 "mission.status_changed" -> {
-                    val newStatus = payload?.get("status")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                    val newStatus = (payload?.get("currentState") ?: payload?.get("status"))?.let { (it as? JsonPrimitive)?.contentOrNull }
                     val prog = payload?.get("progress")?.let { (it as? JsonPrimitive)?.intOrNull }
                     val reason = payload?.get("reason")?.let { (it as? JsonPrimitive)?.contentOrNull }
                     if (newStatus != null) {
@@ -177,14 +177,39 @@ class CamcsRepositoryImpl : CamcsRepository {
                 }
                 "mission.cancelled" -> {
                     val updated = currentList.map { m ->
-                        if (m.id == mid) m.copy(status = "CANCELLED") else m
+                        if (m.id == mid) m.copy(
+                            status = "CANCELLED",
+                            lastTransitionReason = "Mission arrêtée par l'utilisateur",
+                            lastTransitionTime = System.currentTimeMillis() / 1000.0
+                        ) else m
+                    }
+                    _allMissionsStream.value = updated
+                    updateActiveMissionFromList(updated)
+                }
+                "task.cancelled" -> {
+                    val aId = ev.agentId ?: payload?.get("agentId")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                    val tId = payload?.get("taskId")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                    val updated = currentList.map { m ->
+                        if (m.id == mid) {
+                            m.copy(agents = m.agents.map { ag ->
+                                if (aId == null || ag.id == aId) {
+                                    ag.copy(
+                                        status = "CANCELLED",
+                                        pid = null,
+                                        tasks = ag.tasks.map { t ->
+                                            if (tId == null || t.id == tId) t.copy(status = "CANCELLED", pid = null) else t
+                                        }
+                                    )
+                                } else ag
+                            })
+                        } else m
                     }
                     _allMissionsStream.value = updated
                     updateActiveMissionFromList(updated)
                 }
                 "agent.status_changed" -> {
                     val aId = ev.agentId ?: payload?.get("agentId")?.let { (it as? JsonPrimitive)?.contentOrNull }
-                    val aStatus = payload?.get("status")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                    val aStatus = (payload?.get("currentState") ?: payload?.get("status"))?.let { (it as? JsonPrimitive)?.contentOrNull }
                     val aProg = payload?.get("progress")?.let { (it as? JsonPrimitive)?.intOrNull }
                     val aSubtask = payload?.get("subtask")?.let { (it as? JsonPrimitive)?.contentOrNull }
                     val aPid = payload?.get("pid")?.let { (it as? JsonPrimitive)?.intOrNull }

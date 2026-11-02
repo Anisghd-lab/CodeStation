@@ -550,7 +550,7 @@ private fun DynamicIslandExpandedCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (m.status in listOf("WORKING", "RUNNING", "STREAMING", "STARTING", "PLANNING", "DISPATCHING")) {
+                    if (m.status !in listOf("COMPLETED", "FAILED", "CANCELLED")) {
                         Box(
                             modifier = Modifier
                                 .weight(1f)

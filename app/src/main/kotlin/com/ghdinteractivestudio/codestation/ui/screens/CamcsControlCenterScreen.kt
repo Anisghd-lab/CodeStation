@@ -39,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -162,6 +163,62 @@ fun CamcsControlCenterScreen(
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.MILLISECONDS) // SSE stream infinite timeout
             .build()
+    }
+
+    val cancellingMissions = remember { mutableStateMapOf<String, Boolean>() }
+    val cancellingTasks = remember { mutableStateMapOf<String, Boolean>() }
+
+    val handleCancelMission: (String) -> Unit = { mId ->
+        if (cancellingMissions[mId] != true) {
+            cancellingMissions[mId] = true
+            missions = missions.map { m ->
+                if (m.id == mId) {
+                    m.copy(
+                        status = "CANCELLED",
+                        lastTransitionReason = "Annulation en cours...",
+                        lastTransitionTime = System.currentTimeMillis() / 1000.0
+                    )
+                } else m
+            }
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val req = Request.Builder()
+                        .url("http://127.0.0.1:19223/api/camcs/missions/cancel")
+                        .post("""{"missionId": "$mId"}""".toRequestBody("application/json".toMediaType()))
+                        .build()
+                    httpClient.newCall(req).execute().close()
+                } catch (_: Exception) {
+                } finally {
+                    withContext(Dispatchers.Main) {
+                        cancellingMissions.remove(mId)
+                    }
+                }
+            }
+        }
+    }
+
+    val handleStopTask: (missionId: String, taskId: String?, agentId: String?) -> Unit = { mId, tId, aId ->
+        val key = "${mId}_${tId ?: aId ?: ""}"
+        if (cancellingTasks[key] != true) {
+            cancellingTasks[key] = true
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val taskPart = if (tId != null) "\"taskId\": \"$tId\", " else ""
+                    val agentPart = if (aId != null) "\"agentId\": \"$aId\", " else ""
+                    val json = "{$taskPart$agentPart\"missionId\": \"$mId\"}"
+                    val req = Request.Builder()
+                        .url("http://127.0.0.1:19223/api/camcs/tasks/stop")
+                        .post(json.toRequestBody("application/json".toMediaType()))
+                        .build()
+                    httpClient.newCall(req).execute().close()
+                } catch (_: Exception) {
+                } finally {
+                    withContext(Dispatchers.Main) {
+                        cancellingTasks.remove(key)
+                    }
+                }
+            }
+        }
     }
 
     // 0. Non-freezing live monotonic clock tick
@@ -321,7 +378,7 @@ fun CamcsControlCenterScreen(
 
                                                 when (ev.type) {
                                                     "mission.status_changed" -> {
-                                                        val newStatus = payload?.get("status")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        val newStatus = (payload?.get("currentState") ?: payload?.get("status"))?.let { (it as? JsonPrimitive)?.contentOrNull }
                                                         val prog = payload?.get("progress")?.let { (it as? JsonPrimitive)?.intOrNull }
                                                         val reason = payload?.get("reason")?.let { (it as? JsonPrimitive)?.contentOrNull }
                                                         if (newStatus != null) {
@@ -351,12 +408,35 @@ fun CamcsControlCenterScreen(
                                                     }
                                                     "mission.cancelled" -> {
                                                         missions = missions.map { m ->
-                                                            if (m.id == ev.missionId) m.copy(status = "CANCELLED") else m
+                                                            if (m.id == ev.missionId) m.copy(
+                                                                status = "CANCELLED",
+                                                                lastTransitionReason = "Mission arrêtée par l'utilisateur",
+                                                                lastTransitionTime = System.currentTimeMillis() / 1000.0
+                                                            ) else m
+                                                        }
+                                                    }
+                                                    "task.cancelled" -> {
+                                                        val aId = ev.agentId ?: payload?.get("agentId")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        val tId = payload?.get("taskId")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        missions = missions.map { m ->
+                                                            if (m.id == ev.missionId) {
+                                                                m.copy(agents = m.agents.map { ag ->
+                                                                    if (aId == null || ag.id == aId) {
+                                                                        ag.copy(
+                                                                            status = "CANCELLED",
+                                                                            pid = null,
+                                                                            tasks = ag.tasks.map { t ->
+                                                                                if (tId == null || t.id == tId) t.copy(status = "CANCELLED", pid = null) else t
+                                                                            }
+                                                                        )
+                                                                    } else ag
+                                                                })
+                                                            } else m
                                                         }
                                                     }
                                                     "agent.status_changed" -> {
                                                         val aId = ev.agentId ?: payload?.get("agentId")?.let { (it as? JsonPrimitive)?.contentOrNull }
-                                                        val aStatus = payload?.get("status")?.let { (it as? JsonPrimitive)?.contentOrNull }
+                                                        val aStatus = (payload?.get("currentState") ?: payload?.get("status"))?.let { (it as? JsonPrimitive)?.contentOrNull }
                                                         val aProg = payload?.get("progress")?.let { (it as? JsonPrimitive)?.intOrNull }
                                                         val aSubtask = payload?.get("subtask")?.let { (it as? JsonPrimitive)?.contentOrNull }
                                                         val aPid = payload?.get("pid")?.let { (it as? JsonPrimitive)?.intOrNull }
@@ -603,13 +683,16 @@ fun CamcsControlCenterScreen(
                             MissionSelectorRow(
                                 missions = missions,
                                 selectedMissionId = activeMission.id,
-                                onSelect = { selectedMissionId = it }
+                                cancellingMissions = cancellingMissions,
+                                onSelect = { selectedMissionId = it },
+                                onCancelMission = handleCancelMission
                             )
                         }
 
                         MissionMasterCard(
                             mission = activeMission,
                             currentClockTick = currentClockTick,
+                            isCancelling = cancellingMissions[activeMission.id] == true,
                             onPause = {
                                 executeAction(httpClient, "http://127.0.0.1:19223/api/camcs/missions/pause", activeMission.id)
                             },
@@ -617,7 +700,7 @@ fun CamcsControlCenterScreen(
                                 executeAction(httpClient, "http://127.0.0.1:19223/api/camcs/missions/resume", activeMission.id)
                             },
                             onCancel = {
-                                executeAction(httpClient, "http://127.0.0.1:19223/api/camcs/missions/cancel", activeMission.id)
+                                handleCancelMission(activeMission.id)
                             }
                         )
 
@@ -638,12 +721,7 @@ fun CamcsControlCenterScreen(
                                 missionId = activeMission.id,
                                 currentClockTick = currentClockTick,
                                 onStopTask = { taskId ->
-                                    executeStopTask(
-                                        httpClient,
-                                        activeMission.id,
-                                        taskId = taskId,
-                                        agentId = agent.id
-                                    )
+                                    handleStopTask(activeMission.id, taskId, agent.id)
                                 }
                             )
                         }
@@ -809,7 +887,9 @@ fun CamcsControlCenterScreen(
 private fun MissionSelectorRow(
     missions: List<CamcsMission>,
     selectedMissionId: String,
-    onSelect: (String) -> Unit
+    cancellingMissions: Map<String, Boolean>,
+    onSelect: (String) -> Unit,
+    onCancelMission: (String) -> Unit
 ) {
     val scrollState = rememberScrollState()
 
@@ -824,12 +904,15 @@ private fun MissionSelectorRow(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(scrollState),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         missions.forEach { m ->
             val isSelected = m.id == selectedMissionId
-            Box(
+            val canCancel = isCancellableState(m.status) && !isTerminalState(m.status)
+            val isCancelling = cancellingMissions[m.id] == true
+
+            Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .background(
@@ -842,14 +925,54 @@ private fun MissionSelectorRow(
                         RoundedCornerShape(8.dp)
                     )
                     .clickable { onSelect(m.id) }
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .padding(horizontal = 9.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                // Status dot indicator
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when (m.status.uppercase()) {
+                                "COMPLETED" -> Palette.added
+                                "FAILED", "BLOCKED" -> Palette.danger
+                                "CANCELLED" -> Palette.secondary
+                                "STREAMING" -> Palette.electricBlue
+                                else -> Palette.emeraldAccent
+                            }
+                        )
+                )
+
                 Text(
                     text = "${m.title} (${m.progress}%)",
                     style = Type.caption.semibold.copy(fontSize = 10.5.sp),
                     color = if (isSelected) Palette.electricBlue else Palette.secondary,
                     maxLines = 1
                 )
+
+                // Inline Cancel Button for ANY cancellable mission (selected or not)
+                if (canCancel) {
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(Palette.danger.copy(alpha = if (isCancelling) 0.12f else 0.25f))
+                            .clickable(enabled = !isCancelling) { onCancelMission(m.id) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isCancelling) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(10.dp),
+                                color = Palette.danger,
+                                strokeWidth = 1.2.dp
+                            )
+                        } else {
+                            Symbol("xmark", size = 8.dp, tint = Palette.danger)
+                        }
+                    }
+                }
             }
         }
     }
@@ -862,6 +985,7 @@ private fun MissionSelectorRow(
 private fun MissionMasterCard(
     mission: CamcsMission,
     currentClockTick: Long,
+    isCancelling: Boolean,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onCancel: () -> Unit
@@ -1018,7 +1142,7 @@ private fun MissionMasterCard(
             }
 
             // Action Buttons (Pause / Resume / Cancel Mission)
-            val isMissionRunning = mission.status in listOf("WORKING", "RUNNING", "STREAMING", "STARTING", "PLANNING", "DISPATCHING", "QUEUED", "WAITING_FOR_AGENT", "WAITING_FOR_APPROVAL", "VALIDATING")
+            val canCancel = isCancellableState(mission.status) && !isTerminalState(mission.status)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1036,12 +1160,42 @@ private fun MissionMasterCard(
                         modifier = Modifier.weight(1f)
                     )
                 }
-                if (isMissionRunning || mission.status == "PAUSED") {
-                    SecondaryButton(
-                        title = "Arrêter la mission",
-                        action = onCancel,
-                        modifier = Modifier.weight(1f)
-                    )
+                if (canCancel) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Palette.danger.copy(alpha = if (isCancelling) 0.12f else 0.22f))
+                            .border(0.5.dp, Palette.danger.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                            .clickable(enabled = !isCancelling, onClick = onCancel)
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (isCancelling) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(13.dp),
+                                    color = Palette.danger,
+                                    strokeWidth = 1.5.dp
+                                )
+                                Text(
+                                    text = "Annulation...",
+                                    style = Type.caption.semibold,
+                                    color = Palette.danger
+                                )
+                            } else {
+                                Symbol("xmark.circle.fill", size = 14.dp, tint = Palette.danger)
+                                Text(
+                                    text = "Annuler la mission",
+                                    style = Type.caption.semibold,
+                                    color = Palette.danger
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1308,22 +1462,52 @@ private fun LiveAgentCard(
                     )
                 }
 
-                // Status chip & PID/Time Column
+                // Status chip, Stop button & PID/Time Column
                 Column(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(statusVisual.bg)
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = statusVisual.label,
-                            style = Type.caption.semibold.copy(fontSize = 10.sp),
-                            color = statusVisual.color
-                        )
+                        val isAgentCancellable = isCancellableState(agent.status) && !isTerminalState(agent.status)
+                        if (isAgentCancellable) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Palette.danger.copy(alpha = 0.18f))
+                                    .border(0.5.dp, Palette.danger.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                                    .clickable { onStopTask(agent.activeTaskId) }
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Symbol("stop.fill", size = 7.dp, tint = Palette.danger)
+                                    Text(
+                                        text = "Arrêter",
+                                        style = Type.caption2.semibold.copy(fontSize = 9.sp),
+                                        color = Palette.danger
+                                    )
+                                }
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(statusVisual.bg)
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = statusVisual.label,
+                                style = Type.caption.semibold.copy(fontSize = 10.sp),
+                                color = statusVisual.color
+                            )
+                        }
                     }
 
                     Row(
@@ -1549,7 +1733,7 @@ private fun LiveAgentCard(
                                     softWrap = true
                                 )
 
-                                if (subtask.status in listOf("WORKING", "RUNNING")) {
+                                if (isCancellableState(subtask.status) && !isTerminalState(subtask.status)) {
                                     Box(
                                         modifier = Modifier
                                             .size(20.dp)
@@ -2113,6 +2297,31 @@ private fun getStatusVisual(status: String, dark: Boolean): StatusVisual {
         "PAUSED" -> StatusVisual("EN PAUSE", warningColor, warningColor.copy(alpha = 0.16f))
         else -> StatusVisual(status, Palette.secondary, Palette.surface)
     }
+}
+
+private fun isCancellableState(status: String?): Boolean {
+    if (status == null) return false
+    return status.uppercase() in listOf(
+        "CREATED",
+        "PLANNING",
+        "DISPATCHING",
+        "QUEUED",
+        "STARTING",
+        "RUNNING",
+        "STREAMING",
+        "WAITING_FOR_AGENT",
+        "WAITING_FOR_APPROVAL",
+        "VALIDATING",
+        "ANALYZING",
+        "BLOCKED",
+        "PAUSED",
+        "WORKING"
+    )
+}
+
+private fun isTerminalState(status: String?): Boolean {
+    if (status == null) return true
+    return status.uppercase() in listOf("COMPLETED", "FAILED", "CANCELLED", "STOPPED")
 }
 
 /**

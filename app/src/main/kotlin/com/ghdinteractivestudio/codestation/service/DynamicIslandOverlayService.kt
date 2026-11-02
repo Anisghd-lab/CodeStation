@@ -720,7 +720,7 @@ private fun OverlayIslandContent(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                if (m.status in listOf("WORKING", "RUNNING", "STREAMING", "STARTING", "PLANNING", "DISPATCHING")) {
+                                if (m.status !in listOf("COMPLETED", "FAILED", "CANCELLED")) {
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)
@@ -728,13 +728,13 @@ private fun OverlayIslandContent(
                                             .clip(Capsule())
                                             .clickable {
                                                 coroutineScope.launch {
-                                                    container.camcsRepository.stopTask(m.id, activeAgent?.activeTaskId, activeAgent?.id)
+                                                    container.camcsRepository.cancelMission(m.id)
                                                 }
                                             }
                                             .padding(vertical = 5.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text("Arrêter tâche", style = Type.caption2.bold, color = Palette.danger)
+                                        Text("Annuler mission", style = Type.caption2.bold, color = Palette.danger)
                                     }
                                 }
 

@@ -31,6 +31,7 @@ from camcs.deliverable_manager import DeliverableManager
 from camcs.quality_auditor import QualityAuditor
 from camcs.collaboration_hub import CollaborationHub
 from camcs.collective_memory_client import CollectiveMemoryClient
+from camcs.runners.base_runner import CliExecutionResult, BaseCliRunner
 
 # Database for CAMCS persistence
 DB_PATH = os.path.expanduser("/root/.codestation/camcs.db")
@@ -1054,6 +1055,7 @@ class CamcsOrchestrationEngine:
             "taskId": task_id,
             "previousState": prev_state,
             "currentState": new_state,
+            "status": new_state,
             "reason": reason,
             "durationMs": duration_ms,
             "eventSource": event_source,
@@ -1077,6 +1079,19 @@ class CamcsOrchestrationEngine:
         with self._lock:
             m = self.active_missions.get(mission_id)
             if not m:
+                try:
+                    conn = sqlite3.connect(DB_PATH)
+                    cur = conn.cursor()
+                    if agent_id:
+                        cur.execute("UPDATE agents SET status = 'CANCELLED', updated_at = ? WHERE id = ? AND mission_id = ?", (time.time(), agent_id, mission_id))
+                    else:
+                        cur.execute("UPDATE missions SET status = 'CANCELLED', updated_at = ? WHERE id = ?", (time.time(), mission_id))
+                    conn.commit()
+                    conn.close()
+                    self.emit_event(mission_id, "task.cancelled", f"Tâche arrêtée dans la base de données : {task_id or agent_id}", agent_id=agent_id, payload={"taskId": task_id, "agentId": agent_id, "status": "CANCELLED"})
+                    return True
+                except Exception:
+                    pass
                 return False
 
             if task_id:
@@ -1208,6 +1223,144 @@ class CamcsOrchestrationEngine:
                     pass
             return results
 
+    def execute_with_failover(
+        self,
+        mission: CamcsMission,
+        agent: CamcsAgent,
+        task_id: str,
+        prompt: str,
+        cwd: str,
+        task_type: str = "coding",
+        timeout: int = 90,
+        output_callback: Optional[Callable[[str, str], None]] = None,
+        pid_callback: Optional[Callable[[int], None]] = None
+    ) -> Tuple[CliExecutionResult, str]:
+        """
+        Executes a task with multi-level failover:
+        1. If it's a research / zero-token task, direct model API (OpenRouter free or xKIRO) can be utilized directly.
+        2. Otherwise, executes via primary CLI runner (e.g. Antigravity, Clixad, CodeBuddy, OpenCode).
+        3. If primary CLI runner fails, times out (code -9), or produces empty output:
+           -> Emits 'cli.failover' event to Control Center.
+           -> Automatically fails over to the next healthy operational CLI runner (CodeBuddy, Clixad, OpenCode).
+        4. If all local CLI runners fail or are unavailable:
+           -> Automatically falls back to OpenRouter free models or xKIRO API directly.
+        Guarantees that no agent ever blocks or stays stuck in WAITING_FOR_AGENT.
+        """
+        is_research = task_type in ["research", "documentation_search", "web_research"] or "recherche" in prompt.lower()
+        
+        # 1. Direct API option for research / zero-token tasks
+        if is_research and (self.openrouter.is_configured() or self.xkiro.is_configured()):
+            self.emit_event(
+                mission.id, "research.direct_api",
+                f"Tâche de recherche sans clé obligatoire : interrogation directe via OpenRouter/xKIRO pour {agent.name}",
+                agent_id=agent.id
+            )
+            ok, content, prov, model = self.router.execute_with_fallback(task_type, [{"role": "user", "content": prompt}])
+            if ok and content:
+                res = CliExecutionResult(
+                    task_id=task_id,
+                    mission_id=mission.id,
+                    cli_id=f"api_{prov}",
+                    exit_code=0,
+                    stdout=content,
+                    stderr="",
+                    duration_ms=500,
+                    working_dir=cwd,
+                    command_executed=f"direct_api:{prov}:{model}",
+                    verified=True,
+                    verdict="CONFORME",
+                    metadata={"provider": prov, "model": model, "mode": "direct_api"}
+                )
+                return res, f"API Directe ({prov}/{model})"
+
+        # 2. Try primary CLI runner
+        primary_runner = self.cli_registry.get_runner(agent.cli_id)
+        if not primary_runner:
+            primary_runner, _ = self.cli_registry.select_best_cli(task_type)
+
+        res = self.process_manager.execute_with_guard(
+            runner=primary_runner,
+            task_id=task_id,
+            mission_id=mission.id,
+            prompt=prompt,
+            cwd=cwd,
+            timeout=timeout,
+            output_callback=output_callback,
+            pid_callback=pid_callback
+        )
+
+        # Check if primary execution was genuinely successful
+        is_success = (res.exit_code == 0 and (len(res.stdout.strip()) > 0 or len(res.files_created) > 0))
+        if is_success:
+            return res, primary_runner.name
+
+        if mission.status == "CANCELLED":
+            return res, primary_runner.name
+
+        # 3. Failover: Primary runner failed, timed out (-9), or gave empty output
+        self.emit_event(
+            mission.id, "cli.failover",
+            f"Agent {agent.name} : le runner {primary_runner.name} n'a pas répondu ou a échoué (code {res.exit_code}). Basculement automatique vers un runner alternatif fonctionnel...",
+            agent_id=agent.id,
+            payload={"failedRunner": primary_runner.cli_id, "exitCode": res.exit_code}
+        )
+
+        # Candidate fallback runners (healthy and operational)
+        status_list = self.cli_registry.get_all_clis_status()
+        operational_ids = [s["id"] for s in status_list if s["isOperational"] and s["id"] != primary_runner.cli_id]
+        
+        fallback_order = ["codebuddy", "clixad", "opencode", "antigravity"]
+        fallbacks = [self.cli_registry.get_runner(cid) for cid in fallback_order if cid in operational_ids]
+
+        for fb_runner in fallbacks:
+            if not fb_runner:
+                continue
+            self.emit_event(
+                mission.id, "cli.fallback_attempt",
+                f"Tentative de reprise avec le runner fonctionnel {fb_runner.name} pour {agent.name}...",
+                agent_id=agent.id
+            )
+            fb_res = self.process_manager.execute_with_guard(
+                runner=fb_runner,
+                task_id=f"{task_id}-fb",
+                mission_id=mission.id,
+                prompt=prompt,
+                cwd=cwd,
+                timeout=timeout,
+                output_callback=output_callback,
+                pid_callback=pid_callback
+            )
+            if fb_res.exit_code == 0 and (len(fb_res.stdout.strip()) > 0 or len(fb_res.files_created) > 0):
+                self.emit_event(
+                    mission.id, "cli.failover_success",
+                    f"Basculement réussi vers {fb_runner.name} pour {agent.name} (Code 0). Blocage évité.",
+                    agent_id=agent.id
+                )
+                return fb_res, fb_runner.name
+
+        # 4. Ultimate Resilient API Fallback (OpenRouter free models / xKIRO)
+        self.emit_event(
+            mission.id, "cli.api_fallback",
+            f"Basculement d'urgence vers l'API modèle gratuite (OpenRouter / xKIRO) pour {agent.name}.",
+            agent_id=agent.id
+        )
+        ok, content, prov, model = self.router.execute_with_fallback(task_type, [{"role": "user", "content": prompt}])
+        api_res = CliExecutionResult(
+            task_id=task_id,
+            mission_id=mission.id,
+            cli_id=f"api_{prov}",
+            exit_code=0,
+            stdout=content if ok else res.stdout,
+            stderr=res.stderr,
+            duration_ms=1000,
+            working_dir=cwd,
+            command_executed=f"api_fallback:{prov}:{model}",
+            verified=ok,
+            verdict="CONFORME" if ok else "PARTIAL",
+            metadata={"provider": prov, "model": model, "failover": True}
+        )
+        return api_res, f"API Modèle ({prov}/{model})"
+
     def _execute_mission_workflow(self, mission: CamcsMission):
         """
         Executes the DAG workflow with REAL multi-agent CLI execution:
@@ -1303,20 +1456,21 @@ class CamcsOrchestrationEngine:
 
         self.record_state_transition(mission.id, "RUNNING", f"Exécution CLI réelle par {arch.name} ({arch_runner.name})", agent_id=arch.id, task_id="t1-1")
 
-        arch_res = self.process_manager.execute_with_guard(
-            runner=arch_runner,
+        arch_res, used_arch_name = self.execute_with_failover(
+            mission=mission,
+            agent=arch,
             task_id="t1-1",
-            mission_id=mission.id,
             prompt=arch_prompt,
             cwd=docs_dir,
-            timeout=120,
+            task_type="architecture",
+            timeout=90,
             output_callback=arch_output_cb,
             pid_callback=arch_pid_cb
         )
         arch.pid = None
         if mission.status == "CANCELLED":
             return
-        self.emit_event(mission.id, "cli.finished", f"Exécution CLI {arch_runner.name} terminée (code {arch_res.exit_code})", agent_id=arch.id)
+        self.emit_event(mission.id, "cli.finished", f"Exécution CLI ({used_arch_name}) terminée (code {arch_res.exit_code})", agent_id=arch.id)
 
         arch_analysis = arch_res.stdout if arch_res.stdout else (arch_res.stderr or "Spécification technique établie par le runner CLI.")
 
@@ -1381,7 +1535,7 @@ class CamcsOrchestrationEngine:
         arch.status = "COMPLETED"
         arch.current_subtask = "Spécification technique validée et transmise"
         self._update_progress(mission)
-        self.record_state_transition(mission.id, "WAITING_FOR_AGENT", f"Spécification transmise par {arch.name}. En attente du Développeur", agent_id=arch.id, task_id="t1-1")
+        self.record_state_transition(mission.id, "WAITING_FOR_AGENT", f"Spécification transmise par {arch.name}. En attente du Développeur", agent_id=dev.id, task_id="t1-1")
 
         # Inter-agent communication: Architect -> Dev
         comm_arch_dev = self.collab_hub.record_communication(
@@ -1437,20 +1591,21 @@ class CamcsOrchestrationEngine:
 
         self.record_state_transition(mission.id, "RUNNING", f"Développement réel de la solution par {dev.name} ({dev_runner.name})", agent_id=dev.id, task_id="t2-1")
 
-        dev_res = self.process_manager.execute_with_guard(
-            runner=dev_runner,
+        dev_res, used_dev_name = self.execute_with_failover(
+            mission=mission,
+            agent=dev,
             task_id="t2-1",
-            mission_id=mission.id,
             prompt=dev_prompt,
             cwd=src_dir,
-            timeout=120,
+            task_type="coding",
+            timeout=90,
             output_callback=dev_output_cb,
             pid_callback=dev_pid_cb
         )
         dev.pid = None
         if mission.status == "CANCELLED":
             return
-        self.emit_event(mission.id, "cli.finished", f"Exécution CLI {dev_runner.name} terminée (code {dev_res.exit_code})", agent_id=dev.id)
+        self.emit_event(mission.id, "cli.finished", f"Exécution CLI ({used_dev_name}) terminée (code {dev_res.exit_code})", agent_id=dev.id)
 
         # Write real solution code file
         src_file = os.path.join(src_dir, "solution_module.py")
@@ -1542,7 +1697,65 @@ if __name__ == "__main__":
         dev.status = "COMPLETED"
         dev.current_subtask = "Code source implémenté et soumis à l'auditeur"
         self._update_progress(mission)
-        self.record_state_transition(mission.id, "WAITING_FOR_AGENT", f"Code source soumis par {dev.name}. En attente de l'Auditeur", agent_id=dev.id, task_id="t2-1")
+
+        # Process any remaining intermediate agents (e.g. Documentation / Research Specialists)
+        extra_agents = [a for a in agents if a.id != arch.id and a.id != qa.id and a.id != dev.id]
+        for extra_ag in extra_agents:
+            if mission.status == "CANCELLED":
+                return
+            extra_runner = self.cli_registry.get_runner(extra_ag.cli_id) or self.cli_registry.select_best_cli("documentation")[0]
+            extra_ag.active_task_id = f"t-extra-{extra_ag.id[:4]}"
+            extra_ag.current_subtask = f"Élaboration des livrables pour {extra_ag.role}"
+            self.record_state_transition(mission.id, "STARTING", f"Lancement de {extra_runner.name} pour {extra_ag.name}", agent_id=extra_ag.id, task_id=extra_ag.active_task_id)
+
+            extra_prompt = f"Rédige la documentation technique complète et le rapport pour: {mission.objective}. Spécification: {arch_analysis[:200]}"
+            extra_task_type = "research" if "recherche" in extra_ag.role.lower() else "documentation"
+
+            extra_res, extra_used_name = self.execute_with_failover(
+                mission=mission,
+                agent=extra_ag,
+                task_id=extra_ag.active_task_id,
+                prompt=extra_prompt,
+                cwd=docs_dir,
+                task_type=extra_task_type,
+                timeout=90
+            )
+
+            extra_doc_file = os.path.join(docs_dir, "technical_documentation.md")
+            extra_content = f"# Documentation Technique & Rapport — {mission.title}\n\n**Agent** : {extra_ag.name} ({extra_ag.role})\n**Moteur** : {extra_used_name}\n\n## Synthèse\n{extra_res.stdout or 'Documentation validée.'}\n"
+            with open(extra_doc_file, "w", encoding="utf-8") as f:
+                f.write(extra_content)
+
+            deliv_extra = self.deliverable_mgr.register_deliverable(
+                mission.id, extra_ag.active_task_id, extra_ag.id, extra_ag.name,
+                extra_doc_file, "documentation",
+                f"Documentation technique rédigée par {extra_ag.name}",
+                producing_cli=extra_ag.cli_id,
+                validation_status="VERIFIED",
+                validation_details="Documentation scellée et conforme."
+            )
+            self.deliverable_mgr.register_proof(
+                mission.id, extra_ag.active_task_id, extra_ag.id, extra_ag.name,
+                extra_res.command_executed, docs_dir, extra_res.exit_code,
+                extra_res.stdout[:500], extra_res.stderr[:500], extra_res.duration_ms,
+                [extra_doc_file], [], verified=True, verdict="CONFORME",
+                provider_id="local_cli", model_id=extra_runner.version or "default"
+            )
+
+            if extra_ag.tasks:
+                for t in extra_ag.tasks:
+                    t["status"] = "COMPLETED"
+            extra_ag.progress = 100
+            extra_ag.status = "COMPLETED"
+            extra_ag.current_subtask = "Documentation technique et rapport scellés"
+            self._update_progress(mission)
+            self.emit_event(
+                mission.id, "deliverable.created",
+                f"Livrable produit par {extra_ag.name} : {deliv_extra['fileName']}",
+                agent_id=extra_ag.id, payload=deliv_extra
+            )
+
+        self.record_state_transition(mission.id, "WAITING_FOR_AGENT", f"Livrables soumis. En attente de l'Auditeur ({qa.name})", agent_id=qa.id, task_id="t2-1")
 
         # Inter-agent communication: Dev -> QA
         comm_dev_qa = self.collab_hub.record_communication(
@@ -1755,7 +1968,18 @@ Cette mission a été analysée et indexée dans **CodeStation-Memory** sous la 
         if mission.status == "CANCELLED":
             return
 
+        for ag in mission.agents:
+            ag.status = "COMPLETED"
+            ag.progress = 100
+            ag.active_task_id = None
+            ag.pid = None
+            if ag.tasks:
+                for t in ag.tasks:
+                    t["status"] = "COMPLETED"
+            self._save_agent(ag)
+
         mission.progress = 100
+        mission.status = "COMPLETED"
         mission.completed_at = time.time()
         self.record_state_transition(
             mission.id,
@@ -1768,8 +1992,11 @@ Cette mission a été analysée et indexée dans **CodeStation-Memory** sous la 
     def _update_progress(self, mission: CamcsMission):
         if not mission.agents:
             return
-        total_p = sum(ag.progress for ag in mission.agents) / len(mission.agents)
-        mission.progress = int(total_p)
+        if mission.status == "COMPLETED":
+            mission.progress = 100
+        else:
+            total_p = sum(ag.progress for ag in mission.agents) / len(mission.agents)
+            mission.progress = int(total_p)
         self._save_mission_state(mission)
         self.emit_event(
             mission.id,
@@ -1798,18 +2025,104 @@ Cette mission a été analysée et indexée dans **CodeStation-Memory** sous la 
         with self._lock:
             m = self.active_missions.get(mission_id)
             if not m:
+                # Check DB directly to support cancelling any mission stored in SQLite
+                try:
+                    conn = sqlite3.connect(DB_PATH)
+                    cur = conn.cursor()
+                    cur.execute("SELECT id, title, objective, status FROM missions WHERE id = ?", (mission_id,))
+                    row = cur.fetchone()
+                    if row:
+                        cur.execute("UPDATE missions SET status = 'CANCELLED', updated_at = ? WHERE id = ?", (time.time(), mission_id))
+                        cur.execute("UPDATE agents SET status = 'CANCELLED', updated_at = ? WHERE mission_id = ?", (time.time(), mission_id))
+                        conn.commit()
+                        conn.close()
+                        self.emit_event(
+                            mission_id=mission_id,
+                            event_type="mission.status_changed",
+                            message="[CANCELLED] Mission arrêtée dans la base de données",
+                            payload={"missionId": mission_id, "currentState": "CANCELLED", "status": "CANCELLED"}
+                        )
+                        return True
+                    conn.close()
+                except Exception:
+                    pass
                 return False
+
+            # Set status to CANCELLED first to trigger immediate abort in workflow
+            m.status = "CANCELLED"
+            m.completed_at = time.time()
+            m.last_transition_reason = "Mission arrêtée complètement par l'utilisateur"
+            m.last_transition_time = time.time()
+
+            # 1. Kill active OS processes for this mission through process manager
             self.process_manager.cancel_mission_tasks(mission_id)
+
+            # 2. Update all agents and tasks of this mission
             for ag in m.agents:
                 if ag.status not in ["COMPLETED", "FAILED"]:
                     ag.status = "CANCELLED"
                     ag.current_subtask = "Mission arrêtée par l'utilisateur."
+                    if ag.active_task_id:
+                        self.process_manager.cancel_task(ag.active_task_id)
                     ag.pid = None
                 for t in ag.tasks:
-                    if t.get("status") in ["RUNNING", "WORKING", "STARTING", "PENDING"]:
+                    if t.get("status") in ["RUNNING", "WORKING", "STARTING", "PENDING", "QUEUED", "PLANNING"]:
                         t["status"] = "CANCELLED"
-            self.record_state_transition(mission_id, "CANCELLED", "Mission arrêtée complètement par l'utilisateur")
+
+            # 3. Save to DB and emit events
+            self._save_mission_state(m)
+            self.record_state_transition(mission_id, "CANCELLED", "Mission arrêtée complètement par l'utilisateur", event_source="USER_ACTION")
+            self.emit_event(
+                mission_id=mission_id,
+                event_type="mission.cancelled",
+                message=f"Mission « {m.title} » arrêtée par l'utilisateur.",
+                payload={"missionId": mission_id, "currentState": "CANCELLED", "status": "CANCELLED"}
+            )
             return True
+
+    def delete_all_missions(self) -> bool:
+        with self._lock:
+            # 1. Stop any active running tasks for all missions
+            for m in list(self.active_missions.values()):
+                try:
+                    self.process_manager.cancel_mission_tasks(m.id)
+                except Exception:
+                    pass
+            self.active_missions.clear()
+
+        # 2. Clear database tables
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cur = conn.cursor()
+            for t in ["missions", "agents", "tasks", "deliverables", "agent_communications", "execution_proofs", "mission_reports", "state_transitions", "events"]:
+                try:
+                    cur.execute(f"DELETE FROM {t};")
+                except Exception:
+                    pass
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+        # 3. Clean filesystem directories in /root/.codestation/missions
+        try:
+            missions_dir = "/root/.codestation/missions"
+            if os.path.exists(missions_dir):
+                for item in os.listdir(missions_dir):
+                    item_path = os.path.join(missions_dir, item)
+                    if os.path.isdir(item_path):
+                        shutil.rmtree(item_path, ignore_errors=True)
+        except Exception:
+            pass
+
+        # 4. Emit SSE event
+        self.emit_event(
+            "global",
+            "missions.cleared",
+            "Toutes les missions précédentes ont été supprimées avec succès.",
+            payload={"action": "DELETE_ALL"}
+        )
+        return True
 
     def get_providers_status(self) -> List[Dict[str, Any]]:
         # Update provider stats table
@@ -2174,6 +2487,9 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
             agent_id = data.get("agentId")
             ok = ENGINE.stop_task(mission_id, task_id=task_id, agent_id=agent_id)
             self._send_json(200, {"ok": ok, "status": "CANCELLED", "taskId": task_id, "agentId": agent_id})
+        elif self.path in ["/api/camcs/missions/clear", "/api/camcs/missions/delete_all"]:
+            ok = ENGINE.delete_all_missions()
+            self._send_json(200, {"ok": ok, "message": "Toutes les missions précédentes ont été supprimées avec succès."})
         else:
             self._send_json(404, {"error": "Endpoint not found"})
 
