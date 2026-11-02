@@ -284,203 +284,180 @@ exec {PROOT_BIN} \\
                 results.append(m)
         return results
 
-    def detect_clis(self) -> list:
+    def detect_clis(self, use_cache: bool = True) -> list:
         cache_file = Path("/tmp/codestation_clis_cache.json")
         now = time.time()
-        if cache_file.exists():
+        if use_cache and cache_file.exists():
             try:
                 with open(cache_file, "r", encoding="utf-8") as f:
                     cached = json.load(f)
-                if now - cached.get("timestamp", 0) < 60:
+                if now - cached.get("timestamp", 0) < 15:
                     return cached.get("clis", [])
             except Exception:
                 pass
 
         clis = []
 
-        # 1. Google Antigravity (agy) - Primary
-        agy_paths = ["/root/.local/bin/agy", "/root/.gemini/antigravity-cli/bin/agy"]
-        agy_bin = None
-        for p in agy_paths:
-            if os.path.isfile(p) and os.access(p, os.X_OK):
-                agy_bin = p
-                break
-        if not agy_bin:
-            agy_bin = shutil.which("agy")
-
-        if agy_bin:
-            version = "1.4.9"
-            try:
-                res = subprocess.run([agy_bin, "--version"], capture_output=True, text=True, timeout=3)
-                if res.returncode == 0 and res.stdout.strip():
-                    version = res.stdout.strip().splitlines()[0]
-            except Exception:
-                pass
-            clis.append({
+        # Reference CLIs installed in Ubuntu PRoot ARM64
+        definitions = [
+            {
+                "id": "omnirush",
+                "name": "OmniRush",
+                "binary": "omnirush",
+                "paths": ["/usr/local/bin/omnirush", "/usr/bin/omnirush", "/root/.local/bin/omnirush"],
+                "auth_paths": ["/root/.omnirush/auth.json", "/root/.omnirush"],
+                "default_model": "gpt-6-astra",
+                "environment": "bot-omnirush",
+                "version_args": ["--version"]
+            },
+            {
+                "id": "clixad",
+                "name": "Clixad",
+                "binary": "clixad",
+                "paths": ["/usr/local/bin/clixad", "/usr/bin/clixad", "/root/.local/bin/clixad"],
+                "auth_paths": ["/root/.clixad/config.json", "/root/.clixad"],
+                "default_model": "gpt-5-nano",
+                "environment": "bot-clixad",
+                "version_args": ["--version"]
+            },
+            {
                 "id": "antigravity",
                 "name": "Google Antigravity",
                 "binary": "agy",
-                "path": agy_bin,
-                "version": version,
-                "status": "READY",
-                "is_primary": True,
+                "paths": ["/root/.local/bin/agy", "/usr/local/bin/agy", "/root/.gemini/antigravity-cli/bin/agy"],
+                "auth_paths": ["/root/.gemini/antigravity-cli", "/root/.gemini"],
+                "default_model": "gemini-4-argon-medium",
                 "environment": "bot-antigravity",
-                "details": f"CLI agy {version} opérationnel via ACP Bridge"
-            })
-        else:
-            clis.append({
-                "id": "antigravity",
-                "name": "Google Antigravity",
-                "binary": "agy",
-                "path": None,
-                "version": None,
-                "status": "NOT_DETECTED",
-                "is_primary": True,
-                "environment": "bot-antigravity",
-                "details": "Binaire agy introuvable dans PATH et répertoires d'installation"
-            })
-
-        # 2. OpenCode CLI (opencode) - Primary
-        opencode_paths = ["/usr/local/bin/opencode", "/root/.opencode/bin/opencode"]
-        opencode_bin = None
-        for p in opencode_paths:
-            if os.path.isfile(p) and os.access(p, os.X_OK):
-                opencode_bin = p
-                break
-        if not opencode_bin:
-            opencode_bin = shutil.which("opencode")
-
-        if opencode_bin:
-            version = "v2.2.0"
-            try:
-                res = subprocess.run([opencode_bin, "--version"], capture_output=True, text=True, timeout=3)
-                if res.returncode == 0 and res.stdout.strip():
-                    version = res.stdout.strip().splitlines()[0]
-            except Exception:
-                pass
-            clis.append({
+                "version_args": ["--version"]
+            },
+            {
                 "id": "opencode",
                 "name": "OpenCode GLM",
                 "binary": "opencode",
-                "path": opencode_bin,
-                "version": version,
-                "status": "READY",
-                "is_primary": True,
+                "paths": ["/usr/local/bin/opencode", "/root/.opencode/bin/opencode", "/usr/bin/opencode"],
+                "auth_paths": ["/root/.config/opencode/opencode.json", "/root/.secrets/opencode-key"],
+                "default_model": "opencode/glm-5.3-flash-free",
                 "environment": "bot-opencode-glm",
-                "details": f"CLI opencode {version} prêt avec GLM-5.3-Flash Free"
-            })
-        else:
-            clis.append({
-                "id": "opencode",
-                "name": "OpenCode GLM",
-                "binary": "opencode",
-                "path": None,
-                "version": None,
-                "status": "NOT_DETECTED",
-                "is_primary": True,
-                "environment": "bot-opencode-glm",
-                "details": "Binaire opencode introuvable dans l'environnement"
-            })
-
-        # 3. CodeBuddy Code CLI (codebuddy) - Primary
-        cb_paths = ["/usr/local/bin/codebuddy", "/root/.local/bin/codebuddy", "/usr/bin/codebuddy"]
-        cb_bin = None
-        for p in cb_paths:
-            if os.path.isfile(p) and os.access(p, os.X_OK):
-                cb_bin = p
-                break
-        if not cb_bin:
-            cb_bin = shutil.which("codebuddy") or shutil.which("cbc")
-
-        if cb_bin:
-            version = "v2.178.1"
-            try:
-                res = subprocess.run([cb_bin, "--version"], capture_output=True, text=True, timeout=3)
-                if res.returncode == 0 and res.stdout.strip():
-                    raw_ver = res.stdout.strip().splitlines()[0]
-                    version = f"v{raw_ver}" if not raw_ver.startswith("v") else raw_ver
-            except Exception:
-                pass
-
-            model_info = "Hy3"
-            port_info = ""
-            try:
-                settings_p = Path("/root/.codebuddy/settings.json")
-                if settings_p.exists():
-                    with open(settings_p, "r", encoding="utf-8") as f:
-                        s_data = json.load(f)
-                        if "model" in s_data:
-                            model_info = s_data["model"].capitalize()
-                port_p = Path("/root/.codebuddy/web-ui-port.json")
-                if port_p.exists():
-                    with open(port_p, "r", encoding="utf-8") as f:
-                        p_data = json.load(f)
-                        if "port" in p_data:
-                            port_info = f" (serveur local http://127.0.0.1:{p_data['port']})"
-            except Exception:
-                pass
-
-            clis.append({
+                "version_args": ["--version"]
+            },
+            {
                 "id": "codebuddy",
                 "name": "CodeBuddy Code",
                 "binary": "codebuddy",
-                "path": cb_bin,
-                "version": version,
-                "status": "READY",
-                "is_primary": True,
+                "paths": ["/usr/local/bin/codebuddy", "/root/.local/bin/codebuddy", "/usr/bin/codebuddy"],
+                "auth_paths": ["/root/.codebuddy/settings.json", "/root/.codebuddy"],
+                "default_model": "Hy3",
                 "environment": "bot-codebuddy",
-                "details": f"CLI CodeBuddy {version} prêt avec modèle {model_info}{port_info}"
-            })
-        else:
-            clis.append({
-                "id": "codebuddy",
-                "name": "CodeBuddy Code",
-                "binary": "codebuddy",
-                "path": None,
-                "version": None,
-                "status": "NOT_DETECTED",
-                "is_primary": True,
-                "environment": "bot-codebuddy",
-                "details": "Binaire codebuddy introuvable dans /usr/local/bin"
-            })
-
-        # 4. Autres CLI détectées
-        other_candidates = [
-            ("codex", "OpenAI Codex", ["/data/data/com.termux/files/usr/bin/codex", "/usr/local/bin/codex"]),
-            ("claude", "Claude Code", ["/usr/local/bin/claude", "/root/.local/bin/claude"]),
-            ("gemini", "Google Gemini CLI", ["/usr/local/bin/gemini", "/root/.local/bin/gemini"]),
-            ("cursor", "Cursor CLI", ["/usr/local/bin/cursor", "/root/.local/bin/cursor"])
+                "version_args": ["--version"]
+            },
+            {
+                "id": "freebuff",
+                "name": "Freebuff",
+                "binary": "freebuff",
+                "paths": ["/usr/local/bin/freebuff", "/usr/bin/freebuff", "/root/.local/bin/freebuff"],
+                "auth_paths": ["/root/.freebuff/project-id", "/root/.freebuff"],
+                "default_model": "freebuff/free-auto",
+                "environment": "bot-freebuff",
+                "version_args": ["--version"]
+            }
         ]
 
-        for cid, cname, paths in other_candidates:
+        for item in definitions:
+            cid = item["id"]
+            cname = item["name"]
+            cbinary = item["binary"]
+            cpaths = item["paths"]
+            cauth = item["auth_paths"]
+            cmodel = item["default_model"]
+            cenv = item["environment"]
+
+            # 1. Search binary in candidate paths and PATH
             found_bin = None
-            for p in paths:
+            for p in cpaths:
                 if os.path.isfile(p) and os.access(p, os.X_OK):
                     found_bin = p
                     break
             if not found_bin:
-                found_bin = shutil.which(cid)
+                found_bin = shutil.which(cbinary)
 
-            if found_bin:
-                ver = "installé"
-                try:
-                    res = subprocess.run([found_bin, "--version"], capture_output=True, text=True, timeout=2)
-                    if res.returncode == 0 and res.stdout.strip():
-                        ver = res.stdout.strip().splitlines()[0]
-                except Exception:
-                    pass
-                env_type = "termux" if "/data/data/com.termux" in found_bin else "ubuntu"
+            if not found_bin:
                 clis.append({
                     "id": cid,
                     "name": cname,
-                    "binary": cid,
-                    "path": found_bin,
-                    "version": ver,
-                    "status": "INSTALLED",
-                    "is_primary": False,
-                    "environment": env_type,
-                    "details": f"Installé dans l'environnement {env_type} ({found_bin})"
+                    "binary": cbinary,
+                    "path": None,
+                    "version": None,
+                    "status": "NOT_INSTALLED",
+                    "is_primary": True,
+                    "environment": cenv,
+                    "details": f"Binaire {cbinary} introuvable dans l'environnement Ubuntu PRoot"
                 })
+                continue
+
+            # 2. Probe execution & version
+            version_str = None
+            exec_ok = False
+            try:
+                res = subprocess.run([found_bin] + item["version_args"], capture_output=True, text=True, timeout=8)
+                if res.returncode == 0 and res.stdout.strip():
+                    version_str = res.stdout.strip().splitlines()[0]
+                    exec_ok = True
+                else:
+                    exec_ok = (res.returncode == 0)
+            except Exception as e:
+                exec_ok = False
+
+            if not version_str or not exec_ok:
+                # Fallback: check package.json if binary is a symlink or node package
+                try:
+                    real_bin = os.path.realpath(found_bin)
+                    pkg_json = Path(real_bin).parent / "package.json"
+                    if pkg_json.exists():
+                        with open(pkg_json, "r", encoding="utf-8") as f:
+                            pj = json.load(f)
+                            if "version" in pj:
+                                version_str = pj["version"]
+                                exec_ok = True
+                except Exception:
+                    pass
+
+            if not version_str:
+                version_str = "exécutable" if exec_ok else "introuvable"
+
+            # 3. Check authentication status
+            has_auth = False
+            for ap in cauth:
+                auth_p = Path(ap)
+                if auth_p.exists():
+                    if auth_p.is_file() and auth_p.stat().st_size > 0:
+                        has_auth = True
+                        break
+                    elif auth_p.is_dir() and any(auth_p.iterdir()):
+                        has_auth = True
+                        break
+
+            # 4. Compute definitive status: AUTHENTICATED / AVAILABLE / NOT_AUTHENTICATED / ERROR
+            if not exec_ok:
+                status = "ERROR"
+                details = f"Erreur d'exécution de {cbinary} ({found_bin})"
+            elif has_auth:
+                status = "READY"
+                details = f"CLI {cbinary} ({version_str}) authentifié et opérationnel avec modèle {cmodel}"
+            else:
+                status = "AVAILABLE"
+                details = f"CLI {cbinary} ({version_str}) disponible mais authentification requise"
+
+            clis.append({
+                "id": cid,
+                "name": cname,
+                "binary": cbinary,
+                "path": found_bin,
+                "version": version_str,
+                "status": status,
+                "is_primary": True,
+                "environment": cenv,
+                "details": details
+            })
 
         try:
             with open(cache_file, "w", encoding="utf-8") as f:
@@ -526,14 +503,15 @@ if __name__ == "__main__":
         sys.exit(1)
 
     cmd = sys.argv[1]
+    no_cache = "--no-cache" in sys.argv or "--force" in sys.argv or "force" in sys.argv
     if cmd == "list":
         print(json.dumps({
             "environments": manager.list_all_environments(),
             "resources": manager.get_system_resources(),
-            "clis": manager.detect_clis()
+            "clis": manager.detect_clis(use_cache=not no_cache)
         }, indent=2))
     elif cmd in ("detect", "clis"):
-        print(json.dumps({"clis": manager.detect_clis()}, indent=2))
+        print(json.dumps({"clis": manager.detect_clis(use_cache=not no_cache)}, indent=2))
     elif cmd == "create" and len(sys.argv) >= 3:
         bot_id = sys.argv[2]
         engine = sys.argv[3] if len(sys.argv) >= 4 else "opencode"

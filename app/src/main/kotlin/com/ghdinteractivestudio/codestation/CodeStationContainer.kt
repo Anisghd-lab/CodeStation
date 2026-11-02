@@ -88,6 +88,7 @@ class CodeStationContainer(override val context: Context) : AppContainer {
     override val serverRepository: ServerRepository by lazy {
         ServerRepositoryImpl(
             preferencesRepository = preferencesRepository,
+            botDaoProvider = { database.botDao() },
             apiServiceProvider = { url -> createApiService(url) }
         )
     }
@@ -108,6 +109,7 @@ class CodeStationContainer(override val context: Context) : AppContainer {
             messageDao = database.messageDao(),
             approvalDao = database.approvalDao(),
             botDao = database.botDao(),
+            conversationDao = database.conversationDao(),
             apiServiceProvider = {
                 val config = serverRepository.getServerConfig()
                 createApiService(config.url)
@@ -144,7 +146,8 @@ class CodeStationContainer(override val context: Context) : AppContainer {
             serverRepository = serverRepository,
             botDao = database.botDao(),
             messageDao = database.messageDao(),
-            approvalDao = database.approvalDao()
+            approvalDao = database.approvalDao(),
+            conversationDao = database.conversationDao()
         )
     }
 }

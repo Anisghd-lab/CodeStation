@@ -43,7 +43,91 @@ data class SendMessageRequest(
     val text: String,
     val clientNonce: String? = null,
     val replyTo: String? = null,
-    val attachments: List<String> = emptyList()
+    val attachments: List<String> = emptyList(),
+    val conversationId: String? = null
+)
+
+@Serializable
+data class CreateBotRequest(
+    val id: String? = null,
+    val name: String,
+    val description: String? = null,
+    val kind: String = "agent",
+    val backend: String,
+    val model: String? = null,
+    val avatarColor: String? = null,
+    val avatarShape: String? = null,
+    val prompt: String? = null,
+    val permission: String? = "auto",
+    val fastMode: Boolean = true
+)
+
+@Serializable
+data class UpdateBotRequest(
+    val id: String,
+    val name: String? = null,
+    val description: String? = null,
+    val backend: String? = null,
+    val model: String? = null,
+    val prompt: String? = null
+)
+
+@Serializable
+data class DeleteBotRequest(
+    val botId: String
+)
+
+@Serializable
+data class CreateConversationRequest(
+    val id: String? = null,
+    val botId: String,
+    val title: String,
+    val cliId: String? = null,
+    val runnerId: String? = null
+)
+
+@Serializable
+data class ListConversationsRequest(
+    val botId: String
+)
+
+@Serializable
+data class DeleteConversationRequest(
+    val conversationId: String
+)
+
+@Serializable
+data class RenameConversationRequest(
+    val conversationId: String,
+    val title: String
+)
+
+@Serializable
+data class ConversationDto(
+    val id: String,
+    @SerialName("bot_id") val botId: String = "",
+    val title: String = "",
+    @SerialName("cli_id") val cliId: String? = null,
+    @SerialName("runner_id") val runnerId: String? = null,
+    @SerialName("cli_session_id") val cliSessionId: String? = null,
+    val status: String = "ACTIVE",
+    @SerialName("created_at") val createdAt: Long = 0,
+    @SerialName("updated_at") val updatedAt: Long = 0
+)
+
+@Serializable
+data class ConversationsResponse(
+    val conversations: List<ConversationDto> = emptyList()
+)
+
+@Serializable
+data class ConversationResponse(
+    val conversation: ConversationDto? = null
+)
+
+@Serializable
+data class BotResponse(
+    val bot: kotlinx.serialization.json.JsonObject? = null
 )
 
 @Serializable
@@ -124,6 +208,55 @@ interface CodeStationApiService {
     suspend fun hello(
         @Header("Authorization") authHeader: String? = null
     ): Response<HelloResponse>
+
+    /** `POST /api/createBot`, register a new bot with Rust host. */
+    @POST("api/createBot")
+    suspend fun createBot(
+        @Body request: CreateBotRequest,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<BotResponse>
+
+    /** `POST /api/updateBot`, update bot configuration. */
+    @POST("api/updateBot")
+    suspend fun updateBot(
+        @Body request: UpdateBotRequest,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<BotResponse>
+
+    /** `POST /api/deleteBot`, delete bot from Rust host. */
+    @POST("api/deleteBot")
+    suspend fun deleteBot(
+        @Body request: DeleteBotRequest,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<GenericApiResponse>
+
+    /** `POST /api/createConversation`, create a new conversation session. */
+    @POST("api/createConversation")
+    suspend fun createConversation(
+        @Body request: CreateConversationRequest,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<ConversationResponse>
+
+    /** `POST /api/listConversations`, list conversations for a bot. */
+    @POST("api/listConversations")
+    suspend fun listConversations(
+        @Body request: ListConversationsRequest,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<ConversationsResponse>
+
+    /** `POST /api/deleteConversation`, delete a conversation. */
+    @POST("api/deleteConversation")
+    suspend fun deleteConversation(
+        @Body request: DeleteConversationRequest,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<GenericApiResponse>
+
+    /** `POST /api/renameConversation`, rename a conversation. */
+    @POST("api/renameConversation")
+    suspend fun renameConversation(
+        @Body request: RenameConversationRequest,
+        @Header("Authorization") authHeader: String? = null
+    ): Response<GenericApiResponse>
 
     /** `POST /api/send`, post a message to a bot. */
     @POST("api/send")

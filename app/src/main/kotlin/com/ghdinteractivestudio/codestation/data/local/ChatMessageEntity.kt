@@ -17,7 +17,13 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-@Entity(tableName = "chat_messages")
+@Entity(
+    tableName = "chat_messages",
+    indices = [
+        androidx.room.Index(value = ["botId"]),
+        androidx.room.Index(value = ["conversationId"])
+    ]
+)
 data class ChatMessageEntity(
     @PrimaryKey val id: String,
     val botId: String,
@@ -30,7 +36,8 @@ data class ChatMessageEntity(
     val replyToMessageId: String?,
     val replyToAuthor: String?,
     val replyToText: String?,
-    val attachmentsJson: String? = null
+    val attachmentsJson: String? = null,
+    val conversationId: String = ""
 ) {
     fun toDomain(): ChatMessage {
         val author = MessageAuthor(
@@ -74,7 +81,8 @@ data class ChatMessageEntity(
             isFinal = isFinal,
             replyTo = replyTo,
             attachments = parsedAttachments,
-            artifact = parsedArtifact
+            artifact = parsedArtifact,
+            conversationId = conversationId
         )
     }
 
@@ -102,7 +110,8 @@ data class ChatMessageEntity(
                 replyToMessageId = msg.replyTo?.messageId,
                 replyToAuthor = msg.replyTo?.authorName,
                 replyToText = msg.replyTo?.textExcerpt,
-                attachmentsJson = jsonStr
+                attachmentsJson = jsonStr,
+                conversationId = msg.conversationId
             )
         }
     }
@@ -124,6 +133,15 @@ interface MessageDao {
     @Query("SELECT * FROM chat_messages WHERE botId = :botId ORDER BY timestamp ASC")
     fun getMessagesByBotIdStream(botId: String): Flow<List<ChatMessageEntity>>
 
+    @Query("SELECT * FROM chat_messages WHERE conversationId = :conversationId ORDER BY timestamp ASC")
+    fun getMessagesByConversationIdStream(conversationId: String): Flow<List<ChatMessageEntity>>
+
+    @Query("SELECT * FROM chat_messages WHERE botId = :botId AND (:conversationId IS NULL OR :conversationId = '' OR conversationId = :conversationId) ORDER BY timestamp ASC")
+    fun getMessagesByBotAndConversationStream(botId: String, conversationId: String?): Flow<List<ChatMessageEntity>>
+
+    @Query("DELETE FROM chat_messages WHERE conversationId = :conversationId")
+    suspend fun deleteMessagesForConversation(conversationId: String)
+
     @Query("SELECT * FROM chat_messages WHERE id = :id LIMIT 1")
     suspend fun getMessageById(id: String): ChatMessageEntity?
 
@@ -141,6 +159,9 @@ interface MessageDao {
 
     @Query("DELETE FROM chat_messages WHERE botId = :botId")
     suspend fun deleteMessagesForBot(botId: String)
+
+    @Query("DELETE FROM chat_messages WHERE text = 'RECONNECT_OK' OR text = 'RECOVERY_SUCCESS' OR text = 'Reponds uniquement: RECONNECT_OK' OR text = 'Reponds exactement: RECOVERY_SUCCESS' OR text LIKE 'Started a fresh conversation%' OR text LIKE '%carrying this summary%'")
+    suspend fun purgePollutedSessionNotices()
 
     @androidx.room.Transaction
     suspend fun reconcileUserMessage(clientNonce: String?, serverEntity: ChatMessageEntity) {

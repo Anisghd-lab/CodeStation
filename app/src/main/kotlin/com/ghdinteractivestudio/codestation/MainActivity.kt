@@ -23,7 +23,6 @@ import com.ghdinteractivestudio.codestation.notification.CodeStationNotification
 import com.ghdinteractivestudio.codestation.service.CodeStationTaskSyncService
 import com.ghdinteractivestudio.codestation.ui.navigation.Screen
 import com.ghdinteractivestudio.codestation.ui.navigation.CodeStationNavHost
-import com.ghdinteractivestudio.codestation.ui.components.DynamicIslandBar
 import com.ghdinteractivestudio.codestation.ui.theme.CodeStationTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -79,15 +78,6 @@ class MainActivity : ComponentActivity() {
 
                     Box(modifier = Modifier.fillMaxSize()) {
                         CodeStationNavHost(navController = navController)
-                        if (!isSystemOverlayActive) {
-                            DynamicIslandBar(
-                                botRepository = container.botRepository,
-                                approvalDao = container.approvalDao,
-                                onNavigateToBot = { botId: String ->
-                                    navController.navigate(Screen.Chat.createRoute(botId))
-                                }
-                            )
-                        }
                     }
                 }
             }

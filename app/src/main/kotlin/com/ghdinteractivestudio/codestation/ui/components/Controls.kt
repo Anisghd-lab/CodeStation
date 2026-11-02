@@ -347,13 +347,14 @@ fun CardForm(
     modifier: Modifier = Modifier,
     padding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
     verticalSpacing: Dp = 14.dp,
+    scrollState: androidx.compose.foundation.ScrollState = rememberScrollState(),
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(
         modifier
             .fillMaxSize()
             .background(Palette.background)
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(padding),
         verticalArrangement = Arrangement.spacedBy(verticalSpacing)
     ) {

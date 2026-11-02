@@ -44,6 +44,7 @@ class CodeStationEventStreamClient(
     private val botDao: BotDao,
     private val messageDao: MessageDao,
     private val approvalDao: ApprovalDao,
+    private val conversationDao: com.ghdinteractivestudio.codestation.data.local.ConversationDao? = null,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 ) {
     companion object {
@@ -56,6 +57,7 @@ class CodeStationEventStreamClient(
         coerceInputValues = true
         encodeDefaults = true
     }
+    private val ssePrefs by lazy { context.getSharedPreferences("codestation_sse_prefs", Context.MODE_PRIVATE) }
     private var streamJob: Job? = null
     private var lastRev: Long = 0
     private var initialSyncCompleted = false
@@ -69,6 +71,16 @@ class CodeStationEventStreamClient(
 
     fun start() {
         if (streamJob?.isActive == true) return
+        if (lastRev == 0L) {
+            lastRev = ssePrefs.getLong("last_rev", 0L)
+        }
+        scope.launch {
+            try {
+                messageDao.purgePollutedSessionNotices()
+            } catch (e: Exception) {
+                android.util.Log.w(TAG, "Notice cleanup failed: ${e.message}")
+            }
+        }
         android.util.Log.i(TAG, "Starting CodeStationEventStreamClient SSE loop (since=$lastRev)")
         streamJob = scope.launch {
             runEventLoop()
@@ -164,6 +176,7 @@ class CodeStationEventStreamClient(
             val rev = root["rev"]?.jsonPrimitive?.longOrNull
             if (rev != null && type != "hello" && rev > lastRev) {
                 lastRev = rev
+                ssePrefs.edit().putLong("last_rev", rev).apply()
             }
 
             when (type) {
@@ -407,10 +420,45 @@ class CodeStationEventStreamClient(
                         } catch (_: Exception) { null }
                     } else null
 
-                    // Mise à jour de l'historique dans Room (inclut "agent", "assistant", "notice", "user")
+                    // Filtrage des événements de cycle de vie et de session internes
+                    val isInternalNotice = isNotice && (
+                        dataObj.containsKey("handoff") ||
+                        text.startsWith("Started a fresh conversation", ignoreCase = true) ||
+                        text.startsWith("Kept this conversation", ignoreCase = true) ||
+                        text.contains("carrying this summary", ignoreCase = true) ||
+                        text.contains("This conversation is long and has gone quiet", ignoreCase = true) ||
+                        text.contains("You've been away a while", ignoreCase = true) ||
+                        text.contains("Summarizing this conversation no longer frees enough room", ignoreCase = true) ||
+                        text.trim() == "RECONNECT_OK" ||
+                        text.trim() == "RECOVERY_SUCCESS"
+                    )
+
+                    val isSyntheticHarnessEcho = (isUser || isAgent) && (
+                        text.trim() == "Reponds uniquement: RECONNECT_OK" ||
+                        text.trim() == "Reponds exactement: RECOVERY_SUCCESS" ||
+                        text.trim() == "RECONNECT_OK" ||
+                        text.trim() == "RECOVERY_SUCCESS"
+                    )
+
+                    if (isInternalNotice || isSyntheticHarnessEcho) {
+                        android.util.Log.i(TAG, "Internal session/recovery event (diagnostic only, not saved to chat): botId=$botId text=$text")
+                        RequestTracer.logEvent(
+                            requestId = entryId,
+                            event = "internal_session_event",
+                            botId = botId,
+                            details = mapOf("text" to text, "kind" to kind, "isInternalNotice" to isInternalNotice)
+                        )
+                        return true
+                    }
+
+                    // Mise à jour de l'historique dans Room (inclut "agent", "assistant", notices utilisateur, "user")
                     // On filtre les messages de complétion silencieuse interne comme "(pass)"
                     if ((text.isNotBlank() || parsedAttachments.isNotEmpty()) && text.trim() != "(pass)" && (isAgent || isNotice || isUser)) {
-                        val authorType = if (isUser) MessageAuthorType.USER else MessageAuthorType.BOT
+                        val authorType = when {
+                            isUser -> MessageAuthorType.USER
+                            isNotice -> MessageAuthorType.SYSTEM
+                            else -> MessageAuthorType.BOT
+                        }
                         val effectiveText = if (text.isBlank() && parsedAttachments.isNotEmpty()) {
                             parsedAttachments.first().name
                         } else text
@@ -419,20 +467,32 @@ class CodeStationEventStreamClient(
                         } else effectiveText
 
                         val botName = botDao.getBotById(botId)?.name ?: if (isUser) "Moi" else "CodeStation Agent"
+                        val authorName = when {
+                            isUser -> "Moi"
+                            isNotice -> "Système"
+                            else -> botName
+                        }
+                        val authorId = when {
+                            isUser -> "user"
+                            isNotice -> "system"
+                            else -> botId
+                        }
 
+                        val conversationId = dataObj["conversationId"]?.jsonPrimitive?.content.orEmpty()
                         val entity = ChatMessageEntity(
                             id = entryId,
                             botId = botId,
                             authorType = authorType.name,
-                            authorId = if (isUser) "user" else botId,
-                            authorName = if (isUser) "Moi" else botName,
+                            authorId = authorId,
+                            authorName = authorName,
                             text = displayText,
                             timestamp = createdAt,
                             isFinal = isFinal || isNotice || isUser,
                             replyToMessageId = null,
                             replyToAuthor = null,
                             replyToText = null,
-                            attachmentsJson = attachmentsJsonStr
+                            attachmentsJson = attachmentsJsonStr,
+                            conversationId = conversationId
                         )
                         if (isUser) {
                             val clientNonce = dataObj["clientNonce"]?.jsonPrimitive?.content
@@ -441,8 +501,12 @@ class CodeStationEventStreamClient(
                         } else {
                             messageDao.insertMessage(entity)
                         }
-                        if (isFinal || isUser || isNotice) {
+                        // Ne mettre à jour le dernier message que pour les vraies réponses d'agent ou de l'utilisateur
+                        if ((isFinal && isAgent) || isUser) {
                             botDao.updateLastMessage(botId, displayText, entity.timestamp)
+                            if (conversationId.isNotBlank()) {
+                                conversationDao?.updateLastMessage(conversationId, displayText, entity.timestamp)
+                            }
                         }
                         android.util.Log.i(TAG, "Saved chat message id=$entryId botId=$botId isFinal=$isFinal author=$authorType textLen=${text.length}")
 

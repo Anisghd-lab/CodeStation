@@ -87,6 +87,7 @@ pub fn spawn(hub: Arc<Hub>, base: BotConfig) -> BotHandle {
         run_sessions: HashMap::new(),
         lane,
         turn_session: None,
+        turn_conversation_id: None,
         active_group: None,
         active_routine: None,
         routine_deadline: None,
@@ -237,6 +238,7 @@ struct Actor {
     lane: Lane,
     /// The session the current turn prompts.
     turn_session: Option<String>,
+    pub(super) turn_conversation_id: Option<String>,
     active_group: Option<GroupTurn>,
     active_routine: Option<String>,
     routine_deadline: Option<Instant>,
@@ -410,6 +412,11 @@ impl Actor {
         data["author"] = self.cfg.id.clone().into();
         if let (EntryKind::Agent, Some(call)) = (kind, &self.turn_call) {
             data["call"] = call.clone().into();
+        }
+        if let Some(ref cid) = self.turn_conversation_id {
+            if data.get("conversationId").is_none() {
+                data["conversationId"] = serde_json::json!(cid);
+            }
         }
         self.hub.add_entry(&self.lane, kind, turn, &data)
     }

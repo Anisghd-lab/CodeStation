@@ -99,6 +99,10 @@ impl Actor {
         }
         self.lane = lane.clone();
         self.turn = Some(turn);
+        self.turn_conversation_id = entry_ids
+            .last()
+            .and_then(|id| self.hub.store.entry(id))
+            .and_then(|e| e.data.get("conversationId").and_then(serde_json::Value::as_str).map(str::to_owned));
         // Only the user's own words feed memory: not another bot's, a room's or a routine's.
         let from_user = !hidden && self.source() == TurnSource::User;
         self.turn_text = from_user.then(|| text.to_owned());
@@ -186,6 +190,8 @@ impl Actor {
                 None,
             );
             self.turn = None;
+        self.turn_conversation_id = None;
+            self.turn_conversation_id = None;
             if self.routine_completion.is_none() {
                 self.set_inflight(false);
             }
@@ -422,6 +428,7 @@ impl Actor {
             Ok(final_text.clone())
         });
         self.turn = None;
+        self.turn_conversation_id = None;
         self.reply_hops = None;
         // A call's opening was heard on the call: reset it for the next turn.
         let _opening = std::mem::take(&mut self.active_prompt);

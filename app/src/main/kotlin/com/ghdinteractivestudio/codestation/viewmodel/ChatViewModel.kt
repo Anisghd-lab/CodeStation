@@ -9,6 +9,7 @@ import com.ghdinteractivestudio.codestation.domain.model.ApprovalStatus
 import com.ghdinteractivestudio.codestation.domain.model.Bot
 import com.ghdinteractivestudio.codestation.domain.model.BotStatus
 import com.ghdinteractivestudio.codestation.domain.model.ChatMessage
+import com.ghdinteractivestudio.codestation.domain.model.Conversation
 import com.ghdinteractivestudio.codestation.domain.model.MessageAuthorType
 import com.ghdinteractivestudio.codestation.domain.model.ExecutionStep
 import com.ghdinteractivestudio.codestation.domain.model.FileAttachment
@@ -25,7 +26,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -44,15 +47,31 @@ data class ChatUiState(
     val isTranscribing: Boolean = false,
     val errorMessage: String? = null,
     val serverUrl: String = "http://127.0.0.1:19222",
-    val serverToken: String = ""
+    val serverToken: String = "",
+    val activeConversationId: String? = null,
+    val activeConversationTitle: String = "Discussion",
+    val conversations: List<Conversation> = emptyList()
 )
 
 class ChatViewModel(
     private val botId: String,
     private val botRepository: BotRepository,
     private val chatRepository: ChatRepository,
-    private val context: Context? = null
+    private val context: Context? = null,
+    private val initialConversationId: String? = null
 ) : ViewModel() {
+
+    private val _activeConversationId = MutableStateFlow<String?>(initialConversationId)
+    val activeConversationId = _activeConversationId.asStateFlow()
+
+    val conversations: StateFlow<List<Conversation>> =
+        chatRepository.getConversationsStream(botId)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val _messagesFlow = _activeConversationId.flatMapLatest { convId ->
+        chatRepository.getMessagesByConversationStream(botId, convId)
+    }
 
     private val _inputDraft = MutableStateFlow("")
     private val _editingMessage = MutableStateFlow<ChatMessage?>(null)
@@ -138,7 +157,7 @@ class ChatViewModel(
 
     private val _botDataFlow = combine(
         botRepository.getBotByIdStream(botId),
-        chatRepository.getMessagesStream(botId),
+        _messagesFlow,
         chatRepository.getPendingApprovalsStream(botId)
     ) { bot, messages, approvals ->
         Triple(bot, messages, approvals)
@@ -175,8 +194,21 @@ class ChatViewModel(
         _botDataFlow,
         _uiInputFlow,
         _serverUrl,
-        _serverToken
-    ) { (bot, messages, approvals), input, sUrl, sToken ->
+        _serverToken,
+        _activeConversationId,
+        conversations
+    ) { args: Array<Any?> ->
+        @Suppress("UNCHECKED_CAST")
+        val triple = args[0] as Triple<Bot?, List<ChatMessage>, List<ApprovalRequest>>
+        val (bot, messages, approvals) = triple
+        val input = args[1] as InputState
+        val sUrl = args[2] as String
+        val sToken = args[3] as String
+        val activeConvId = args[4] as String?
+        @Suppress("UNCHECKED_CAST")
+        val convList = args[5] as List<Conversation>
+        val activeTitle = convList.find { it.id == activeConvId }?.title ?: "Discussion"
+
         ChatUiState(
             bot = bot,
             messages = messages,
@@ -192,7 +224,10 @@ class ChatViewModel(
             isTranscribing = input.isTranscribing,
             errorMessage = input.error,
             serverUrl = sUrl,
-            serverToken = sToken
+            serverToken = sToken,
+            activeConversationId = activeConvId,
+            activeConversationTitle = activeTitle,
+            conversations = convList
         )
     }.stateIn(
         scope = viewModelScope,
@@ -425,7 +460,14 @@ class ChatViewModel(
                     )
                 }
 
-                val result = chatRepository.sendMessage(botId, text, reply, domainAttachments)
+                var currentConvId = _activeConversationId.value
+                if (currentConvId.isNullOrBlank()) {
+                    val newConv = chatRepository.createConversation(botId, "Discussion").getOrNull()
+                    currentConvId = newConv?.id
+                    _activeConversationId.value = currentConvId
+                }
+
+                val result = chatRepository.sendMessage(botId, text, reply, domainAttachments, currentConvId)
                 result.onSuccess {
                     RequestTracer.logEvent(
                         requestId = reqId,
@@ -566,16 +608,45 @@ class ChatViewModel(
         }
     }
 
+    fun selectConversation(id: String) {
+        _activeConversationId.value = id
+    }
+
+    fun createNewConversation(title: String = "Nouvelle discussion") {
+        viewModelScope.launch {
+            val res = chatRepository.createConversation(botId, title)
+            res.onSuccess { conv ->
+                _activeConversationId.value = conv.id
+            }
+        }
+    }
+
+    fun deleteConversation(id: String) {
+        viewModelScope.launch {
+            chatRepository.deleteConversation(id)
+            if (_activeConversationId.value == id) {
+                _activeConversationId.value = null
+            }
+        }
+    }
+
+    fun renameConversation(id: String, title: String) {
+        viewModelScope.launch {
+            chatRepository.renameConversation(id, title)
+        }
+    }
+
     companion object {
         fun provideFactory(
             botId: String,
             botRepository: BotRepository,
             chatRepository: ChatRepository,
-            context: Context? = null
+            context: Context? = null,
+            conversationId: String? = null
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return ChatViewModel(botId, botRepository, chatRepository, context) as T
+                return ChatViewModel(botId, botRepository, chatRepository, context, conversationId) as T
             }
         }
     }

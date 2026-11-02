@@ -214,7 +214,7 @@ impl Hub {
                 "permission": "auto",
                 "fastMode": true,
                 "pinned": true,
-                "position": 4,
+                "position": 1,
             }))?;
             let _ = self.store.save_bot(&cfg);
         }
@@ -234,12 +234,52 @@ impl Hub {
                 "model": "opencode/glm-5.3-flash-free",
                 "fastMode": false,
                 "pinned": true,
-                "position": 1,
+                "position": 2,
             }))?;
             let _ = self.store.save_bot(&cfg);
         }
 
-        // 3. CodeBuddy Code
+        // 3. OmniRush
+        if !existing_ids.contains("bot-omnirush") {
+            let cfg: BotConfig = serde_json::from_value(serde_json::json!({
+                "id": "bot-omnirush",
+                "kind": "agent",
+                "name": "OmniRush",
+                "description": "Agent OmniRush propulsé par GPT-6 Astra",
+                "avatarColor": "#10B981",
+                "avatarShape": "circle",
+                "backend": "omnirush",
+                "cwd": "/root/CodeStation",
+                "permission": "auto",
+                "model": "gpt-6-astra",
+                "fastMode": true,
+                "pinned": true,
+                "position": 3,
+            }))?;
+            let _ = self.store.save_bot(&cfg);
+        }
+
+        // 4. Clixad
+        if !existing_ids.contains("bot-clixad") {
+            let cfg: BotConfig = serde_json::from_value(serde_json::json!({
+                "id": "bot-clixad",
+                "kind": "agent",
+                "name": "Clixad",
+                "description": "Agent Clixad propulsé par GPT-5 Nano",
+                "avatarColor": "#EC4899",
+                "avatarShape": "square",
+                "backend": "clixad",
+                "cwd": "/root/CodeStation",
+                "permission": "auto",
+                "model": "gpt-5-nano",
+                "fastMode": true,
+                "pinned": true,
+                "position": 4,
+            }))?;
+            let _ = self.store.save_bot(&cfg);
+        }
+
+        // 5. CodeBuddy Code
         if !existing_ids.contains("bot-codebuddy") {
             let cfg: BotConfig = serde_json::from_value(serde_json::json!({
                 "id": "bot-codebuddy",
@@ -255,6 +295,26 @@ impl Hub {
                 "fastMode": true,
                 "pinned": true,
                 "position": 5,
+            }))?;
+            let _ = self.store.save_bot(&cfg);
+        }
+
+        // 6. Freebuff
+        if !existing_ids.contains("bot-freebuff") {
+            let cfg: BotConfig = serde_json::from_value(serde_json::json!({
+                "id": "bot-freebuff",
+                "kind": "agent",
+                "name": "Freebuff",
+                "description": "Free AI Coding Assistant propulsé par Freebuff CLI",
+                "avatarColor": "#F59E0B",
+                "avatarShape": "hexagon",
+                "backend": "freebuff",
+                "cwd": "/root/CodeStation",
+                "permission": "auto",
+                "model": "freebuff/free-auto",
+                "fastMode": true,
+                "pinned": true,
+                "position": 6,
             }))?;
             let _ = self.store.save_bot(&cfg);
         }
@@ -285,7 +345,9 @@ impl Hub {
     }
 
     pub fn create_bot(self: &Arc<Self>, mut cfg: BotConfig) -> Result<Value> {
-        cfg.id = uuid::Uuid::new_v4().to_string();
+        if cfg.id.trim().is_empty() {
+            cfg.id = uuid::Uuid::new_v4().to_string();
+        }
         cfg.created_at = crate::store::now_ms();
         cfg.position = self.new_bot_position()?;
         // No name yet (Grok Bot's flow): it gets one after its first few conversations.

@@ -28,6 +28,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +41,7 @@ import com.ghdinteractivestudio.codestation.ui.components.CardForm
 import com.ghdinteractivestudio.codestation.ui.components.CardSection
 import com.ghdinteractivestudio.codestation.ui.components.CharacterAvatar
 import com.ghdinteractivestudio.codestation.ui.components.CodyncSwitch
+import com.ghdinteractivestudio.codestation.ui.components.GlassAlertDialog
 import com.ghdinteractivestudio.codestation.ui.components.PageHeader
 import com.ghdinteractivestudio.codestation.ui.components.PrimaryButton
 import com.ghdinteractivestudio.codestation.ui.components.SecondaryButton
@@ -62,6 +64,46 @@ fun BotEditorScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val antigravityCatalogState by (viewModel.antigravityCatalogState?.collectAsState() ?: remember { mutableStateOf(null) })
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(state.isSaved, state.isDeleted) {
+        if (state.isSaved || state.isDeleted) {
+            onNavigateBack()
+        }
+    }
+
+    if (showDeleteConfirm) {
+        GlassAlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Supprimer l'Agent", style = Type.title3.bold, color = Palette.danger) },
+            text = { Text("Êtes-vous sûr de vouloir supprimer définitivement l'agent '${state.name}' ? Cette action est irréversible.", style = Type.body, color = Palette.text) },
+            confirmButton = {
+                Box(
+                    modifier = Modifier
+                        .clip(Capsule())
+                        .background(Palette.danger)
+                        .clickable {
+                            showDeleteConfirm = false
+                            viewModel.deleteBot()
+                        }
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text("Supprimer", style = Type.caption.bold, color = Color.White)
+                }
+            },
+            dismissButton = {
+                Box(
+                    modifier = Modifier
+                        .clip(Capsule())
+                        .background(Palette.text.copy(alpha = 0.1f))
+                        .clickable { showDeleteConfirm = false }
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text("Annuler", style = Type.caption.semibold, color = Palette.text)
+                }
+            }
+        )
+    }
 
     Column(
         modifier = modifier
@@ -73,6 +115,25 @@ fun BotEditorScreen(
             title = if (state.isNewBot) "Nouvel Agent" else "Modifier l'Agent",
             pop = onNavigateBack
         )
+
+        state.errorMessage?.let { err ->
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .background(Palette.danger.copy(alpha = 0.15f), RoundedRectangle(8.dp))
+                    .border(1.dp, Palette.danger.copy(alpha = 0.5f), RoundedRectangle(8.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Symbol("exclamationmark.triangle.fill", size = 16.dp, tint = Palette.danger)
+                    Text(err, style = Type.caption, color = Palette.danger, modifier = Modifier.weight(1f))
+                }
+            }
+        }
 
         CardForm(
             modifier = Modifier.weight(1f),
@@ -205,22 +266,32 @@ fun BotEditorScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "Agents prioritaires (Ubuntu PRoot)",
+                            text = "Registre Officiel des 6 CLI (CodeStation Execution Engine)",
                             style = Type.caption.semibold,
                             color = Palette.accent
                         )
 
-                        val primaryProviders = listOf(ProviderType.ANTIGRAVITY, ProviderType.OPENCODE, ProviderType.CODEBUDDY)
-                        val otherProviders = ProviderType.entries.filter { it !in primaryProviders }
+                        val officialClis = listOf(
+                            ProviderType.ANTIGRAVITY,
+                            ProviderType.OPENCODE,
+                            ProviderType.CODEBUDDY,
+                            ProviderType.CLIXAD,
+                            ProviderType.FREEBUFF,
+                            ProviderType.OMNIRUSH
+                        )
+                        val otherProviders = ProviderType.entries.filter { it !in officialClis }
 
-                        // Section 1: Agents Prioritaires (Antigravity, OpenCode GLM & CodeBuddy Code)
-                        primaryProviders.forEach { provider ->
+                        // Section 1: Registre Officiel des 6 CLI
+                        officialClis.forEach { provider ->
                             val isSelected = state.provider == provider
                             val (badgeText, badgeColor) = when (provider) {
-                                ProviderType.ANTIGRAVITY -> "Prête (agy v1.4.9)" to Palette.emeraldAccent
-                                ProviderType.OPENCODE -> "Prête (GLM-5.3-Flash)" to Palette.emeraldAccent
-                                ProviderType.CODEBUDDY -> "Prête (Hy3 v2.178.1)" to Palette.emeraldAccent
-                                else -> "Prête" to Palette.emeraldAccent
+                                ProviderType.ANTIGRAVITY -> "Opérationnel (Gemini 4 Argon / Claude 5.5)" to Palette.emeraldAccent
+                                ProviderType.OPENCODE -> "Opérationnel (GLM-5.3-Flash Free)" to Palette.emeraldAccent
+                                ProviderType.CODEBUDDY -> "Opérationnel (Hy3 Free)" to Palette.emeraldAccent
+                                ProviderType.CLIXAD -> "Opérationnel (GPT-5 Nano)" to Palette.emeraldAccent
+                                ProviderType.FREEBUFF -> "Opérationnel (Free Auto - TUI)" to Palette.accent
+                                ProviderType.OMNIRUSH -> "Configuré (GPT-6 Astra - Standby Cloud)" to Palette.warning
+                                else -> "CLI Détectée" to Palette.emeraldAccent
                             }
 
                             val itemShape = RoundedRectangle(10.dp)
@@ -635,6 +706,31 @@ fun BotEditorScreen(
                 }
             }
 
+            if (!state.isNewBot && !state.isLead) {
+                CardSection(title = "Gestion de l'Agent") {
+                    row {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedRectangle(10.dp))
+                                .border(1.dp, Palette.danger.copy(alpha = 0.5f), RoundedRectangle(10.dp))
+                                .background(Palette.danger.copy(alpha = 0.08f))
+                                .clickable { showDeleteConfirm = true }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Symbol("trash.fill", size = 18.dp, tint = Palette.danger)
+                            Text(
+                                "Supprimer définitivement cet agent",
+                                style = Type.body.semibold,
+                                color = Palette.danger
+                            )
+                        }
+                    }
+                }
+            }
+
             Spacer(Modifier.height(10.dp))
         }
 
@@ -663,7 +759,6 @@ fun BotEditorScreen(
                     enabled = state.name.isNotBlank() && !state.isSaving,
                     action = {
                         viewModel.saveBot()
-                        onNavigateBack()
                     },
                     modifier = Modifier.weight(1f)
                 )

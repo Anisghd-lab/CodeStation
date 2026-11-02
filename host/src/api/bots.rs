@@ -65,7 +65,49 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
             let bot = str_arg(&b, "botId")?;
             let before = b["beforeSeq"].as_i64().unwrap_or(i64::MAX);
             let limit = b["limit"].as_i64().unwrap_or(100).clamp(1, 500);
-            json!({"entries": hub.store.history(bot, before, limit)?})
+            let entries = if let Some(conv_id) = b["conversationId"].as_str().filter(|s| !s.is_empty()) {
+                hub.store.history_conversation(bot, conv_id, before, limit)?
+            } else {
+                hub.store.history(bot, before, limit)?
+            };
+            json!({"entries": entries})
+        }
+        "createConversation" => {
+            let bot_id = str_arg(&b, "botId")?.to_owned();
+            let title = b["title"].as_str().unwrap_or("Nouvelle discussion").trim();
+            let title = if title.is_empty() { "Nouvelle discussion" } else { title };
+            let conv_id = b["id"].as_str().filter(|s| !s.trim().is_empty()).map(str::to_owned).unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+            let cli_id = b["cliId"].as_str().map(str::to_owned);
+            let runner_id = b["runnerId"].as_str().map(str::to_owned);
+            let now = crate::store::now_ms();
+            let conv = crate::store::Conversation {
+                id: conv_id,
+                bot_id,
+                title: title.to_owned(),
+                cli_id,
+                runner_id,
+                cli_session_id: None,
+                status: "ACTIVE".to_owned(),
+                created_at: now,
+                updated_at: now,
+            };
+            hub.store.save_conversation(&conv)?;
+            json!({"conversation": conv})
+        }
+        "listConversations" => {
+            let bot_id = str_arg(&b, "botId")?;
+            json!({"conversations": hub.store.conversations_for_bot(bot_id)?})
+        }
+        "deleteConversation" => {
+            let conv_id = str_arg(&b, "conversationId")?;
+            hub.store.delete_conversation(conv_id)?;
+            json!({"ok": true})
+        }
+        "renameConversation" => {
+            let conv_id = str_arg(&b, "conversationId")?;
+            let title = str_arg(&b, "title")?;
+            hub.store.rename_conversation(conv_id, title)?;
+            json!({"ok": true})
         }
         // Notices between a bot and one peer (the newest 200), for the read-only bot conversation sheet.
         "botConversation" => {
@@ -203,6 +245,9 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
                 }
             }
             let mut data = json!({"text": text, "clientNonce": nonce, "attachments": attachments});
+            if let Some(conv_id) = b["conversationId"].as_str().filter(|s| !s.is_empty()) {
+                data["conversationId"] = conv_id.into();
+            }
             // What the user pasted rather than typed: memory never takes it as the user's own words.
             let pasted: Vec<&str> = b["pasted"]
                 .as_array()

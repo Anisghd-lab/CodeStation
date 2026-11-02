@@ -2,7 +2,8 @@
 """
 Lightweight ACP (Agent Client Protocol) Bridge for Google Antigravity (agy).
 Enables CodeStation Host to communicate with agy over standard JSON-RPC 2.0 stdio,
-including dynamic model discovery via `agy models`.
+including dynamic model discovery via `agy models`, multi-turn conversation tracking,
+and per-session process lifecycle management to prevent timeouts and orphan processes.
 """
 
 import sys
@@ -12,16 +13,26 @@ import threading
 import os
 import time
 
-active_proc = None
-active_proc_lock = threading.Lock()
-current_selected_model = "gemini-3.8-flash-medium"
+active_procs: dict[str, subprocess.Popen] = {}
+active_procs_lock = threading.Lock()
+session_conversations: dict[str, str] = {}
+session_conversations_lock = threading.Lock()
+
+current_selected_model = "gemini-4-argon-medium"
 
 DEFAULT_AGY_MODELS = [
+    {"value": "gemini-4-argon-medium", "name": "Gemini 4 Argon (Medium)"},
+    {"value": "gemini-4-argon-high", "name": "Gemini 4 Argon (High)"},
+    {"value": "gemini-4-argon-low", "name": "Gemini 4 Argon (Low)"},
     {"value": "gemini-3.8-flash-high", "name": "Gemini 3.8 Flash (High)"},
     {"value": "gemini-3.8-flash-medium", "name": "Gemini 3.8 Flash (Medium)"},
     {"value": "gemini-3.8-flash-low", "name": "Gemini 3.8 Flash (Low)"},
-    {"value": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6 (Thinking)"},
-    {"value": "claude-opus-4-6-thinking", "name": "Claude Opus 4.6 (Thinking)"},
+    {"value": "claude-opus-5-5-high", "name": "Claude Opus 5.5 (High)"},
+    {"value": "claude-opus-5-5-medium", "name": "Claude Opus 5.5 (Medium)"},
+    {"value": "claude-opus-5-5-low", "name": "Claude Opus 5.5 (Low)"},
+    {"value": "claude-sonnet-5-5-high", "name": "Claude Sonnet 5.5 (High)"},
+    {"value": "claude-sonnet-5-5-medium", "name": "Claude Sonnet 5.5 (Medium)"},
+    {"value": "claude-sonnet-5-5-low", "name": "Claude Sonnet 5.5 (Low)"},
     {"value": "gpt-oss-120b-medium", "name": "GPT-OSS 120B (Medium)"}
 ]
 
@@ -47,7 +58,7 @@ def _background_refresh_models():
     try:
         env = os.environ.copy()
         env["PATH"] = "/root/.gemini/antigravity-cli/bin:/root/.local/bin:/usr/local/bin:/usr/bin:/bin:" + env.get("PATH", "")
-        out = subprocess.check_output(["agy", "models"], text=True, timeout=8, env=env)
+        out = subprocess.check_output(["agy", "models"], text=True, timeout=10, env=env)
         models = []
         for line in out.splitlines():
             line = line.strip()
@@ -64,6 +75,7 @@ def _background_refresh_models():
         if models:
             _models_cache = models
             _models_cache_time = time.time()
+            log(f"Dynamic model list refreshed ({len(models)} models)")
     except Exception as e:
         log(f"Background models refresh skipped: {e}")
 
@@ -89,7 +101,7 @@ def send_notification(method, params):
     sys.stdout.flush()
 
 def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
-    global active_proc
+    proc = None
     try:
         env = os.environ.copy()
         env["PATH"] = "/root/.gemini/antigravity-cli/bin:/root/.local/bin:/usr/local/bin:/usr/bin:/bin:" + env.get("PATH", "")
@@ -97,27 +109,36 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
         # Validate model against available models
         avail_models = [m["value"] for m in fetch_agy_models()]
         if not model_id or model_id not in avail_models:
-            model_id = "gemini-3.8-flash-medium"
-            log(f"Falling back to default model: {model_id}")
+            model_id = "gemini-4-argon-medium"
+            log(f"Model {model_id} not in cache, using default: gemini-4-argon-medium")
+
+        # Check existing conversation ID for multi-turn continuity
+        with session_conversations_lock:
+            existing_conv_id = session_conversations.get(session_id)
 
         if prompt_text.strip().lower() in ["/quota", "/usage", "quota", "usage"]:
             cmd = ["agy", "-p", "/quota", "--dangerously-skip-permissions"]
             log(f"Executing quota query directly: {' '.join(cmd)}")
         else:
             cmd = ["agy", "-p", prompt_text, "--dangerously-skip-permissions", "--model", model_id, "--output-format", "stream-json"]
+            if existing_conv_id:
+                cmd.extend(["--conversation", existing_conv_id])
+                log(f"Continuing existing conversation {existing_conv_id} for session {session_id}")
             log(f"Executing: {' '.join(cmd[:3])} ... --model {model_id} --output-format stream-json (cwd={cwd})")
 
-        with active_proc_lock:
-            active_proc = subprocess.Popen(
-                cmd,
-                cwd=cwd if os.path.isdir(cwd) else "/root/workspace",
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env=env,
-                bufsize=1
-            )
+        proc = subprocess.Popen(
+            cmd,
+            cwd=cwd if os.path.isdir(cwd) else "/root/workspace",
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+            bufsize=1
+        )
+
+        with active_procs_lock:
+            active_procs[session_id] = proc
         
         output_chunks = []
         stderr_chunks = []
@@ -126,19 +147,21 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
 
         # Stream stderr chunks
         def read_stderr():
-            for sline in active_proc.stderr:
-                stderr_chunks.append(sline)
-                log(f"[agy stderr] {sline.strip()}")
+            if proc.stderr:
+                for sline in proc.stderr:
+                    stderr_chunks.append(sline)
+                    log(f"[agy stderr] {sline.strip()}")
 
         stderr_thread = threading.Thread(target=read_stderr, daemon=True)
         stderr_thread.start()
 
         # Heartbeat to keep connection alive during lengthy thinking or tool execution
         def heartbeat_worker():
-            while not heartbeat_stop.wait(8.0):
-                with active_proc_lock:
-                    proc_alive = (active_proc is not None and active_proc.poll() is None)
-                if proc_alive and (time.time() - last_stream_time >= 8.0):
+            while not heartbeat_stop.wait(6.0):
+                with active_procs_lock:
+                    p = active_procs.get(session_id)
+                    proc_alive = (p is not None and p.poll() is None)
+                if proc_alive and (time.time() - last_stream_time >= 6.0):
                     send_notification("session/update", {
                         "sessionId": session_id,
                         "update": {
@@ -150,7 +173,7 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
         heartbeat_thread = threading.Thread(target=heartbeat_worker, daemon=True)
         heartbeat_thread.start()
 
-        for raw_line in active_proc.stdout:
+        for raw_line in proc.stdout:
             last_stream_time = time.time()
             line = raw_line.strip()
             if not line:
@@ -165,6 +188,16 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
 
             if parsed and isinstance(parsed, dict) and "event" in parsed:
                 event = parsed.get("event")
+                # Capture conversation_id for multi-turn continuity
+                conv_id = parsed.get("conversation_id")
+                if not conv_id and isinstance(parsed.get("result"), dict):
+                    conv_id = parsed["result"].get("conversation_id")
+                if not conv_id and isinstance(parsed.get("step_update"), dict):
+                    conv_id = parsed["step_update"].get("conversation_id")
+                if conv_id:
+                    with session_conversations_lock:
+                        session_conversations[session_id] = conv_id
+
                 if event == "step_update":
                     step = parsed.get("step_update", {})
                     step_type = step.get("step_type")
@@ -223,27 +256,27 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
         heartbeat_stop.set()
         heartbeat_thread.join(timeout=1.0)
         try:
-            active_proc.wait(timeout=300.0)
+            proc.wait(timeout=300.0)
         except subprocess.TimeoutExpired:
             log("agy execution timed out after 300s, killing process")
-            with active_proc_lock:
-                if active_proc is not None:
+            with active_procs_lock:
+                p = active_procs.pop(session_id, None)
+                if p is not None:
                     try:
-                        active_proc.terminate()
+                        p.terminate()
                         time.sleep(1.0)
-                        if active_proc.poll() is None:
-                            active_proc.kill()
+                        if p.poll() is None:
+                            p.kill()
                     except Exception:
                         pass
-                    active_proc = None
             send_response(req_id, error={"code": -32000, "message": "Google Antigravity process timed out after 300s"})
             return
 
         stderr_thread.join(timeout=2.0)
         
-        exit_code = active_proc.returncode if active_proc else -1
-        with active_proc_lock:
-            active_proc = None
+        exit_code = proc.returncode if proc else -1
+        with active_procs_lock:
+            active_procs.pop(session_id, None)
 
         full_stdout = "".join(output_chunks).strip()
         full_stderr = "".join(stderr_chunks).strip()
@@ -264,8 +297,8 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
         })
     except Exception as e:
         log(f"Error executing agy prompt with model {model_id}: {e}")
-        with active_proc_lock:
-            active_proc = None
+        with active_procs_lock:
+            active_procs.pop(session_id, None)
         send_response(req_id, error={"code": -32603, "message": str(e)})
 
 def main():
@@ -296,7 +329,7 @@ def main():
                 },
                 "agentInfo": {
                     "name": "Google Antigravity",
-                    "version": "1.4.3"
+                    "version": "1.4.12"
                 }
             })
         elif method == "session/new":
@@ -360,20 +393,32 @@ def main():
             )
             t.start()
         elif method == "session/cancel":
-            with active_proc_lock:
-                if active_proc is not None:
+            target_sid = params.get("sessionId", session_id)
+            with active_procs_lock:
+                p = active_procs.pop(target_sid, None)
+                if p is not None:
                     try:
-                        active_proc.terminate()
+                        p.terminate()
                         time.sleep(0.5)
-                        if active_proc.poll() is None:
-                            active_proc.kill()
+                        if p.poll() is None:
+                            p.kill()
                     except Exception:
                         pass
-                    active_proc = None
             if req_id is not None:
                 send_response(req_id, {})
         elif method == "session/close":
-            send_response(req_id, {})
+            target_sid = params.get("sessionId", session_id)
+            with active_procs_lock:
+                p = active_procs.pop(target_sid, None)
+                if p is not None:
+                    try:
+                        p.terminate()
+                    except Exception:
+                        pass
+            with session_conversations_lock:
+                session_conversations.pop(target_sid, None)
+            if req_id is not None:
+                send_response(req_id, {})
         else:
             if req_id is not None:
                 send_response(req_id, {})

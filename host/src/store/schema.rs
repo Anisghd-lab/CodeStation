@@ -147,7 +147,12 @@ impl Store {
                 rev INTEGER NOT NULL, kind TEXT NOT NULL, turn INTEGER NOT NULL, data TEXT NOT NULL,
                 created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
              CREATE INDEX IF NOT EXISTS entries_rev ON entries(rev);
-             CREATE INDEX IF NOT EXISTS entries_bot ON entries(bot_id, seq);",
+             CREATE INDEX IF NOT EXISTS entries_bot ON entries(bot_id, seq);
+             CREATE TABLE IF NOT EXISTS conversations(
+                id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, title TEXT NOT NULL,
+                cli_id TEXT, runner_id TEXT, cli_session_id TEXT, status TEXT NOT NULL,
+                created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+             CREATE INDEX IF NOT EXISTS conversations_bot ON conversations(bot_id, updated_at);",
         )?;
         migrate(&c)?;
         codync_mem::schema::migrate(&c)?;

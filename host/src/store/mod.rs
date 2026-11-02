@@ -6,6 +6,7 @@
 //! client's catch-up) is capped per bot, and the history search runs through `spawn_blocking`.
 
 mod bots;
+mod conversations;
 mod devices;
 mod entries;
 mod memory;
@@ -14,7 +15,7 @@ mod schema;
 
 pub use devices::{Device, DeviceSource, Scope};
 pub use model::{
-    AVATAR_COLORS, AVATAR_SHAPES, BotConfig, BotKind, BotRow, Entry, EntryKind, Fallback, Lane, Permission,
+    AVATAR_COLORS, AVATAR_SHAPES, BotConfig, BotKind, BotRow, Conversation, Entry, EntryKind, Fallback, Lane, Permission,
     message_text, run_session_key,
 };
 

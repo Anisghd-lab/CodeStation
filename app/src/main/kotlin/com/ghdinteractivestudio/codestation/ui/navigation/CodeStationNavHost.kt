@@ -14,6 +14,8 @@ import androidx.navigation.navArgument
 import com.ghdinteractivestudio.codestation.CodeStationApplication
 import com.ghdinteractivestudio.codestation.ui.screens.ApprovalsScreen
 import com.ghdinteractivestudio.codestation.ui.screens.BotEditorScreen
+import com.ghdinteractivestudio.codestation.ui.screens.CamcsControlCenterScreen
+import com.ghdinteractivestudio.codestation.ui.screens.CamcsTaskScreen
 import com.ghdinteractivestudio.codestation.ui.screens.ChatScreen
 import com.ghdinteractivestudio.codestation.ui.screens.ExtensionsScreen
 import com.ghdinteractivestudio.codestation.ui.screens.GroupEditorScreen
@@ -81,8 +83,22 @@ fun CodeStationNavHost(
             )
             RosterScreen(
                 viewModel = rosterViewModel,
-                onBotClick = { botId -> navController.navigate(Screen.Chat.createRoute(botId)) },
+                onBotClick = { botId, conversationId ->
+                    navController.navigate(Screen.Chat.createRoute(botId, conversationId)) {
+                        launchSingleTop = true
+                    }
+                },
                 onMemoryClick = { navController.navigate(Screen.Memory.route) },
+                onNewTaskClick = {
+                    navController.navigate(Screen.CamcsTask.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onOpenControlCenter = {
+                    navController.navigate(Screen.CamcsControlCenter.route) {
+                        launchSingleTop = true
+                    }
+                },
                 onCreateBotClick = { navController.navigate(Screen.BotEditor.createRoute()) },
                 onCreateGroupClick = { navController.navigate(Screen.GroupEditor.route) },
                 onConfigureServerClick = { navController.navigate(Screen.Pairing.route) },
@@ -93,12 +109,20 @@ fun CodeStationNavHost(
         // 4. Conversation / Chat
         composable(
             route = Screen.Chat.route,
-            arguments = listOf(navArgument("botId") { type = NavType.StringType })
+            arguments = listOf(
+                navArgument("botId") { type = NavType.StringType },
+                navArgument("conversationId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
         ) { backStackEntry ->
             val botId = backStackEntry.arguments?.getString("botId") ?: return@composable
+            val conversationId = backStackEntry.arguments?.getString("conversationId")
             val chatViewModel: ChatViewModel = viewModel(
-                key = botId,
-                factory = ChatViewModel.provideFactory(botId, container.botRepository, container.chatRepository, container.context)
+                key = "$botId-$conversationId",
+                factory = ChatViewModel.provideFactory(botId, container.botRepository, container.chatRepository, container.context, conversationId)
             )
             ChatScreen(
                 viewModel = chatViewModel,
@@ -219,6 +243,46 @@ fun CodeStationNavHost(
         }
         composable(Screen.Voice.route) {
             VoiceScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(Screen.CamcsTask.route) {
+            val rosterViewModel: RosterViewModel = viewModel(
+                factory = RosterViewModel.provideFactory(
+                    container.botRepository,
+                    container.serverRepository,
+                    container.memoryRepository
+                )
+            )
+            val state by rosterViewModel.uiState.collectAsState()
+            val allBots = listOfNotNull(state.leadBot) + state.pinnedBots + state.otherBots
+
+            CamcsTaskScreen(
+                availableBots = allBots,
+                onLaunchTask = { objective, missionId, _ ->
+                    navController.navigate(Screen.CamcsControlCenter.createRoute(missionId)) {
+                        popUpTo(Screen.CamcsTask.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // 14. CAMCS Control Center Screen
+        composable(
+            route = Screen.CamcsControlCenter.route,
+            arguments = listOf(
+                navArgument("missionId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val missionId = backStackEntry.arguments?.getString("missionId")
+            CamcsControlCenterScreen(
+                initialMissionId = missionId,
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
     }
 }

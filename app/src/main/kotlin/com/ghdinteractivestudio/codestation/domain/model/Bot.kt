@@ -8,17 +8,31 @@ enum class BotStatus {
 }
 
 enum class ProviderType(val displayName: String, val defaultModel: String, val backendId: String) {
-    CLAUDE_CODE("Claude Code", "claude-3-7-sonnet", "claude"),
-    OPENAI_CODEX("OpenAI Codex", "gpt-4o", "codex"),
-    GEMINI_CLI("Google Gemini CLI", "gemini-2.0-flash", "gemini"),
+    OMNIRUSH("OmniRush", "gpt-6-astra", "omnirush"),
+    CLIXAD("Clixad", "gpt-5-nano", "clixad"),
+    FREEBUFF("Freebuff", "freebuff/free-auto", "freebuff"),
     ANTIGRAVITY("Google Antigravity", "gemini-4-argon-medium", "antigravity"),
     OPENCODE("OpenCode", "opencode/glm-5.3-flash-free", "opencode"),
     CODEBUDDY("CodeBuddy Code", "Hy3", "codebuddy"),
+    CLAUDE_CODE("Claude Code", "claude-3-7-sonnet", "claude"),
+    OPENAI_CODEX("OpenAI Codex", "gpt-4o", "codex"),
+    GEMINI_CLI("Google Gemini CLI", "gemini-2.0-flash", "gemini"),
     ACP_LOCAL("ACP Local Agent", "local-qwen-2.5", "acp"),
     CUSTOM("Custom Agent", "default", "custom");
 
     fun getAvailableModels(): List<ModelInfo> {
         return when (this) {
+            FREEBUFF -> listOf(
+                ModelInfo("freebuff/free-auto", "Freebuff Auto (Free)", isFree = true, isDefault = true, isVerified = true)
+            )
+            OMNIRUSH -> listOf(
+                ModelInfo("gpt-6-astra", "GPT-6 Astra", isFree = false, isDefault = true, isVerified = true),
+                ModelInfo("gpt-6-turbo", "GPT-6 Turbo", isFree = false, isVerified = true)
+            )
+            CLIXAD -> listOf(
+                ModelInfo("gpt-5-nano", "GPT-5 Nano", isFree = false, isDefault = true, isVerified = true),
+                ModelInfo("gpt-5-flash", "GPT-5 Flash", isFree = false, isVerified = true)
+            )
             CODEBUDDY -> listOf(
                 ModelInfo("Hy3", "Hy3", isFree = true, isDefault = true, isVerified = true),
                 ModelInfo("hy4-preview", "Hy4 Preview", isFree = false, isVerified = true),

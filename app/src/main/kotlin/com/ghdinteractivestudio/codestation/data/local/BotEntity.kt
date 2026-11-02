@@ -124,4 +124,7 @@ interface BotDao {
 
     @Query("SELECT COUNT(*) FROM bots")
     suspend fun getBotCount(): Int
+
+    @Query("SELECT COUNT(*) FROM bots WHERE status != 'OFFLINE'")
+    suspend fun getActiveBotCount(): Int
 }

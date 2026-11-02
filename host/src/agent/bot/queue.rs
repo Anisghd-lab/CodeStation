@@ -318,6 +318,7 @@ impl Actor {
         // What the chain carried in (a recap, a takeover) was this turn's; the user's handoff waits for the next.
         self.relay.carried = None;
         self.turn = None;
+        self.turn_conversation_id = None;
         self.reply_hops = None;
         self.active_prompt = false;
         memory::turns::drop_turn(&self.cfg.id);

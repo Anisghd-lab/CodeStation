@@ -20,8 +20,10 @@ pub fn prepare(cfg: &mut BotConfig) -> Result<()> {
     if cfg.is_group() || !cfg.cwd.is_empty() {
         return Ok(());
     }
-    // Only host-issued IDs may become directory components.
-    uuid::Uuid::parse_str(&cfg.id).context("invalid bot workspace id")?;
+    // Safe ID check against path traversal (UUID or alphanumeric slug)
+    if cfg.id.is_empty() || !cfg.id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        anyhow::bail!("invalid bot workspace id");
+    }
     let dir = path(&cfg.id);
     std::fs::create_dir_all(&dir).context("creating bot workspace")?;
     cfg.cwd = dir.to_string_lossy().into_owned();

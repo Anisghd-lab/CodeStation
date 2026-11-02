@@ -50,5 +50,6 @@ data class ChatMessage(
     val executionTrace: List<ExecutionStep> = emptyList(),
     val reactions: Map<String, Int> = emptyMap(),
     val isSending: Boolean = false,
-    val hasError: Boolean = false
+    val hasError: Boolean = false,
+    val conversationId: String = ""
 )

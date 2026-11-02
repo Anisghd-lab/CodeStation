@@ -1,6 +1,7 @@
 package com.ghdinteractivestudio.codestation.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -47,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ghdinteractivestudio.codestation.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.codestation.ui.components.BotCard
+import com.ghdinteractivestudio.codestation.ui.components.CamcsNewTaskCard
 import com.ghdinteractivestudio.codestation.ui.components.CharacterAvatar
 import com.ghdinteractivestudio.codestation.ui.components.CollectiveMemoryCard
 import com.ghdinteractivestudio.codestation.ui.components.Edge
@@ -75,8 +78,10 @@ import com.ghdinteractivestudio.codestation.viewmodel.RosterViewModel
 @Composable
 fun RosterScreen(
     viewModel: RosterViewModel,
-    onBotClick: (String) -> Unit,
+    onBotClick: (String, String?) -> Unit,
     onMemoryClick: () -> Unit = {},
+    onNewTaskClick: () -> Unit = {},
+    onOpenControlCenter: () -> Unit = {},
     onCreateBotClick: () -> Unit,
     onCreateGroupClick: () -> Unit,
     onConfigureServerClick: () -> Unit,
@@ -89,6 +94,7 @@ fun RosterScreen(
     var isComputerMenuOpen by remember { mutableStateOf(false) }
     var selectedTab by rememberSaveable { mutableStateOf("bots") }
     var botPendingDelete by remember { mutableStateOf<Bot?>(null) }
+    var showNewDiscussionDialog by remember { mutableStateOf(false) }
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val isConnected = state.serverConfig.status == ServerConnectionStatus.CONNECTED
@@ -186,44 +192,73 @@ fun RosterScreen(
                         }
                     }
 
-                    // Right: New bot/group menu button (+)
-                    Box {
+                    // Right: Actions (CAMCS History / Control Center + New bot/group menu)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // CAMCS History button with electric green accent and clock.arrow.circlepath
                         Box(
                             Modifier
                                 .size(40.dp)
                                 .glass(Capsule())
-                                .clickable(role = Role.Button) { isNewMenuOpen = true },
+                                .border(1.dp, Palette.emeraldAccent.copy(alpha = 0.55f), Capsule())
+                                .clickable(role = Role.Button, onClick = onOpenControlCenter),
                             contentAlignment = Alignment.Center
                         ) {
-                            Symbol("plus", size = 22.dp, tint = Palette.text)
+                            Symbol("clock.arrow.circlepath", size = 20.dp, tint = Palette.emeraldAccent)
                         }
 
-                        GlassMenu(
-                            expanded = isNewMenuOpen,
-                            onDismissRequest = { isNewMenuOpen = false },
-                            width = 240.dp
-                        ) {
-                            GlassMenuItem(
-                                title = "Nouvel Agent",
-                                subtitle = "Créer un bot dédié",
-                                icon = "plus.circle.fill",
-                                tint = Palette.electricBlue,
-                                onClick = {
-                                    isNewMenuOpen = false
-                                    onCreateBotClick()
-                                }
-                            )
-                            GlassMenuDivider()
-                            GlassMenuItem(
-                                title = "Nouvelle Discussion",
-                                subtitle = "Groupe multi-agents",
-                                icon = "person.2.fill",
-                                tint = Palette.electricBlue,
-                                onClick = {
-                                    isNewMenuOpen = false
-                                    onCreateGroupClick()
-                                }
-                            )
+                        // New bot/group menu button (+)
+                        Box {
+                            Box(
+                                Modifier
+                                    .size(40.dp)
+                                    .glass(Capsule())
+                                    .clickable(role = Role.Button) { isNewMenuOpen = true },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Symbol("plus", size = 22.dp, tint = Palette.text)
+                            }
+
+                            GlassMenu(
+                                expanded = isNewMenuOpen,
+                                onDismissRequest = { isNewMenuOpen = false },
+                                width = 240.dp
+                            ) {
+                                GlassMenuItem(
+                                    title = "Nouvel Agent",
+                                    subtitle = "Créer un bot dédié",
+                                    icon = "plus.circle.fill",
+                                    tint = Palette.electricBlue,
+                                    onClick = {
+                                        isNewMenuOpen = false
+                                        onCreateBotClick()
+                                    }
+                                )
+                                GlassMenuDivider()
+                                GlassMenuItem(
+                                    title = "Nouvelle Discussion",
+                                    subtitle = "Ouvrir une nouvelle session",
+                                    icon = "bubble.left.and.bubble.right.fill",
+                                    tint = Palette.electricBlue,
+                                    onClick = {
+                                        isNewMenuOpen = false
+                                        showNewDiscussionDialog = true
+                                    }
+                                )
+                                GlassMenuDivider()
+                                GlassMenuItem(
+                                    title = "Nouveau Groupe",
+                                    subtitle = "Salon multi-agents",
+                                    icon = "person.2.fill",
+                                    tint = Palette.secondary,
+                                    onClick = {
+                                        isNewMenuOpen = false
+                                        onCreateGroupClick()
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -325,16 +360,112 @@ fun RosterScreen(
                         )
                     }
 
+                    item("camcs_new_task_card") {
+                        CamcsNewTaskCard(
+                            onNewTaskClick = onNewTaskClick,
+                            onOpenControlCenter = onOpenControlCenter
+                        )
+                    }
+
                     items(allBots, key = { it.id }) { bot ->
                         SwipeToDismissBotItem(
                             bot = bot,
                             allBots = allBots,
-                            onBotClick = { onBotClick(bot.id) },
+                            onBotClick = { onBotClick(bot.id, null) },
                             onRequestDelete = { botPendingDelete = it }
                         )
                     }
                 }
             }
+        }
+
+        // Boîte de dialogue de sélection d'agent pour Nouvelle Discussion
+        if (showNewDiscussionDialog) {
+            val allBotsList = buildList {
+                state.leadBot?.let { add(it) }
+                addAll(state.pinnedBots)
+                addAll(state.otherBots)
+            }
+            AlertDialog(
+                onDismissRequest = { showNewDiscussionDialog = false },
+                containerColor = Palette.surface,
+                title = {
+                    Text(
+                        text = "Nouvelle Discussion",
+                        style = Type.title3.bold,
+                        color = Palette.text
+                    )
+                },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 400.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Sélectionnez un agent pour démarrer une nouvelle session indépendante :",
+                            style = Type.footnote,
+                            color = Palette.secondary
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.weight(1f, fill = false)
+                        ) {
+                            items(allBotsList, key = { it.id }) { b ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedRectangle(10.dp))
+                                        .background(Palette.glassSurface)
+                                        .border(1.dp, Palette.glassBorder, RoundedRectangle(10.dp))
+                                        .clickable {
+                                            showNewDiscussionDialog = false
+                                            val newSessionId = java.util.UUID.randomUUID().toString()
+                                            onBotClick(b.id, newSessionId)
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    CharacterAvatar(
+                                        shape = b.avatarGlyph,
+                                        color = b.avatarColorHex,
+                                        size = 36.dp,
+                                        status = b.status.name.lowercase()
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = b.name,
+                                            style = Type.body.semibold,
+                                            color = Palette.text
+                                        )
+                                        Text(
+                                            text = "${b.provider.displayName} • ${b.model}",
+                                            style = Type.caption,
+                                            color = Palette.secondary
+                                        )
+                                    }
+                                    Symbol("plus.circle.fill", size = 18.dp, tint = Palette.emeraldAccent)
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    Box(
+                        Modifier
+                            .clip(Capsule())
+                            .background(Palette.text.copy(alpha = 0.1f))
+                            .clickable { showNewDiscussionDialog = false }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text("Annuler", style = Type.caption.semibold, color = Palette.text)
+                    }
+                }
+            )
         }
 
         // Boîte de dialogue de confirmation de suppression en Frosted Liquid Glass

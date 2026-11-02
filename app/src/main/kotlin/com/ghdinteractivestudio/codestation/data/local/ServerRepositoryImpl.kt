@@ -26,6 +26,7 @@ import kotlinx.coroutines.sync.withLock
 
 class ServerRepositoryImpl(
     private val preferencesRepository: PreferencesRepositoryImpl,
+    private val botDaoProvider: (() -> BotDao)? = null,
     private val apiServiceProvider: (String) -> CodeStationApiService?
 ) : ServerRepository {
 
@@ -158,7 +159,13 @@ class ServerRepositoryImpl(
 
             val hello = helloResponse.body()!!
             verifiedVersion = hello.version ?: verifiedVersion
-            activeBots = hello.backends?.size ?: 0
+            // P1-01: Ne plus utiliser hello.backends.size (~46 adaptateurs) mais le nombre réel de bots configurés dans Room
+            val configuredBots = runCatching {
+                val dao = botDaoProvider?.invoke()
+                val active = dao?.getActiveBotCount() ?: 0
+                if (active > 0) active else (dao?.getBotCount() ?: 0)
+            }.getOrDefault(0)
+            activeBots = configuredBots
 
             val connected = current.copy(
                 status = ServerConnectionStatus.CONNECTED,

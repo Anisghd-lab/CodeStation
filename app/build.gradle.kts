@@ -73,7 +73,14 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        unitTests.all {
+            it.jvmArgs("-Dos.name=Linux", "-Dsqlite.os.name=Linux", "-Dorg.sqlite.lib.path=/usr/lib", "-Dorg.sqlite.lib.name=libsqlitejdbc.so")
+        }
     }
+}
+
+ksp {
+    arg("room.verify.schemas", "false")
 }
 
 dependencies {

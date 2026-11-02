@@ -1,8 +1,12 @@
 package com.ghdinteractivestudio.codestation.domain.model
 
 enum class CliHealthStatus(val displayName: String) {
+    NOT_INSTALLED("Non installée"),
     NOT_DETECTED("Non détectée"),
     INSTALLED("Installée"),
+    AVAILABLE("Disponible"),
+    AUTHENTICATED("Authentifiée"),
+    NOT_AUTHENTICATED("Non authentifiée"),
     AUTH_REQUIRED("Authentification à vérifier"),
     READY("Prête"),
     BUSY("En cours"),
@@ -11,9 +15,13 @@ enum class CliHealthStatus(val displayName: String) {
     companion object {
         fun fromString(str: String?): CliHealthStatus {
             return when (str?.uppercase()) {
+                "AUTHENTICATED" -> AUTHENTICATED
+                "AVAILABLE" -> AVAILABLE
                 "READY" -> READY
                 "INSTALLED" -> INSTALLED
+                "NOT_AUTHENTICATED" -> NOT_AUTHENTICATED
                 "AUTH_REQUIRED" -> AUTH_REQUIRED
+                "NOT_INSTALLED" -> NOT_INSTALLED
                 "BUSY" -> BUSY
                 "ERROR" -> ERROR
                 else -> NOT_DETECTED

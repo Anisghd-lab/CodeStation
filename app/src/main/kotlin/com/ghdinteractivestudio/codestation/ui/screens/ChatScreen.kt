@@ -136,6 +136,9 @@ fun ChatScreen(
     var codeBlocksForDialog by remember { mutableStateOf<List<MarkdownCodeBlock>?>(null) }
     var fullscreenImage by remember { mutableStateOf<Pair<String, String>?>(null) }
     var activeArtifact by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var showConversationDialog by remember { mutableStateOf(false) }
+    var renamingConversation by remember { mutableStateOf<com.ghdinteractivestudio.codestation.domain.model.Conversation?>(null) }
+    var renameText by remember { mutableStateOf("") }
 
     // Réinitialisation des menus et du mode édition lors d'un changement de conversation
     LaunchedEffect(state.bot?.id) {
@@ -151,9 +154,11 @@ fun ChatScreen(
 
     // Gestion du bouton Retour Android : fermeture prioritaire des menus et dialogues actifs
     BackHandler(
-        enabled = activeContextMenuMessage != null || messageForSelection != null || codeBlocksForDialog != null || fullscreenImage != null || activeArtifact != null || state.editingMessage != null
+        enabled = showConversationDialog || renamingConversation != null || activeContextMenuMessage != null || messageForSelection != null || codeBlocksForDialog != null || fullscreenImage != null || activeArtifact != null || state.editingMessage != null
     ) {
         when {
+            renamingConversation != null -> renamingConversation = null
+            showConversationDialog -> showConversationDialog = false
             fullscreenImage != null -> fullscreenImage = null
             activeArtifact != null -> activeArtifact = null
             activeContextMenuMessage != null -> activeContextMenuMessage = null
@@ -412,20 +417,19 @@ fun ChatScreen(
                     Symbol("chevron.left", size = 28.dp, tint = Palette.text)
                 }
 
-                // Centered Bot Identity & Host Subtitle
+                // Centered Bot Identity & Active Conversation Selector
                 Box(
-                    Modifier
-                        .weight(1f)
-                        .clickable { bot?.id?.let { onEditBot(it) } },
+                    Modifier.weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Row(
+                            modifier = Modifier.clickable { bot?.id?.let { onEditBot(it) } },
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(7.dp)
                         ) {
                             if (bot != null) {
-                                BotAvatar(bot = bot, size = 22.dp)
+                                BotAvatar(bot = bot, size = 20.dp)
                                 Text(
                                     bot.name,
                                     style = Type.system(14f).semibold,
@@ -436,15 +440,21 @@ fun ChatScreen(
                             }
                         }
                         Row(
+                            modifier = Modifier
+                                .clip(Capsule())
+                                .clickable { showConversationDialog = true }
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Symbol("wifi", size = 10.dp, tint = Palette.secondary)
                             Text(
-                                "Termux 127.0.0.1",
+                                state.activeConversationTitle ?: "Discussion principale",
                                 style = Type.system(10f).medium,
-                                color = Palette.secondary
+                                color = Palette.accent,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
+                            Symbol("chevron.down", size = 9.dp, tint = Palette.accent)
                         }
                     }
                 }
@@ -458,6 +468,28 @@ fun ChatScreen(
                         onDismissRequest = { isMenuOpen = false },
                         width = 250.dp
                     ) {
+                        GlassMenuItem(
+                            title = "Nouvelle Discussion",
+                            subtitle = "Démarrer une session indépendante",
+                            icon = "plus.bubble",
+                            tint = Palette.accent,
+                            onClick = {
+                                isMenuOpen = false
+                                viewModel.createNewConversation()
+                            }
+                        )
+                        GlassMenuDivider()
+                        GlassMenuItem(
+                            title = "Discussions & Sessions",
+                            subtitle = "${state.conversations.size} session(s) active(s)",
+                            icon = "bubble.left.and.bubble.right",
+                            tint = Palette.electricBlue,
+                            onClick = {
+                                isMenuOpen = false
+                                showConversationDialog = true
+                            }
+                        )
+                        GlassMenuDivider()
                         GlassMenuItem(
                             title = "Session Termux",
                             subtitle = "Console interactive PRoot",
@@ -817,6 +849,199 @@ fun ChatScreen(
                 artifactUrl = url,
                 title = title,
                 onDismiss = { activeArtifact = null }
+            )
+        }
+
+        // Dialogue du sélecteur de sessions & discussions
+        if (showConversationDialog) {
+            GlassAlertDialog(
+                onDismissRequest = { showConversationDialog = false },
+                title = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Discussions & Sessions", style = Type.title3.bold, color = Palette.text)
+                        Box(
+                            modifier = Modifier
+                                .clip(Capsule())
+                                .background(Palette.accent.copy(alpha = 0.15f))
+                                .clickable {
+                                    showConversationDialog = false
+                                    viewModel.createNewConversation()
+                                }
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Symbol("plus", size = 12.dp, tint = Palette.accent)
+                                Text("Nouvelle", style = Type.caption.bold, color = Palette.accent)
+                            }
+                        }
+                    }
+                },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (state.conversations.isEmpty()) {
+                            Text(
+                                "Aucune discussion enregistrée. Une nouvelle session sera créée lors de l'envoi de votre prochain message.",
+                                style = Type.footnote,
+                                color = Palette.secondary
+                            )
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height((state.conversations.size * 60).coerceIn(60, 280).dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                items(state.conversations, key = { it.id }) { conv ->
+                                    val isActive = conv.id == state.activeConversationId
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedRectangle(12.dp))
+                                            .background(
+                                                if (isActive) Palette.accent.copy(alpha = 0.15f)
+                                                else Palette.text.copy(alpha = 0.05f)
+                                            )
+                                            .clickable {
+                                                viewModel.selectConversation(conv.id)
+                                                showConversationDialog = false
+                                            }
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Symbol(
+                                            if (isActive) "checkmark.circle.fill" else "bubble.left",
+                                            size = 18.dp,
+                                            tint = if (isActive) Palette.accent else Palette.secondary
+                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                conv.title.ifBlank { "Discussion sans titre" },
+                                                style = Type.subheadline.semibold,
+                                                color = if (isActive) Palette.accent else Palette.text,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            if (!conv.cliSessionId.isNullOrBlank()) {
+                                                Text(
+                                                    "Session: ${conv.cliSessionId?.take(12)}...",
+                                                    style = Type.caption2,
+                                                    color = Palette.tertiary,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
+                                        // Bouton Renommer
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(Capsule())
+                                                .clickable {
+                                                    renamingConversation = conv
+                                                    renameText = conv.title
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Symbol("pencil", size = 14.dp, tint = Palette.secondary)
+                                        }
+                                        // Bouton Supprimer
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(Capsule())
+                                                .clickable {
+                                                    viewModel.deleteConversation(conv.id)
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Symbol("trash", size = 14.dp, tint = Palette.danger)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Box(
+                        Modifier
+                            .clip(Capsule())
+                            .background(Palette.text.copy(alpha = 0.1f))
+                            .clickable { showConversationDialog = false }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text("Fermer", style = Type.caption.semibold, color = Palette.text)
+                    }
+                }
+            )
+        }
+
+        // Dialogue pour renommer une discussion
+        if (renamingConversation != null) {
+            val conv = renamingConversation!!
+            GlassAlertDialog(
+                onDismissRequest = { renamingConversation = null },
+                title = {
+                    Text("Renommer la discussion", style = Type.title3.bold, color = Palette.text)
+                },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = renameText,
+                            onValueChange = { renameText = it },
+                            textStyle = Type.body.copy(color = Palette.text),
+                            cursorBrush = androidx.compose.ui.graphics.SolidColor(Palette.accent),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedRectangle(10.dp))
+                                .background(Palette.glassSurface)
+                                .border(0.5.dp, Palette.glassBorder, RoundedRectangle(10.dp))
+                                .padding(12.dp)
+                        )
+                    }
+                },
+                confirmButton = {
+                    Box(
+                        Modifier
+                            .clip(Capsule())
+                            .background(Palette.accent)
+                            .clickable {
+                                if (renameText.isNotBlank()) {
+                                    viewModel.renameConversation(conv.id, renameText.trim())
+                                }
+                                renamingConversation = null
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text("Enregistrer", style = Type.caption.bold, color = Color.White)
+                    }
+                },
+                dismissButton = {
+                    Box(
+                        Modifier
+                            .clip(Capsule())
+                            .background(Palette.text.copy(alpha = 0.1f))
+                            .clickable { renamingConversation = null }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text("Annuler", style = Type.caption.semibold, color = Palette.text)
+                    }
+                }
             )
         }
     }

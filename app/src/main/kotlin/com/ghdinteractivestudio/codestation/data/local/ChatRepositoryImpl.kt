@@ -20,6 +20,7 @@ class ChatRepositoryImpl(
     private val messageDao: MessageDao,
     private val approvalDao: ApprovalDao,
     private val botDao: BotDao,
+    private val conversationDao: ConversationDao? = null,
     private val apiServiceProvider: (suspend () -> CodeStationApiService?)? = null,
     private val serverRepository: ServerRepository? = null,
     private val context: android.content.Context? = null
@@ -28,6 +29,111 @@ class ChatRepositoryImpl(
     override fun getMessagesStream(botId: String): Flow<List<ChatMessage>> {
         return messageDao.getMessagesByBotIdStream(botId).map { entities ->
             entities.map { it.toDomain() }
+        }
+    }
+
+    override fun getMessagesByConversationStream(botId: String, conversationId: String?): Flow<List<ChatMessage>> {
+        return if (conversationId.isNullOrBlank()) {
+            messageDao.getMessagesByBotIdStream(botId).map { entities ->
+                entities.map { it.toDomain() }
+            }
+        } else {
+            messageDao.getMessagesByBotAndConversationStream(botId, conversationId).map { entities ->
+                entities.map { it.toDomain() }
+            }
+        }
+    }
+
+    override fun getConversationsStream(botId: String): Flow<List<com.ghdinteractivestudio.codestation.domain.model.Conversation>> {
+        val dao = conversationDao ?: return kotlinx.coroutines.flow.flowOf(emptyList())
+        return dao.getConversationsByBotIdStream(botId).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    override suspend fun getConversationById(id: String): com.ghdinteractivestudio.codestation.domain.model.Conversation? {
+        return conversationDao?.getConversationById(id)?.toDomain()
+    }
+
+    override suspend fun createConversation(
+        botId: String,
+        title: String,
+        cliId: String?,
+        runnerId: String?
+    ): Result<com.ghdinteractivestudio.codestation.domain.model.Conversation> {
+        return runCatching {
+            val convId = UUID.randomUUID().toString()
+            val now = System.currentTimeMillis()
+            val conv = com.ghdinteractivestudio.codestation.domain.model.Conversation(
+                id = convId,
+                botId = botId,
+                title = title,
+                cliId = cliId,
+                runnerId = runnerId,
+                createdAt = now,
+                updatedAt = now,
+                status = com.ghdinteractivestudio.codestation.domain.model.ConversationStatus.ACTIVE
+            )
+            if (apiServiceProvider != null && serverRepository != null) {
+                val config = serverRepository.getServerConfig()
+                val api = apiServiceProvider.invoke()
+                if (api != null && !config.token.isNullOrBlank()) {
+                    val auth = "Bearer ${config.token}"
+                    runCatching {
+                        api.createConversation(
+                            com.ghdinteractivestudio.codestation.data.remote.CreateConversationRequest(
+                                id = convId,
+                                botId = botId,
+                                title = title,
+                                cliId = cliId,
+                                runnerId = runnerId
+                            ),
+                            authHeader = auth
+                        )
+                    }
+                }
+            }
+            conversationDao?.insertConversation(ConversationEntity.fromDomain(conv))
+            conv
+        }
+    }
+
+    override suspend fun deleteConversation(conversationId: String): Result<Unit> {
+        return runCatching {
+            if (apiServiceProvider != null && serverRepository != null) {
+                val config = serverRepository.getServerConfig()
+                val api = apiServiceProvider.invoke()
+                if (api != null && !config.token.isNullOrBlank()) {
+                    val auth = "Bearer ${config.token}"
+                    runCatching {
+                        api.deleteConversation(
+                            com.ghdinteractivestudio.codestation.data.remote.DeleteConversationRequest(conversationId),
+                            authHeader = auth
+                        )
+                    }
+                }
+            }
+            conversationDao?.deleteConversationById(conversationId)
+            messageDao.deleteMessagesForConversation(conversationId)
+        }
+    }
+
+    override suspend fun renameConversation(conversationId: String, title: String): Result<Unit> {
+        return runCatching {
+            if (apiServiceProvider != null && serverRepository != null) {
+                val config = serverRepository.getServerConfig()
+                val api = apiServiceProvider.invoke()
+                if (api != null && !config.token.isNullOrBlank()) {
+                    val auth = "Bearer ${config.token}"
+                    runCatching {
+                        api.renameConversation(
+                            com.ghdinteractivestudio.codestation.data.remote.RenameConversationRequest(conversationId, title),
+                            authHeader = auth
+                        )
+                    }
+                }
+            }
+            conversationDao?.renameConversation(conversationId, title, System.currentTimeMillis())
         }
     }
 
@@ -44,12 +150,32 @@ class ChatRepositoryImpl(
         botId: String,
         text: String,
         replyTo: QuotedReply?,
-        attachments: List<com.ghdinteractivestudio.codestation.domain.model.FileAttachment>
+        attachments: List<com.ghdinteractivestudio.codestation.domain.model.FileAttachment>,
+        conversationId: String?
     ): Result<ChatMessage> {
         return runCatching {
             val now = System.currentTimeMillis()
             val recentMsg = messageDao.findRecentUserMessage(botId, text)
             val isRetry = recentMsg != null && (now - recentMsg.timestamp < 120_000L)
+
+            val effectiveConvId = if (!conversationId.isNullOrBlank()) {
+                conversationId
+            } else {
+                conversationDao?.getLatestConversationForBot(botId)?.id ?: run {
+                    val newConvId = UUID.randomUUID().toString()
+                    conversationDao?.insertConversation(
+                        ConversationEntity(
+                            id = newConvId,
+                            botId = botId,
+                            title = "Discussion",
+                            createdAt = now,
+                            updatedAt = now,
+                            status = "ACTIVE"
+                        )
+                    )
+                    newConvId
+                }
+            }
 
             val userMsg = if (isRetry && recentMsg != null) {
                 recentMsg.toDomain()
@@ -62,7 +188,8 @@ class ChatRepositoryImpl(
                     timestamp = now,
                     isFinal = true,
                     replyTo = replyTo,
-                    attachments = attachments
+                    attachments = attachments,
+                    conversationId = effectiveConvId
                 )
                 messageDao.insertMessage(ChatMessageEntity.fromDomain(newMsg))
                 newMsg
@@ -70,6 +197,7 @@ class ChatRepositoryImpl(
 
             val previewText = text.ifBlank { if (attachments.isNotEmpty()) "[Pièce jointe: ${attachments.first().name}]" else "" }
             botDao.updateLastMessage(botId, previewText, userMsg.timestamp)
+            conversationDao?.updateLastMessage(effectiveConvId, previewText, userMsg.timestamp)
 
             // Envoi réseau vers apiService si connecté
             if (apiServiceProvider != null && serverRepository != null) {
@@ -143,7 +271,8 @@ class ChatRepositoryImpl(
                             text = text,
                             clientNonce = userMsg.id,
                             replyTo = replyTo?.messageId,
-                            attachments = attachments.map { it.id }
+                            attachments = attachments.map { it.id },
+                            conversationId = effectiveConvId
                         ),
                         authHeader = auth
                     )

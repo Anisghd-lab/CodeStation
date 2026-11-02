@@ -16,7 +16,10 @@ impl Actor {
     /// Which session the running turn uses: a routine run has one of its own (by its slot); everything else uses
     /// the main one.
     pub(super) fn slot(&self) -> Option<String> {
-        self.active_routine.as_deref().map(crate::routines::session_slot)
+        if let Some(r) = self.active_routine.as_deref() {
+            return Some(crate::routines::session_slot(r));
+        }
+        self.turn_conversation_id.as_ref().map(|c| format!("conv_{c}"))
     }
 
     pub(super) fn session_for(&mut self, slot: Option<&str>) -> Option<String> {

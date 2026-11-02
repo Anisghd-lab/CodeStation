@@ -236,6 +236,20 @@ pub struct BotRow {
     pub read_rev: i64,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Conversation {
+    pub id: String,
+    pub bot_id: String,
+    pub title: String,
+    pub cli_id: Option<String>,
+    pub runner_id: Option<String>,
+    pub cli_session_id: Option<String>,
+    pub status: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

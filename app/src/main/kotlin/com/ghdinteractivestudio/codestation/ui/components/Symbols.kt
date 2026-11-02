@@ -57,6 +57,7 @@ fun symbolRes(name: String): Int? = when (name) {
     "circle.lefthalf.striped.horizontal" -> R.drawable.sf_circle
     "clock" -> R.drawable.sf_clock
     "clock.fill" -> R.drawable.sf_clock_fill
+    "clock.arrow.circlepath" -> R.drawable.sf_clock_arrow_circlepath
     "cloud" -> R.drawable.sf_cloud
     "desktopcomputer" -> R.drawable.sf_desktopcomputer
     "doc" -> R.drawable.sf_doc
@@ -78,10 +79,13 @@ fun symbolRes(name: String): Int? = when (name) {
     "folder.fill" -> R.drawable.sf_folder
     "gearshape" -> R.drawable.sf_gearshape
     "globe" -> R.drawable.sf_globe
+    "key" -> R.drawable.sf_key
+    "key.fill" -> R.drawable.sf_key_fill
     "keyboard" -> R.drawable.sf_keyboard
     "laptopcomputer" -> R.drawable.sf_laptopcomputer
     "link" -> R.drawable.sf_network
     "lock.fill" -> R.drawable.sf_lock_fill
+    "lock.shield" -> R.drawable.sf_lock_shield
     "magnifyingglass" -> R.drawable.sf_magnifyingglass
     "mic" -> R.drawable.sf_mic
     "mic.fill" -> R.drawable.sf_mic_fill
@@ -104,6 +108,8 @@ fun symbolRes(name: String): Int? = when (name) {
     "plus.circle.fill" -> R.drawable.sf_plus_circle
     "qrcode" -> R.drawable.sf_qrcode
     "qrcode.viewfinder" -> R.drawable.sf_qrcode_viewfinder
+    "info.circle" -> R.drawable.sf_info_circle
+    "info" -> R.drawable.sf_info_circle
     "questionmark.circle" -> R.drawable.sf_info_circle
     "repeat" -> R.drawable.sf_arrow_clockwise
     "shippingbox" -> R.drawable.sf_shippingbox
