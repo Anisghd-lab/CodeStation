@@ -56,7 +56,7 @@ class ChatViewModelTest {
         every { chatRepository.getPendingApprovalsStream("bot-1") } returns flowOf(emptyList())
         every { chatRepository.getConversationsStream(any()) } returns flowOf(emptyList())
         every { chatRepository.getMessagesByConversationStream(any(), any()) } returns flowOf(testMessages)
-        coEvery { chatRepository.createConversation(any(), any()) } returns Result.success(Conversation(id = "conv-1", botId = "bot-1", title = "Discussion", status = "ACTIVE", createdAt = 0, updatedAt = 0))
+        coEvery { chatRepository.createConversation(any(), any()) } returns Result.success(Conversation(id = "conv-1", botId = "bot-1", title = "Discussion"))
         coEvery { chatRepository.sendMessage(any(), any(), any(), any(), any()) } returns Result.success(testMessages.first())
         coEvery { chatRepository.respondApproval(any(), any(), any()) } returns Result.success(Unit)
     }
