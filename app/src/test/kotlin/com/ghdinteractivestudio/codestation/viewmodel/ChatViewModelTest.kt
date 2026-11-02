@@ -55,7 +55,8 @@ class ChatViewModelTest {
         every { chatRepository.getPendingApprovalsStream("bot-1") } returns flowOf(emptyList())
         every { chatRepository.getConversationsStream(any()) } returns flowOf(emptyList())
         every { chatRepository.getMessagesByConversationStream(any(), any()) } returns flowOf(testMessages)
-        coEvery { chatRepository.sendMessage(any(), any(), any(), any()) } returns Result.success(testMessages.first())
+        coEvery { chatRepository.createConversation(any(), any()) } returns Result.success(Conversation(id = "conv-1", botId = "bot-1", title = "Discussion", status = "ACTIVE", createdAt = 0, updatedAt = 0))
+        coEvery { chatRepository.sendMessage(any(), any(), any(), any(), any()) } returns Result.success(testMessages.first())
         coEvery { chatRepository.respondApproval(any(), any(), any()) } returns Result.success(Unit)
     }
 
@@ -86,7 +87,7 @@ class ChatViewModelTest {
         viewModel.sendMessage()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        coVerify { chatRepository.sendMessage("bot-1", "Nouvelle tâche", any(), any()) }
+        coVerify { chatRepository.sendMessage("bot-1", "Nouvelle tâche", any(), any(), any()) }
         assertEquals("", viewModel.uiState.value.inputDraft)
     }
 
@@ -156,7 +157,7 @@ class ChatViewModelTest {
         viewModel.confirmEditAndSend("Bonjour modifié")
         testDispatcher.scheduler.advanceUntilIdle()
 
-        coVerify { chatRepository.sendMessage("bot-1", "Bonjour modifié", any(), any()) }
+        coVerify { chatRepository.sendMessage("bot-1", "Bonjour modifié", any(), any(), any()) }
         assertEquals(null, viewModel.uiState.value.editingMessage)
         assertEquals("", viewModel.uiState.value.inputDraft)
     }
@@ -181,7 +182,7 @@ class ChatViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         // Verifies the user prompt was retrieved and re-sent
-        coVerify { chatRepository.sendMessage("bot-1", "Bonjour", any(), any()) }
+        coVerify { chatRepository.sendMessage("bot-1", "Bonjour", any(), any(), any()) }
         // Verify deleteMessage was NOT called (preserving history)
         coVerify(exactly = 0) { chatRepository.deleteMessage("bot-msg-1") }
     }
