@@ -5,6 +5,7 @@ import com.ghdinteractivestudio.codestation.domain.model.ApprovalRequest
 import com.ghdinteractivestudio.codestation.domain.model.ApprovalStatus
 import com.ghdinteractivestudio.codestation.domain.model.Bot
 import com.ghdinteractivestudio.codestation.domain.model.ChatMessage
+import com.ghdinteractivestudio.codestation.domain.model.Conversation
 import com.ghdinteractivestudio.codestation.domain.model.MessageAuthor
 import com.ghdinteractivestudio.codestation.domain.model.MessageAuthorType
 import com.ghdinteractivestudio.codestation.domain.repository.BotRepository
