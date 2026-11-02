@@ -171,10 +171,11 @@ fun CamcsControlCenterScreen(
                     if (mResp.isSuccessful) {
                         val body = mResp.body?.string() ?: ""
                         val parsed = jsonParser.decodeFromString<CamcsMissionsResponse>(body)
-                        missions = parsed.missions
+                        val sorted = parsed.missions.sortedByDescending { it.createdAt }
+                        missions = sorted
                         isEngineConnected = true
-                        if (selectedMissionId == null && parsed.missions.isNotEmpty()) {
-                            selectedMissionId = parsed.missions.last().id
+                        if (selectedMissionId == null && sorted.isNotEmpty()) {
+                            selectedMissionId = sorted.first().id
                         }
                     }
                     mResp.close()
@@ -335,7 +336,7 @@ fun CamcsControlCenterScreen(
     }
 
     val activeMission = missions.firstOrNull { it.id == selectedMissionId }
-        ?: missions.lastOrNull()
+        ?: missions.firstOrNull()
 
     // Pulse animation for LIVE indicator
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -664,10 +665,19 @@ private fun MissionSelectorRow(
     selectedMissionId: String,
     onSelect: (String) -> Unit
 ) {
+    val scrollState = rememberScrollState()
+
+    // S'assure que la mission la plus récente (en 1re position à gauche) est immédiatement visible
+    LaunchedEffect(missions.firstOrNull()?.id) {
+        if (selectedMissionId.isEmpty() || selectedMissionId == missions.firstOrNull()?.id) {
+            scrollState.scrollTo(0)
+        }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
+            .horizontalScroll(scrollState),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

@@ -827,7 +827,7 @@ class CamcsOrchestrationEngine:
             cur = conn.cursor()
             cur.execute("""
                 SELECT id, title, objective, status, progress, created_at, completed_at, config_json
-                FROM missions ORDER BY created_at ASC
+                FROM missions ORDER BY created_at DESC
             """)
             rows = cur.fetchall()
             for r in rows:
@@ -1699,7 +1699,7 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/camcs/missions" or self.path.startswith("/api/camcs/missions?"):
             with ENGINE._lock:
                 missions_list = []
-                sorted_missions = sorted(ENGINE.active_missions.values(), key=lambda m: getattr(m, "created_at", 0))
+                sorted_missions = sorted(ENGINE.active_missions.values(), key=lambda m: getattr(m, "created_at", 0), reverse=True)
                 for m in sorted_missions:
                     missions_list.append({
                         "id": m.id,
