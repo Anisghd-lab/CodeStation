@@ -21,8 +21,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+
 import com.ghdinteractivestudio.codestation.data.local.FileAttachmentDto
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.jsonArray
@@ -37,6 +41,12 @@ import okhttp3.Response
 import java.io.BufferedReader
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+
+data class StreamingEvent(
+    val botId: String,
+    val isStreaming: Boolean,
+    val timestamp: Long = System.currentTimeMillis()
+)
 
 class CodeStationEventStreamClient(
     private val context: Context,
@@ -62,6 +72,8 @@ class CodeStationEventStreamClient(
     private var lastRev: Long = 0
     private var initialSyncCompleted = false
     private val botPreviousStatus = ConcurrentHashMap<String, String>()
+    private val _streamingFlow = MutableSharedFlow<StreamingEvent>(extraBufferCapacity = 64)
+    val streamingFlow: SharedFlow<StreamingEvent> = _streamingFlow.asSharedFlow()
 
     private val client = OkHttpClient.Builder()
         .readTimeout(35, TimeUnit.SECONDS) // Auto-détection de socket orphelin (KeepAlive hôte = 15s)
@@ -519,6 +531,7 @@ class CodeStationEventStreamClient(
                                 botId = botId,
                                 details = mapOf("botId" to botId, "textLength" to text.length)
                             )
+                            _streamingFlow.tryEmit(StreamingEvent(botId, isStreaming = false))
                             botDao.updateStatus(botId, BotStatus.IDLE.name)
                             botPreviousStatus[botId] = "idle"
                             CodeStationNotificationManager.updateTaskNotification(
@@ -536,6 +549,7 @@ class CodeStationEventStreamClient(
                                 botId = botId,
                                 details = mapOf("botId" to botId, "chunkLength" to text.length)
                             )
+                            _streamingFlow.tryEmit(StreamingEvent(botId, isStreaming = true))
                             botDao.updateStatus(botId, BotStatus.WORKING.name)
                             botPreviousStatus[botId] = "working"
                             // Mise à jour de la notification persistante avec l'extrait de streaming

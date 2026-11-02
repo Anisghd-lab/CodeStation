@@ -22,10 +22,12 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -45,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -68,10 +71,38 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 enum class IslandPhase {
+    READY,
     WORKING,
-    NEEDS_APPROVAL,
+    STREAMING,
     COMPLETED,
-    ERROR
+    NEEDS_APPROVAL,
+    ERROR,
+    PAUSED,
+    IDLE
+}
+
+@Composable
+fun IslandPhase.tint(): Color = when (this) {
+    IslandPhase.NEEDS_APPROVAL -> Palette.warning
+    IslandPhase.ERROR -> Palette.danger
+    IslandPhase.COMPLETED -> Palette.added
+    IslandPhase.STREAMING -> Palette.electricBlue
+    IslandPhase.WORKING -> Palette.emeraldAccent
+    IslandPhase.PAUSED -> Palette.secondary
+    IslandPhase.IDLE -> Palette.secondary
+    IslandPhase.READY -> Palette.text
+}
+
+@Composable
+fun IslandPhase.backgroundColor(): Color = when (this) {
+    IslandPhase.NEEDS_APPROVAL -> Palette.warning
+    IslandPhase.ERROR -> Palette.danger
+    IslandPhase.COMPLETED -> Palette.added
+    IslandPhase.STREAMING -> Color(0xFF1E2A3A)
+    IslandPhase.WORKING -> Color(0xFF2C2C2C)
+    IslandPhase.PAUSED -> Color(0xFF1E1E1E)
+    IslandPhase.IDLE -> Color(0xFF1E1E1E)
+    IslandPhase.READY -> Color(0xFF1E1E1E)
 }
 
 /**
@@ -138,14 +169,19 @@ fun BoxScope.DynamicIslandBar(
 
     val displayBot = bots.firstOrNull { it.id == displayBotId }
 
+    val density = LocalDensity.current
+    val insets = WindowInsets.statusBars
+    val topInsetDp = with(density) { insets.getTop(density).toDp() }
+    val pillHeight = 26.dp
+    val pillTop = ((topInsetDp - pillHeight) / 2).coerceAtLeast(0.dp)
+
     AnimatedVisibility(
         visible = isVisible,
         enter = fadeIn(Motion.fade()) + slideInVertically { -it },
         exit = fadeOut(Motion.fade()) + slideOutVertically { -it },
         modifier = modifier
             .align(Alignment.TopCenter)
-            .statusBarsPadding()
-            .padding(top = 4.dp, start = 12.dp, end = 12.dp)
+            .padding(top = pillTop)
     ) {
         AnimatedContent(
             targetState = isExpanded,
@@ -208,94 +244,80 @@ private fun DynamicIslandCollapsedPill(
     )
 
     val pillShape = Capsule()
-    val bgColor = Color(0xF00B0D12)
-
-    val accentBorder = when (phase) {
-        IslandPhase.NEEDS_APPROVAL -> Palette.warning.copy(alpha = 0.5f)
-        IslandPhase.COMPLETED -> Palette.added.copy(alpha = 0.5f)
-        IslandPhase.ERROR -> Palette.danger.copy(alpha = 0.5f)
-        IslandPhase.WORKING -> Palette.electricBlue.copy(alpha = 0.4f)
-    }
+    val pillBg = phase.backgroundColor()
+    val accentColor = phase.tint()
 
     Row(
         modifier = Modifier
-            .background(bgColor, pillShape)
-            .border(0.5.dp, accentBorder, pillShape)
+            .height(15.dp)
             .clip(pillShape)
+            .background(pillBg)
+            .border(
+                width = 0.5.dp,
+                color = if (phase == IslandPhase.NEEDS_APPROVAL || phase == IslandPhase.ERROR || phase == IslandPhase.COMPLETED) {
+                    Color.Transparent
+                } else {
+                    accentColor.copy(alpha = 0.35f)
+                },
+                shape = pillShape
+            )
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(start = 10.dp, end = 12.dp, top = 5.dp, bottom = 5.dp)
+            .padding(start = 5.dp, end = 7.dp, top = 1.dp, bottom = 1.dp)
             .animateContentSize(Motion.layoutSize),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         when (phase) {
             IslandPhase.WORKING -> {
                 Box(
                     modifier = Modifier
-                        .size(8.dp)
+                        .size(4.5.dp)
                         .scale(pulseScale)
                         .clip(Capsule())
                         .background(Palette.emeraldAccent)
                 )
-                Text(
-                    text = formatIslandElapsed(startedAt),
-                    style = Type.system(12f).semibold.monospacedDigit,
-                    color = Color.White,
-                    maxLines = 1
-                )
-                Text(text = "·", style = Type.system(12f), color = Color.White.copy(alpha = 0.5f))
-                Text(
-                    text = botName,
-                    style = Type.system(12f).semibold,
-                    color = Color.White.copy(alpha = 0.95f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
-            IslandPhase.NEEDS_APPROVAL -> {
-                Symbol("exclamationmark.triangle.fill", size = 13.dp, tint = Palette.warning)
-                Text(
-                    text = "Action requise",
-                    style = Type.system(12f).bold,
-                    color = Palette.warning,
-                    maxLines = 1
-                )
-                Text(text = "·", style = Type.system(12f), color = Color.White.copy(alpha = 0.5f))
-                Text(
-                    text = botName,
-                    style = Type.system(12f).semibold,
-                    color = Color.White.copy(alpha = 0.95f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+            IslandPhase.STREAMING -> {
+                Box(
+                    modifier = Modifier
+                        .size(4.5.dp)
+                        .scale(pulseScale)
+                        .clip(Capsule())
+                        .background(Palette.electricBlue)
                 )
             }
             IslandPhase.COMPLETED -> {
-                Symbol("checkmark.circle.fill", size = 13.dp, tint = Palette.added)
-                Text(
-                    text = "Terminé",
-                    style = Type.system(12f).semibold,
-                    color = Palette.added,
-                    maxLines = 1
-                )
-                Text(text = "·", style = Type.system(12f), color = Color.White.copy(alpha = 0.5f))
-                Text(
-                    text = botName,
-                    style = Type.system(12f).semibold,
-                    color = Color.White.copy(alpha = 0.95f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Symbol("checkmark", size = 9.dp, tint = Color.White)
+            }
+            IslandPhase.NEEDS_APPROVAL -> {
+                Symbol("exclamationmark.triangle.fill", size = 9.dp, tint = Color.White)
             }
             IslandPhase.ERROR -> {
-                Symbol("xmark.circle.fill", size = 13.dp, tint = Palette.danger)
-                Text(
-                    text = "Erreur",
-                    style = Type.system(12f).semibold,
-                    color = Palette.danger,
-                    maxLines = 1
-                )
+                Symbol("exclamationmark.triangle.fill", size = 9.dp, tint = Color.White)
+            }
+            IslandPhase.PAUSED -> {
+                Symbol("pause.fill", size = 8.dp, tint = Color.White.copy(alpha = 0.8f))
+            }
+            IslandPhase.IDLE, IslandPhase.READY -> {
+                Symbol("sparkles", size = 9.dp, tint = Color.White)
             }
         }
+
+        Text(
+            text = when (phase) {
+                IslandPhase.WORKING, IslandPhase.STREAMING -> formatIslandElapsed(startedAt)
+                IslandPhase.NEEDS_APPROVAL -> "Needs you"
+                IslandPhase.COMPLETED -> "Done"
+                IslandPhase.ERROR -> "Failed"
+                IslandPhase.PAUSED -> "Paused"
+                IslandPhase.IDLE -> "Idle"
+                IslandPhase.READY -> "Ready"
+            },
+            style = Type.system(9f).semibold.monospacedDigit,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -318,7 +340,9 @@ private fun DynamicIslandExpandedCard(
         IslandPhase.NEEDS_APPROVAL -> Palette.warning.copy(alpha = 0.6f)
         IslandPhase.COMPLETED -> Palette.added.copy(alpha = 0.6f)
         IslandPhase.ERROR -> Palette.danger.copy(alpha = 0.6f)
+        IslandPhase.STREAMING -> Palette.electricBlue.copy(alpha = 0.6f)
         IslandPhase.WORKING -> Palette.electricBlue.copy(alpha = 0.5f)
+        else -> Color.White.copy(alpha = 0.2f)
     }
 
     Column(
@@ -379,7 +403,7 @@ private fun DynamicIslandExpandedCard(
 
         // Corps d'état
         when (phase) {
-            IslandPhase.WORKING -> {
+            IslandPhase.WORKING, IslandPhase.STREAMING -> {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -388,10 +412,10 @@ private fun DynamicIslandExpandedCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Symbol("sparkles", size = 16.dp, tint = Palette.electricBlue)
+                    Symbol("sparkles", size = 16.dp, tint = if (phase == IslandPhase.STREAMING) Palette.electricBlue else Palette.emeraldAccent)
                     Column(Modifier.weight(1f)) {
                         Text(
-                            text = "Exécution en cours",
+                            text = if (phase == IslandPhase.STREAMING) "Réception des tokens en cours..." else "Exécution en cours",
                             style = Type.caption.bold,
                             color = Color.White
                         )
@@ -406,7 +430,7 @@ private fun DynamicIslandExpandedCard(
                     Text(
                         text = formatIslandElapsed(startedAt),
                         style = Type.caption.bold.monospacedDigit,
-                        color = Palette.emeraldAccent
+                        color = if (phase == IslandPhase.STREAMING) Palette.electricBlue else Palette.emeraldAccent
                     )
                 }
 
@@ -528,6 +552,34 @@ private fun DynamicIslandExpandedCard(
                 ) {
                     Symbol("xmark.circle.fill", size = 18.dp, tint = Palette.danger)
                     Text("L'exécution a échoué.", style = Type.caption.bold, color = Palette.danger)
+                }
+            }
+
+            IslandPhase.PAUSED -> {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White.copy(alpha = 0.05f), RoundedRectangle(12.dp))
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Symbol("pause.fill", size = 16.dp, tint = Color.White.copy(alpha = 0.7f))
+                    Text("Exécution suspendue", style = Type.caption.bold, color = Color.White.copy(alpha = 0.8f))
+                }
+            }
+
+            IslandPhase.IDLE, IslandPhase.READY -> {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White.copy(alpha = 0.05f), RoundedRectangle(12.dp))
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Symbol("sparkles", size = 16.dp, tint = Color.White)
+                    Text("Prêt pour de nouvelles instructions", style = Type.caption.bold, color = Color.White)
                 }
             }
         }

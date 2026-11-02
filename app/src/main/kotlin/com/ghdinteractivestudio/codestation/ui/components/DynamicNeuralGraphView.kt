@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.ghdinteractivestudio.codestation.domain.model.Bot
 import com.ghdinteractivestudio.codestation.domain.model.MemoryExperience
 import com.ghdinteractivestudio.codestation.domain.model.MemoryKnowledge
 import com.ghdinteractivestudio.codestation.ui.theme.Capsule
@@ -148,6 +149,7 @@ fun DynamicNeuralGraphView(
     onSelectExperience: (MemoryExperience) -> Unit,
     onSelectKnowledge: (MemoryKnowledge) -> Unit,
     modifier: Modifier = Modifier,
+    bots: List<Bot> = emptyList(),
     height: Dp = 230.dp,
     onNodeSelected: ((GraphNode3D?) -> Unit)? = null
 ) {
@@ -263,50 +265,71 @@ fun DynamicNeuralGraphView(
             )
         )
 
-        // 2. Core Agent Lobes (4 dense cortical poles)
-        val agentSpecs = listOf(
-            Triple("agent-antigravity", "Google Antigravity", blueAgent),
-            Triple("agent-codebuddy", "CodeBuddy Code", greenAgent),
-            Triple("agent-opencode", "OpenCode GLM", purpleAgent),
-            Triple("agent-codex", "OpenAI Codex", amberAgent)
-        )
+        // 2. Core Agent Lobes (dynamic from registered/installed CLI & AI bots)
+        val activeBots = if (bots.isNotEmpty()) {
+            bots
+        } else {
+            listOf(
+                Bot(id = "agent-antigravity", name = "Google Antigravity", avatarColorHex = "#4285F4"),
+                Bot(id = "agent-codebuddy", name = "CodeBuddy Code", avatarColorHex = "#10B981"),
+                Bot(id = "agent-opencode", name = "OpenCode GLM", avatarColorHex = "#A855F7"),
+                Bot(id = "agent-codex", name = "OpenAI Codex", avatarColorHex = "#F59E0B")
+            )
+        }
 
-        val agentPositions = listOf(
-            Triple(-0.28f, -0.42f, 0.22f),  // Front-Left Superior
-            Triple(-0.48f, 0.20f, 0.18f),   // Lateral Left
-            Triple(0.48f, 0.18f, 0.18f),    // Lateral Right
-            Triple(0.05f, 0.12f, -0.48f)    // Deep Ventral
-        )
-
+        val numAgents = activeBots.size
         val agentIndices = mutableListOf<Int>()
-        for ((idx, spec) in agentSpecs.withIndex()) {
-            val (ax, ay, az) = agentPositions[idx]
+        for ((idx, bot) in activeBots.withIndex()) {
+            val phi = Math.acos(-1.0 + (2.0 * idx + 1.0) / numAgents).toFloat()
+            val theta = (Math.sqrt(numAgents * Math.PI) * phi).toFloat()
+            val radius = 0.52f
+            val ax = radius * Math.cos(theta.toDouble()).toFloat() * Math.sin(phi.toDouble()).toFloat()
+            val ay = radius * Math.sin(theta.toDouble()).toFloat() * Math.sin(phi.toDouble()).toFloat()
+            val az = radius * Math.cos(phi.toDouble()).toFloat()
+
+            val botColor = runCatching {
+                Color(android.graphics.Color.parseColor(bot.avatarColorHex))
+            }.getOrDefault(
+                when (idx % 4) {
+                    0 -> blueAgent
+                    1 -> greenAgent
+                    2 -> purpleAgent
+                    else -> amberAgent
+                }
+            )
+
             val nodeIdx = nodeList.size
             nodeList.add(
                 GraphNode3D(
-                    id = spec.first,
+                    id = bot.id,
                     type = GraphNodeType.AGENT,
-                    label = spec.second,
-                    subtitle = "Nœud Cortical Majeur",
+                    label = bot.name,
+                    subtitle = bot.description.ifEmpty { "Agent IA Mobilisé" },
                     normX = ax,
                     normY = ay,
                     normZ = az,
-                    color = spec.third,
+                    color = botColor,
                     baseRadius = 9.5f,
-                    dataRefId = spec.first,
+                    dataRefId = bot.id,
                     clusterId = idx + 1
                 )
             )
             agentIndices.add(nodeIdx)
             // Primary axon highway connecting Core to Agent
-            edgeList.add(GraphEdge3D(prjIndex, nodeIdx, spec.third.copy(alpha = 0.85f), isRealRelation = true))
+            edgeList.add(GraphEdge3D(prjIndex, nodeIdx, botColor.copy(alpha = 0.85f), isRealRelation = true))
         }
 
-        // Inter-agent synaptic highways (creating an interconnected brain rather than spokes)
-        edgeList.add(GraphEdge3D(agentIndices[0], agentIndices[1], cyanSynapse, isRealRelation = true))
-        edgeList.add(GraphEdge3D(agentIndices[0], agentIndices[2], electricBlueSynapse, isRealRelation = true))
-        edgeList.add(GraphEdge3D(agentIndices[1], agentIndices[3], turquoiseSynapse, isRealRelation = true))
-        edgeList.add(GraphEdge3D(agentIndices[2], agentIndices[3], violetSynapse, isRealRelation = true))
+        // Inter-agent synaptic highways (creating an interconnected brain mesh)
+        for (i in 0 until agentIndices.size) {
+            val next = (i + 1) % agentIndices.size
+            val edgeColor = when (i % 4) {
+                0 -> cyanSynapse
+                1 -> electricBlueSynapse
+                2 -> turquoiseSynapse
+                else -> violetSynapse
+            }
+            edgeList.add(GraphEdge3D(agentIndices[i], agentIndices[next], edgeColor, isRealRelation = true))
+        }
 
         // 3. Real Experiences Cluster (Dendritic Branching per Agent Domain)
         val expIndices = mutableListOf<Int>()
@@ -314,7 +337,9 @@ fun DynamicNeuralGraphView(
             // Find parent agent
             val parentAgentIdx = agentIndices.firstOrNull {
                 val agentNode = nodeList[it]
-                exp.agent.contains(agentNode.id.removePrefix("agent-"), ignoreCase = true)
+                val cleanId = agentNode.id.removePrefix("bot-").removePrefix("agent-")
+                exp.agent.contains(cleanId, ignoreCase = true) ||
+                exp.agent.contains(agentNode.label, ignoreCase = true)
             } ?: agentIndices[i % agentIndices.size]
 
             val parentNode = nodeList[parentAgentIdx]
@@ -398,9 +423,12 @@ fun DynamicNeuralGraphView(
         for (i in 0 until interneuronCount) {
             // Assign to one of the 5 clusters (0=Core, 1..4=Lobes)
             val cluster = rng.nextInt(5)
-            val centerAnchor = when (cluster) {
-                0 -> Triple(0f, 0f, 0f)
-                else -> agentPositions[cluster - 1]
+            val centerAnchor = when {
+                cluster == 0 || agentIndices.isEmpty() -> Triple(0f, 0f, 0f)
+                else -> {
+                    val agentNode = nodeList[agentIndices[(cluster - 1) % agentIndices.size]]
+                    Triple(agentNode.normX, agentNode.normY, agentNode.normZ)
+                }
             }
 
             // Scatter tightly around cluster center with organic Gaussian-like dispersion

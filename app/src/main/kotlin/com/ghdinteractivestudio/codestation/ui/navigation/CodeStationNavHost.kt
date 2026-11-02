@@ -228,7 +228,10 @@ fun CodeStationNavHost(
         // 10. Pages Complémentaires
         composable(Screen.Memory.route) {
             val memoryViewModel: MemoryViewModel = viewModel(
-                factory = MemoryViewModel.provideFactory(container.memoryRepository)
+                factory = MemoryViewModel.provideFactory(
+                    memoryRepository = container.memoryRepository,
+                    botRepository = container.botRepository
+                )
             )
             MemoryScreen(
                 viewModel = memoryViewModel,

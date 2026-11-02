@@ -165,6 +165,7 @@ fun MemoryScreen(
                 DynamicNeuralGraphView(
                     experiences = state.allExperiences,
                     knowledge = state.allKnowledge,
+                    bots = state.bots,
                     onSelectExperience = { exp ->
                         viewModel.selectExperience(exp)
                         showDetailSheet = true

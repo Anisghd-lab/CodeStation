@@ -3,11 +3,13 @@ package com.ghdinteractivestudio.codestation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.ghdinteractivestudio.codestation.domain.model.Bot
 import com.ghdinteractivestudio.codestation.domain.model.CollectiveMemoryStatus
 import com.ghdinteractivestudio.codestation.domain.model.MemoryExperience
 import com.ghdinteractivestudio.codestation.domain.model.MemoryKnowledge
 import com.ghdinteractivestudio.codestation.domain.model.MemorySearchResultItem
 import com.ghdinteractivestudio.codestation.domain.model.MemorySyncState
+import com.ghdinteractivestudio.codestation.domain.repository.BotRepository
 import com.ghdinteractivestudio.codestation.domain.repository.MemoryRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +24,7 @@ data class MemoryUiState(
     val items: List<MemorySearchResultItem> = emptyList(),
     val allExperiences: List<MemoryExperience> = emptyList(),
     val allKnowledge: List<MemoryKnowledge> = emptyList(),
+    val bots: List<Bot> = emptyList(),
     val selectedExperience: MemoryExperience? = null,
     val selectedKnowledge: MemoryKnowledge? = null,
     val isLoading: Boolean = false,
@@ -31,7 +34,8 @@ data class MemoryUiState(
 )
 
 class MemoryViewModel(
-    private val memoryRepository: MemoryRepository
+    private val memoryRepository: MemoryRepository,
+    private val botRepository: BotRepository? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MemoryUiState())
@@ -42,6 +46,12 @@ class MemoryViewModel(
         viewModelScope.launch {
             memoryRepository.memoryStatus.collect { status ->
                 _uiState.update { it.copy(status = status) }
+            }
+        }
+        // Observe active/installed bots dynamically
+        viewModelScope.launch {
+            botRepository?.getBotsStream()?.collect { botList ->
+                _uiState.update { it.copy(bots = botList) }
             }
         }
         loadAll()
@@ -214,11 +224,14 @@ class MemoryViewModel(
     }
 
     companion object {
-        fun provideFactory(memoryRepository: MemoryRepository): ViewModelProvider.Factory =
+        fun provideFactory(
+            memoryRepository: MemoryRepository,
+            botRepository: BotRepository? = null
+        ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return MemoryViewModel(memoryRepository) as T
+                    return MemoryViewModel(memoryRepository, botRepository) as T
                 }
             }
     }

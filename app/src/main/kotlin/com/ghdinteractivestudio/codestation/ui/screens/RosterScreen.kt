@@ -363,7 +363,8 @@ fun RosterScreen(
                     item("camcs_new_task_card") {
                         CamcsNewTaskCard(
                             onNewTaskClick = onNewTaskClick,
-                            onOpenControlCenter = onOpenControlCenter
+                            onOpenControlCenter = onOpenControlCenter,
+                            bots = allBots
                         )
                     }
 

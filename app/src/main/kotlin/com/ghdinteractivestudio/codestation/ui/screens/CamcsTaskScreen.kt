@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -209,19 +210,25 @@ fun CamcsTaskScreen(
                             color = Palette.text
                         )
 
+                        val mobilizedBots = if (availableBots.isNotEmpty()) {
+                            availableBots
+                        } else {
+                            listOf(
+                                Bot(id = "bot-antigravity", name = "Google Antigravity", avatarGlyph = "diamond", avatarColorHex = "#4285F4"),
+                                Bot(id = "bot-opencode-glm", name = "OpenCode", avatarGlyph = "hexagon", avatarColorHex = "#A855F7"),
+                                Bot(id = "bot-codebuddy", name = "CodeBuddy Code", avatarGlyph = "circle", avatarColorHex = "#3B82F6"),
+                                Bot(id = "bot-codex", name = "Codex", avatarGlyph = "circle", avatarColorHex = "#10B981")
+                            )
+                        }
+
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val defaultAgents = listOf(
-                                Triple("Google Antigravity", "green", "squircle"),
-                                Triple("OpenCode", "magenta", "blob"),
-                                Triple("CodeBuddy Code", "blue", "tablet"),
-                                Triple("Codex", "violet", "pebble")
-                            )
-
-                            defaultAgents.forEach { (name, color, shape) ->
+                            mobilizedBots.forEach { bot ->
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(12.dp))
@@ -233,9 +240,9 @@ fun CamcsTaskScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        CharacterAvatar(shape, color, 20.dp)
+                                        CharacterAvatar(bot.avatarGlyph, bot.avatarColorHex, 20.dp)
                                         Text(
-                                            text = name.split(" ").first(),
+                                            text = bot.name.split(" ").first(),
                                             style = Type.caption.semibold,
                                             color = Palette.text
                                         )

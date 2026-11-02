@@ -860,9 +860,16 @@ fun ChatScreen(
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Discussions & Sessions", style = Type.title3.bold, color = Palette.text)
+                        Text(
+                            text = "Discussions",
+                            style = Type.title3.bold,
+                            color = Palette.text,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                         Box(
                             modifier = Modifier
                                 .clip(Capsule())
@@ -871,14 +878,19 @@ fun ChatScreen(
                                     showConversationDialog = false
                                     viewModel.createNewConversation()
                                 }
-                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Symbol("plus", size = 12.dp, tint = Palette.accent)
-                                Text("Nouvelle", style = Type.caption.bold, color = Palette.accent)
+                                Text(
+                                    text = "Nouvelle",
+                                    style = Type.caption.bold,
+                                    color = Palette.accent,
+                                    maxLines = 1
+                                )
                             }
                         }
                     }

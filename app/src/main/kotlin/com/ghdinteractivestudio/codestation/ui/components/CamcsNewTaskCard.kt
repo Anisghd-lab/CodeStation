@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ghdinteractivestudio.codestation.domain.model.Bot
 import com.ghdinteractivestudio.codestation.ui.theme.Capsule
 import com.ghdinteractivestudio.codestation.ui.theme.LocalDark
 import com.ghdinteractivestudio.codestation.ui.theme.Palette
@@ -65,6 +66,7 @@ import com.ghdinteractivestudio.codestation.ui.theme.semibold
 fun CamcsNewTaskCard(
     onNewTaskClick: () -> Unit,
     onOpenControlCenter: (() -> Unit)? = null,
+    bots: List<Bot> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     val dark = LocalDark.current
@@ -307,15 +309,24 @@ fun CamcsNewTaskCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // 4 Mini agent avatars with exact CodeStation colors and styles
+                // Dynamic Mini agent avatars with exact CodeStation colors and styles
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    CharacterAvatar(shape = "squircle", color = "green", size = 20.dp)
-                    CharacterAvatar(shape = "blob", color = "magenta", size = 20.dp)
-                    CharacterAvatar(shape = "tablet", color = "blue", size = 20.dp)
-                    CharacterAvatar(shape = "pebble", color = "violet", size = 20.dp)
+                    val displayBots = if (bots.isNotEmpty()) {
+                        bots.take(5)
+                    } else {
+                        listOf(
+                            Bot(id = "1", name = "Antigravity", avatarGlyph = "diamond", avatarColorHex = "#4285F4"),
+                            Bot(id = "2", name = "OpenCode", avatarGlyph = "hexagon", avatarColorHex = "#A855F7"),
+                            Bot(id = "3", name = "CodeBuddy", avatarGlyph = "circle", avatarColorHex = "#3B82F6"),
+                            Bot(id = "4", name = "Codex", avatarGlyph = "circle", avatarColorHex = "#10B981")
+                        )
+                    }
+                    displayBots.forEach { b ->
+                        CharacterAvatar(shape = b.avatarGlyph, color = b.avatarColorHex, size = 20.dp)
+                    }
                 }
 
                 // Text: Multi-agents · Hybride · Autonome
