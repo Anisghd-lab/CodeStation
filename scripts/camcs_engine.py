@@ -1105,6 +1105,12 @@ class CamcsOrchestrationEngine:
             if mission.status == MissionState.CANCELLED:
                 return
 
+            # Active pause check
+            while mission.status in (MissionState.PAUSED, "PAUSED", MissionState.WAITING_FOR_APPROVAL, "WAITING_FOR_APPROVAL") or getattr(mission, "is_paused", False):
+                time.sleep(0.5)
+                if mission.status == MissionState.CANCELLED:
+                    return
+
             ready_tasks = [t for t in dag_tasks if t.id not in completed_task_ids and all(dep in completed_task_ids for dep in t.dependencies)]
             if not ready_tasks:
                 # Check if remaining tasks are blocked
@@ -1136,6 +1142,12 @@ class CamcsOrchestrationEngine:
             for task in ready_tasks:
                 if mission.status == MissionState.CANCELLED:
                     return
+
+                # Active pause check before launching next task
+                while mission.status in (MissionState.PAUSED, "PAUSED", MissionState.WAITING_FOR_APPROVAL, "WAITING_FOR_APPROVAL") or getattr(mission, "is_paused", False):
+                    time.sleep(0.5)
+                    if mission.status == MissionState.CANCELLED:
+                        return
 
                 agent = next((a for a in mission.agents if a.id == task.agent_id), mission.agents[0])
                 agent.active_task_id = task.id
@@ -1460,7 +1472,7 @@ class CamcsOrchestrationEngine:
             return True
 
     def cancel_mission(self, mission_id: str) -> bool:
-        """Universal cancellation: terminates all child processes, marks CANCELLED."""
+        """Universal cancellation: terminates all child processes, marks CANCELLED and removes from active tracking."""
         with self._lock:
             m = self.active_missions.get(mission_id)
             if not m:
@@ -1482,16 +1494,15 @@ class CamcsOrchestrationEngine:
             m.last_transition_reason = "Mission arrêtée complètement par l'utilisateur"
             m.last_transition_time = time.time()
 
-            # Terminate all OS processes
+            # Terminate all OS processes and CLIs immediately
             self.process_manager.cancel_mission_tasks(mission_id)
 
             for ag in m.agents:
-                if ag.status not in AgentState.TERMINAL_STATES:
-                    ag.status = AgentState.CANCELLED
-                    ag.pid = None
-                    ag.active_task_id = None
-                    ag.current_subtask = "Mission arrêtée par l'utilisateur"
-                    self._save_agent(ag)
+                ag.status = AgentState.CANCELLED
+                ag.pid = None
+                ag.active_task_id = None
+                ag.current_subtask = "Mission arrêtée par l'utilisateur"
+                self._save_agent(ag)
 
             for t in m.tasks:
                 if t.status not in TaskState.TERMINAL_STATES:
@@ -1499,6 +1510,8 @@ class CamcsOrchestrationEngine:
                     self._save_task(t)
 
             self._save_mission_state(m)
+            # Remove from active memory so tracking window closes immediately
+            self.active_missions.pop(mission_id, None)
 
         self.emit_event(
             mission_id, "mission.cancelled",
@@ -1510,15 +1523,21 @@ class CamcsOrchestrationEngine:
     def pause_mission(self, mission_id: str) -> bool:
         with self._lock:
             m = self.active_missions.get(mission_id)
-            if m and m.status in [MissionState.RUNNING, MissionState.STREAMING, MissionState.STARTING]:
-                return self.record_mission_transition(mission_id, MissionState.WAITING_FOR_APPROVAL, "Mission mise en pause")
+            if m and m.status in [MissionState.RUNNING, MissionState.STREAMING, MissionState.STARTING, "RUNNING", "STREAMING"]:
+                m.is_paused = True
+                ok = self.record_mission_transition(mission_id, MissionState.PAUSED, "Mission mise en pause")
+                self.emit_event(mission_id, "mission.paused", f"Mission « {m.title} » mise en pause.")
+                return ok
         return False
 
     def resume_mission(self, mission_id: str) -> bool:
         with self._lock:
             m = self.active_missions.get(mission_id)
-            if m and m.status == MissionState.WAITING_FOR_APPROVAL:
-                return self.record_mission_transition(mission_id, MissionState.RUNNING, "Reprise de la mission")
+            if m and m.status in [MissionState.PAUSED, MissionState.WAITING_FOR_APPROVAL, "PAUSED", "WAITING_FOR_APPROVAL"]:
+                m.is_paused = False
+                ok = self.record_mission_transition(mission_id, MissionState.RUNNING, "Reprise de la mission")
+                self.emit_event(mission_id, "mission.resumed", f"Reprise de la mission « {m.title} ».")
+                return ok
         return False
 
     def delete_all_missions(self) -> bool:

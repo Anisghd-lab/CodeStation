@@ -180,14 +180,10 @@ fun CamcsControlCenterScreen(
     val handleCancelMission: (String) -> Unit = { mId ->
         if (cancellingMissions[mId] != true) {
             cancellingMissions[mId] = true
-            missions = missions.map { m ->
-                if (m.id == mId) {
-                    m.copy(
-                        status = "CANCELLED",
-                        lastTransitionReason = "Annulation en cours...",
-                        lastTransitionTime = System.currentTimeMillis() / 1000.0
-                    )
-                } else m
+            // Immediately close tracking window for this mission
+            missions = missions.filterNot { it.id == mId }
+            if (selectedMissionId == mId) {
+                selectedMissionId = missions.firstOrNull()?.id
             }
             CoroutineScope(Dispatchers.IO).launch {
                 try {
@@ -714,9 +710,15 @@ fun CamcsControlCenterScreen(
                             currentClockTick = currentClockTick,
                             isCancelling = cancellingMissions[activeMission.id] == true,
                             onPause = {
+                                missions = missions.map { m ->
+                                    if (m.id == activeMission.id) m.copy(status = "PAUSED") else m
+                                }
                                 executeAction(httpClient, "http://127.0.0.1:19223/api/camcs/missions/pause", activeMission.id)
                             },
                             onResume = {
+                                missions = missions.map { m ->
+                                    if (m.id == activeMission.id) m.copy(status = "RUNNING") else m
+                                }
                                 executeAction(httpClient, "http://127.0.0.1:19223/api/camcs/missions/resume", activeMission.id)
                             },
                             onCancel = {
@@ -1173,18 +1175,18 @@ private fun MissionMasterCard(
             }
 
             // Action Buttons (Pause / Resume / Cancel Mission)
+            val isPaused = mission.status in listOf("PAUSED", "WAITING_FOR_APPROVAL")
             val canCancel = isCancellableState(mission.status) && !isTerminalState(mission.status)
-            if (canCancel || mission.status == "PAUSED") {
-                val isPaused = mission.status == "PAUSED"
-                val canPause = mission.status in listOf("WORKING", "RUNNING", "STREAMING", "IN_PROGRESS", "AUTHENTICATING", "CONNECTED", "EXECUTION")
+            val canPause = mission.status in listOf("WORKING", "RUNNING", "STREAMING", "IN_PROGRESS", "AUTHENTICATING", "CONNECTED", "EXECUTION", "STARTING")
 
+            if (canCancel || isPaused) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     CamcsMissionActionButton(
-                        text = if (isPaused) "Reprendre la mission" else "Mettre en pause",
+                        text = if (isPaused) "Continuer la mission" else "Mettre en pause",
                         icon = if (isPaused) "play.fill" else "pause.fill",
                         action = if (isPaused) onResume else onPause,
                         modifier = Modifier.weight(1f),
@@ -1196,7 +1198,7 @@ private fun MissionMasterCard(
                         icon = "stop.fill",
                         action = onCancel,
                         modifier = Modifier.weight(1f),
-                        enabled = canCancel && !isCancelling,
+                        enabled = (canCancel || isPaused) && !isCancelling,
                         isLoading = isCancelling,
                         loadingText = "Arrêt en cours..."
                     )
