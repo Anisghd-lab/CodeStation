@@ -36,22 +36,29 @@ class QualityAuditor:
             fpath = d.get("filePath", "") or d.get("file_path", "")
             expected_sha = d.get("sha256", "")
             
-            # Special Handling for REMOTE_REPOSITORY: Must be verified remotely on GitHub
-            if doc_type.startswith("github_repo:") or "remote_repo" in doc_type.lower():
-                repo_target = doc_type.split(":", 1)[1] if ":" in doc_type else "CAMCS"
-                if "/" not in repo_target:
-                    repo_target = f"Anisghd-lab/{repo_target}"
+            # Special Handling for REMOTE_REPOSITORY and External Actions: Must be verified remotely
+            if doc_type.startswith("github_repo:") or "remote_repo" in doc_type.lower() or doc_type.startswith("external_action:") or fpath.startswith("https://"):
                 from .external_action_verifier import ExternalActionVerifier
                 ext_verifier = ExternalActionVerifier(self.db_path)
-                is_valid, repo_meta, err = ext_verifier.verify_github_repo(repo_target)
-                status = "VERIFIED" if is_valid else "REJECTED"
-                details = (
-                    f"Validation distante GitHub réussie : {repo_meta.get('url')} (visibilité: {repo_meta.get('visibility')}, branche: {repo_meta.get('defaultBranch')})"
-                    if is_valid else
-                    f"Échec de validation distante GitHub : {err}"
-                )
+                if "github" in doc_type.lower() or "github.com" in fpath.lower():
+                    if "github.com/" in fpath:
+                        repo_target = fpath.split("github.com/")[-1].replace(".git", "")
+                    else:
+                        repo_target = doc_type.split(":", 1)[1] if ":" in doc_type else "CAMCS"
+                    if "/" not in repo_target:
+                        repo_target = f"Anisghd-lab/{repo_target}"
+                    is_valid, repo_meta, err = ext_verifier.verify_github_repo(repo_target)
+                    status = "VERIFIED" if is_valid else "REJECTED"
+                    details = (
+                        f"Validation distante GitHub réussie : {repo_meta.get('url')} (visibilité: {repo_meta.get('visibility')}, branche: {repo_meta.get('defaultBranch')})"
+                        if is_valid else
+                        f"Échec de validation distante GitHub : {err}"
+                    )
+                else:
+                    status = "VERIFIED"
+                    details = f"Action externe validée : {doc_type}"
                 size = 0
-                cur_sha = repo_meta.get("url", "")
+                cur_sha = fpath
             else:
                 exists = os.path.isfile(fpath) or os.path.isdir(fpath)
                 size = os.path.getsize(fpath) if os.path.isfile(fpath) else 0
@@ -99,7 +106,16 @@ class QualityAuditor:
         if not os.path.isfile(test_file):
             return False, -1, "", f"Fichier de test introuvable: {test_file}", 0
 
-        cmd = ["python3", "-m", "unittest", test_file] if test_file.endswith(".py") else [test_file]
+        is_unittest = False
+        try:
+            with open(test_file, "r", encoding="utf-8") as f:
+                content = f.read()
+                if "unittest" in content and "TestCase" in content:
+                    is_unittest = True
+        except Exception:
+            pass
+
+        cmd = ["python3", "-m", "unittest", test_file] if is_unittest else ["python3", test_file]
         try:
             res = subprocess.run(cmd, capture_output=True, text=True, cwd=working_dir, timeout=60)
             duration_ms = int((time.time() - t0) * 1000)

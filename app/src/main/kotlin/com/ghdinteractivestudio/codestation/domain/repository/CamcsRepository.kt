@@ -13,4 +13,6 @@ interface CamcsRepository {
     suspend fun refreshMissions()
     suspend fun stopTask(missionId: String, taskId: String? = null, agentId: String? = null): Boolean
     suspend fun cancelMission(missionId: String): Boolean
+    suspend fun deleteMission(missionId: String): Boolean
+    suspend fun clearPastMissions(onlyPast: Boolean = true): Boolean
 }

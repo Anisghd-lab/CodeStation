@@ -20,9 +20,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -256,8 +258,15 @@ class DynamicIslandOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
         val pillHeightDp = (statusBarHeightDp * 0.36f).coerceIn(14f, 16f)
         val pillHeightPx = (pillHeightDp * density).toInt()
 
-        // Centrage vertical précis avec le centre de la découpe caméra
-        val pillTopYPx = (cameraCenterYPx - pillHeightPx / 2).coerceAtLeast(0)
+        // Décalage vertical d'exactement 1 millimètre physique pour alignement parfait avec les icônes de notification
+        val oneMmPx = android.util.TypedValue.applyDimension(
+            android.util.TypedValue.COMPLEX_UNIT_MM,
+            1.0f,
+            resources.displayMetrics
+        ).toInt().coerceAtLeast(3)
+
+        // Centrage vertical avec la découpe caméra physique + abaissement d'1 mm
+        val pillTopYPx = (cameraCenterYPx - pillHeightPx / 2 + oneMmPx).coerceAtLeast(0)
 
         // Positionnement immédiatement à gauche de la découpe caméra avec petit espace régulier (5dp)
         val spacingPx = (5 * density).toInt()
@@ -409,6 +418,14 @@ class DynamicIslandOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
                             }
                             startActivity(intent)
                         },
+                        onOpenApp = {
+                            val intent = Intent(this@DynamicIslandOverlayService, MainActivity::class.java).apply {
+                                action = Intent.ACTION_MAIN
+                                addCategory(Intent.CATEGORY_LAUNCHER)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                            }
+                            startActivity(intent)
+                        },
                         onToggleExpand = { expanded ->
                             updateOverlayExpansion(expanded)
                         }
@@ -449,6 +466,7 @@ class DynamicIslandOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
     override fun onBind(intent: Intent?): IBinder? = null
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun OverlayIslandContent(
     container: com.ghdinteractivestudio.codestation.AppContainer,
@@ -456,6 +474,7 @@ private fun OverlayIslandContent(
     metrics: CutoutMetrics,
     onOpenBot: (String) -> Unit,
     onOpenCamcs: (String) -> Unit = {},
+    onOpenApp: () -> Unit = {},
     onToggleExpand: (Boolean) -> Unit = {}
 ) {
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -925,9 +944,19 @@ private fun OverlayIslandContent(
                             },
                             shape = Capsule()
                         )
-                        .clickable(role = Role.Button) {
-                            onToggleExpand(true)
-                        }
+                        .combinedClickable(
+                            role = Role.Button,
+                            onClick = {
+                                if (camcsMission != null) {
+                                    onOpenCamcs(camcsMission!!.id)
+                                } else {
+                                    onOpenApp()
+                                }
+                            },
+                            onLongClick = {
+                                onToggleExpand(true)
+                            }
+                        )
                         .padding(start = 5.dp, end = 7.dp, top = 1.dp, bottom = 1.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)

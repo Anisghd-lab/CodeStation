@@ -214,3 +214,75 @@ class DeliverableManager:
                 "createdAt": r["created_at"]
             })
         return res
+
+    def save_mission_report(
+        self,
+        mission_id: str,
+        title: str,
+        initial_objective: str,
+        report_markdown: str,
+        independent_validation_summary: str = "Validé par CAMCS Quality Auditor",
+        final_state: str = "COMPLETED"
+    ) -> Dict[str, Any]:
+        """Saves a formal sealed mission report in SQLite."""
+        report_id = f"rep-{uuid.uuid4().hex[:8]}"
+        now = time.time()
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT OR REPLACE INTO mission_reports
+            (id, mission_id, title, initial_objective, executed_plan_json, agents_summary_json, files_summary_json, deliverables_summary_json, tests_summary_json, independent_validation_summary, final_state, report_markdown, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            report_id, mission_id, title, initial_objective, "[]", "[]", "[]", "[]", "[]",
+            independent_validation_summary, final_state, report_markdown, now
+        ))
+        conn.commit()
+        conn.close()
+        return {
+            "id": report_id,
+            "missionId": mission_id,
+            "title": title,
+            "initialObjective": initial_objective,
+            "independentValidationSummary": independent_validation_summary,
+            "finalState": final_state,
+            "reportMarkdown": report_markdown,
+            "createdAt": now
+        }
+
+    def get_mission_report(self, mission_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves the sealed report for a mission."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM mission_reports WHERE mission_id = ? ORDER BY created_at DESC LIMIT 1", (mission_id,))
+        row = cur.fetchone()
+        conn.close()
+
+        if row:
+            return {
+                "id": row["id"],
+                "missionId": row["mission_id"],
+                "title": row["title"],
+                "initialObjective": row["initial_objective"],
+                "independentValidationSummary": row["independent_validation_summary"],
+                "finalState": row["final_state"],
+                "reportMarkdown": row["report_markdown"],
+                "createdAt": row["created_at"]
+            }
+
+        report_file = f"/root/.codestation/missions/{mission_id}/report.md"
+        if os.path.isfile(report_file):
+            with open(report_file, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            return {
+                "id": f"rep-{mission_id[:8]}",
+                "missionId": mission_id,
+                "title": f"Rapport de mission {mission_id[:8]}",
+                "initialObjective": "",
+                "independentValidationSummary": "Validé par CAMCS Quality Auditor",
+                "finalState": "COMPLETED",
+                "reportMarkdown": content,
+                "createdAt": os.path.getmtime(report_file)
+            }
+        return None

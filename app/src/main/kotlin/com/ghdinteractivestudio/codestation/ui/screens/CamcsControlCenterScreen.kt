@@ -32,8 +32,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -176,6 +178,46 @@ fun CamcsControlCenterScreen(
 
     val cancellingMissions = remember { mutableStateMapOf<String, Boolean>() }
     val cancellingTasks = remember { mutableStateMapOf<String, Boolean>() }
+    val deletingMissions = remember { mutableStateMapOf<String, Boolean>() }
+    var showClearHistoryDialog by remember { mutableStateOf(false) }
+
+    val handleDeleteMission: (String) -> Unit = { mId ->
+        if (deletingMissions[mId] != true) {
+            deletingMissions[mId] = true
+            missions = missions.filterNot { it.id == mId }
+            if (selectedMissionId == mId) {
+                selectedMissionId = missions.firstOrNull()?.id
+            }
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val req = Request.Builder()
+                        .url("http://127.0.0.1:19223/api/camcs/missions/delete")
+                        .post("""{"missionId": "$mId"}""".toRequestBody("application/json".toMediaType()))
+                        .build()
+                    httpClient.newCall(req).execute().close()
+                } catch (_: Exception) {
+                } finally {
+                    withContext(Dispatchers.Main) {
+                        deletingMissions.remove(mId)
+                    }
+                }
+            }
+        }
+    }
+
+    val handleClearPastMissions: () -> Unit = {
+        missions = missions.filterNot { isTerminalState(it.status) }
+        selectedMissionId = missions.firstOrNull()?.id
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val req = Request.Builder()
+                    .url("http://127.0.0.1:19223/api/camcs/missions/clear")
+                    .post("""{"onlyPast": true}""".toRequestBody("application/json".toMediaType()))
+                    .build()
+                httpClient.newCall(req).execute().close()
+            } catch (_: Exception) {}
+        }
+    }
 
     val handleCancelMission: (String) -> Unit = { mId ->
         if (cancellingMissions[mId] != true) {
@@ -605,6 +647,21 @@ fun CamcsControlCenterScreen(
                 modifier = Modifier.weight(1f)
             )
 
+            val pastMissionsCount = missions.count { isTerminalState(it.status) }
+            if (pastMissionsCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Palette.danger.copy(alpha = 0.15f))
+                        .border(0.5.dp, Palette.danger.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                        .clickable { showClearHistoryDialog = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Symbol("trash", size = 13.dp, tint = Palette.danger)
+                }
+            }
+
             // Live Connection Badge with pulsing LED
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -632,6 +689,44 @@ fun CamcsControlCenterScreen(
                     color = if (isEngineConnected) Palette.emeraldAccent else Palette.danger
                 )
             }
+        }
+
+        if (showClearHistoryDialog) {
+            val pastMissionsCount = missions.count { isTerminalState(it.status) }
+            AlertDialog(
+                onDismissRequest = { showClearHistoryDialog = false },
+                title = {
+                    Text(
+                        text = "Supprimer les anciennes missions",
+                        style = Type.headline.semibold,
+                        color = Palette.text
+                    )
+                },
+                text = {
+                    Text(
+                        text = "Voulez-vous supprimer définitivement toutes les anciennes missions terminées ou annulées ($pastMissionsCount mission(s)) ?",
+                        style = Type.body,
+                        color = Palette.secondary
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showClearHistoryDialog = false
+                            handleClearPastMissions()
+                        }
+                    ) {
+                        Text("Supprimer", color = Palette.danger, style = Type.body.semibold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showClearHistoryDialog = false }) {
+                        Text("Annuler", color = Palette.secondary)
+                    }
+                },
+                containerColor = Palette.surface,
+                shape = RoundedCornerShape(16.dp)
+            )
         }
 
         // 2. ADAPTIVE TAB SELECTOR (Scrollable horizontally, NEVER cuts text or uses ellipses)
@@ -694,14 +789,17 @@ fun CamcsControlCenterScreen(
                 0 -> {
                     // TAB 1: Mission Dashboard, Dispatching Flow & Agents
                     if (activeMission != null) {
-                        // Multi-mission selector if multiple missions exist
-                        if (missions.size > 1) {
+                        // Multi-mission selector chip bar
+                        if (missions.isNotEmpty()) {
                             MissionSelectorRow(
                                 missions = missions,
                                 selectedMissionId = activeMission.id,
                                 cancellingMissions = cancellingMissions,
+                                deletingMissions = deletingMissions,
                                 onSelect = { selectedMissionId = it },
-                                onCancelMission = handleCancelMission
+                                onCancelMission = handleCancelMission,
+                                onDeleteMission = handleDeleteMission,
+                                onClearPastMissions = { showClearHistoryDialog = true }
                             )
                         }
 
@@ -709,6 +807,7 @@ fun CamcsControlCenterScreen(
                             mission = activeMission,
                             currentClockTick = currentClockTick,
                             isCancelling = cancellingMissions[activeMission.id] == true,
+                            isDeleting = deletingMissions[activeMission.id] == true,
                             onPause = {
                                 missions = missions.map { m ->
                                     if (m.id == activeMission.id) m.copy(status = "PAUSED") else m
@@ -723,6 +822,9 @@ fun CamcsControlCenterScreen(
                             },
                             onCancel = {
                                 handleCancelMission(activeMission.id)
+                            },
+                            onDelete = {
+                                handleDeleteMission(activeMission.id)
                             }
                         )
 
@@ -916,8 +1018,11 @@ private fun MissionSelectorRow(
     missions: List<CamcsMission>,
     selectedMissionId: String,
     cancellingMissions: Map<String, Boolean>,
+    deletingMissions: Map<String, Boolean> = emptyMap(),
     onSelect: (String) -> Unit,
-    onCancelMission: (String) -> Unit
+    onCancelMission: (String) -> Unit,
+    onDeleteMission: (String) -> Unit = {},
+    onClearPastMissions: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
 
@@ -939,6 +1044,8 @@ private fun MissionSelectorRow(
             val isSelected = m.id == selectedMissionId
             val canCancel = isCancellableState(m.status) && !isTerminalState(m.status)
             val isCancelling = cancellingMissions[m.id] == true
+            val isTerminal = isTerminalState(m.status)
+            val isDeleting = deletingMissions[m.id] == true
 
             Row(
                 modifier = Modifier
@@ -980,7 +1087,7 @@ private fun MissionSelectorRow(
                     maxLines = 1
                 )
 
-                // Inline Cancel Button for ANY cancellable mission (selected or not)
+                // Inline Cancel Button for ANY cancellable mission
                 if (canCancel) {
                     Box(
                         modifier = Modifier
@@ -1001,6 +1108,53 @@ private fun MissionSelectorRow(
                         }
                     }
                 }
+
+                // Inline Delete Button for ANY terminal/past mission
+                if (isTerminal) {
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(Palette.danger.copy(alpha = if (isDeleting) 0.12f else 0.22f))
+                            .clickable(enabled = !isDeleting) { onDeleteMission(m.id) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isDeleting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(10.dp),
+                                color = Palette.danger,
+                                strokeWidth = 1.2.dp
+                            )
+                        } else {
+                            Symbol("trash", size = 8.dp, tint = Palette.danger)
+                        }
+                    }
+                }
+            }
+        }
+
+        val pastMissionsCount = missions.count { isTerminalState(it.status) }
+        if (pastMissionsCount > 0) {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Palette.danger.copy(alpha = 0.12f))
+                    .border(
+                        0.5.dp,
+                        Palette.danger.copy(alpha = 0.35f),
+                        RoundedCornerShape(8.dp)
+                    )
+                    .clickable { onClearPastMissions() }
+                    .padding(horizontal = 9.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Symbol("trash.fill", size = 9.dp, tint = Palette.danger)
+                Text(
+                    text = "Purger ($pastMissionsCount)",
+                    style = Type.caption.semibold.copy(fontSize = 10.5.sp),
+                    color = Palette.danger
+                )
             }
         }
     }
@@ -1014,9 +1168,11 @@ private fun MissionMasterCard(
     mission: CamcsMission,
     currentClockTick: Long,
     isCancelling: Boolean,
+    isDeleting: Boolean = false,
     onPause: () -> Unit,
     onResume: () -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    onDelete: () -> Unit = {}
 ) {
     val dark = LocalDark.current
     val progressAnimated by animateFloatAsState(
@@ -1201,6 +1357,22 @@ private fun MissionMasterCard(
                         enabled = (canCancel || isPaused) && !isCancelling,
                         isLoading = isCancelling,
                         loadingText = "Arrêt en cours..."
+                    )
+                }
+            } else if (isTerminalState(mission.status)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CamcsMissionActionButton(
+                        text = "Supprimer la mission",
+                        icon = "trash.fill",
+                        action = onDelete,
+                        modifier = Modifier.weight(1f),
+                        enabled = !isDeleting,
+                        isLoading = isDeleting,
+                        loadingText = "Suppression..."
                     )
                 }
             }
@@ -3083,27 +3255,73 @@ private fun MissionDeliverablesAndResultsView(
                     color = Palette.text
                 )
 
-                // Quick stats row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    MetricCapsule(
-                        label = "Livrables",
-                        value = "${deliverables.size}",
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricCapsule(
-                        label = "Tests",
-                        value = if (proofs.any { it.exitCode == 0 }) "100% OK" else "En cours",
-                        isSuccess = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricCapsule(
-                        label = "Preuves",
-                        value = "${proofs.size}",
-                        modifier = Modifier.weight(1f)
-                    )
+                // Separated Metrics: Tâches, Livrables, Tests, Preuves & Actions Externes
+                val verifiedDeliverablesCount = deliverables.count { it.validationStatus == "VERIFIED" }
+                val confirmedExtActionsCount = mission?.externalActions?.count { it.status == "CONFIRMED" } ?: 0
+                val totalExtActions = mission?.externalActions?.size ?: 0
+                val allTasks = mission?.agents?.flatMap { it.tasks } ?: emptyList()
+                val executedTasksCount = allTasks.count { it.status == "COMPLETED" }
+                val totalTasksCount = allTasks.size
+                val testsExecuted = proofs.count { it.executionType == "test_run" || (it.cliCommand != null && it.cliCommand.contains("test")) }
+                val testsPassed = proofs.count { (it.executionType == "test_run" || (it.cliCommand != null && it.cliCommand.contains("test"))) && it.exitCode == 0 }
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        MetricCapsule(
+                            label = "Livrables",
+                            value = "${deliverables.size}",
+                            modifier = Modifier.weight(1f)
+                        )
+                        MetricCapsule(
+                            label = "Vérifiés",
+                            value = "$verifiedDeliverablesCount",
+                            isSuccess = verifiedDeliverablesCount > 0 && verifiedDeliverablesCount == deliverables.size,
+                            modifier = Modifier.weight(1f)
+                        )
+                        MetricCapsule(
+                            label = "Preuves",
+                            value = "${proofs.size}",
+                            isSuccess = proofs.isNotEmpty() && proofs.all { it.exitCode == 0 },
+                            modifier = Modifier.weight(1f)
+                        )
+                        MetricCapsule(
+                            label = "Actions Ext.",
+                            value = if (totalExtActions > 0) "$confirmedExtActionsCount/$totalExtActions" else "Locale",
+                            isSuccess = totalExtActions == 0 || confirmedExtActionsCount == totalExtActions,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        MetricCapsule(
+                            label = "Tâches Exéc.",
+                            value = "$executedTasksCount/$totalTasksCount",
+                            modifier = Modifier.weight(1f)
+                        )
+                        MetricCapsule(
+                            label = "Tâches Valid.",
+                            value = "$executedTasksCount",
+                            isSuccess = executedTasksCount == totalTasksCount && totalTasksCount > 0,
+                            modifier = Modifier.weight(1f)
+                        )
+                        MetricCapsule(
+                            label = "Tests Exéc.",
+                            value = "$testsExecuted",
+                            modifier = Modifier.weight(1f)
+                        )
+                        MetricCapsule(
+                            label = "Tests Réussis",
+                            value = if (testsExecuted > 0) "$testsPassed/$testsExecuted" else if (mission?.status == "COMPLETED") "100%" else "En cours",
+                            isSuccess = testsExecuted > 0 && testsPassed == testsExecuted,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
         }

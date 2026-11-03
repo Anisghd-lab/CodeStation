@@ -89,7 +89,8 @@ class DagPlanner:
         now = time.time()
         m_short = mission_id[:6]
         obj_lower = (title + " " + objective).lower()
-        is_github_repo = any(w in obj_lower for w in ["repo github", "dépôt github", "depot github", "github repo", "repository github"])
+        repo_keywords = ["repo", "dépôt", "depot", "repository", "github", "git"]
+        is_github_repo = any(kw in obj_lower for kw in repo_keywords)
 
         arch_agent = next((a for a in agents if "architect" in a["role"].lower() or "architecture" in a["role"].lower()), agents[0])
         qa_agent = next((a for a in agents if "qualité" in a["role"].lower() or "audit" in a["role"].lower() or "test" in a["role"].lower()), agents[-1])
@@ -100,8 +101,20 @@ class DagPlanner:
         if is_github_repo:
             # Objective requires a real remote GitHub repository creation & publication
             import re
-            m = re.search(r'(?:nomm[ée]|nome|named)\s+(?:le\s+)?([A-Za-z0-9_\-\.]+)', objective, re.IGNORECASE)
-            target_repo_name = m.group(1).strip() if m else "CAMCS"
+            target_repo_name = "CAMCS"
+            patterns = [
+                r'(?:nomm[ée]|nome|named)\s+(?:le\s+)?([A-Za-z0-9_\-\.]+)',
+                r'(?:repo|dépôt|depot|repository)\s+(?:github\s+)?(?:nomm[ée]\s+)?([A-Za-z0-9_\-\.]+)',
+                r'(?:sur|to)\s+github\s+(?:nomm[ée]\s+)?([A-Za-z0-9_\-\.]+)',
+                r'(?:cr[ée]e|create|initialise|build)\s+(?:un\s+)?(?:repo|dépôt|depot)?\s*([A-Za-z0-9_\-\.]+)'
+            ]
+            for p in patterns:
+                m = re.search(p, objective, re.IGNORECASE)
+                if m:
+                    cand = m.group(1).strip()
+                    if cand.lower() not in ["un", "le", "la", "github", "distant", "remote", "public", "privé", "private", "et", "and", "avec", "with"]:
+                        target_repo_name = cand
+                        break
 
             # 1. Architecture specification & Tree Design
             t1_id = f"task-{m_short}-spec"

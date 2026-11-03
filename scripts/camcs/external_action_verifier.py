@@ -193,13 +193,18 @@ class ExternalActionVerifier:
             actions.append(act)
         return actions
 
-    def are_all_mandatory_actions_confirmed(self, mission_id: str) -> Tuple[bool, List[str]]:
+    def are_all_mandatory_actions_confirmed(self, mission_id: str, objective: str = "") -> Tuple[bool, List[str]]:
         """
         Validates the fundamental rule:
         A mission with mandatory external actions can NEVER reach OBJECTIVE_COMPLETED
         unless 100% of its mandatory actions are CONFIRMED.
+        If objective requested a remote resource (e.g. GitHub repo) but no action exists, it fails.
         """
         actions = self.get_mission_actions(mission_id)
+        repo_keywords = ["repo", "dépôt", "depot", "repository", "github", "git"]
+        if any(kw in objective.lower() for kw in repo_keywords) and not actions:
+            return False, ["L'objectif exigeait un dépôt GitHub mais aucune action externe n'a été enregistrée."]
+
         if not actions:
             return True, []  # Purely local mission
 

@@ -143,9 +143,16 @@ class GitHubWorkflowExecutor:
         # Étape 3 : Configuration Git
         # -------------------------------------------------------------
         t0 = time.time()
+        # Clean up any nested .git directories created by CLIs in subfolders
+        import shutil
+        for root, dirs, files in os.walk(workspace_dir):
+            if root != workspace_dir and ".git" in dirs:
+                shutil.rmtree(os.path.join(root, ".git"), ignore_errors=True)
+                dirs.remove(".git")
+
         gitignore_path = os.path.join(workspace_dir, ".gitignore")
         with open(gitignore_path, "w", encoding="utf-8") as f:
-            f.write("*.pyc\n__pycache__/\n.env\n*.key\n*.secret\n.git/\n")
+            f.write("*.pyc\n__pycache__/\n.env\n*.key\n*.secret\n")
 
         git_dir = os.path.join(workspace_dir, ".git")
         if not os.path.exists(git_dir):
@@ -168,8 +175,19 @@ class GitHubWorkflowExecutor:
         # Étape 4 : Commit des livrables
         # -------------------------------------------------------------
         t0 = time.time()
-        subprocess.run(["git", "add", "."], cwd=workspace_dir, capture_output=True)
-        subprocess.run(["git", "commit", "-m", f"feat: autonomous generation by CAMCS ({mission_id[:8]})"], cwd=workspace_dir, capture_output=True)
+        add_res = subprocess.run(["git", "add", "-A"], cwd=workspace_dir, capture_output=True, text=True)
+        if add_res.returncode != 0:
+            action.status = ExternalActionStatus.FAILED
+            action.error_message = f"Échec de git add : {add_res.stderr.strip()}"
+            self.verifier.save_action(action)
+            return False, {}, action.error_message
+
+        commit_res = subprocess.run(["git", "commit", "-m", f"feat: autonomous generation by CAMCS ({mission_id[:8]})"], cwd=workspace_dir, capture_output=True, text=True)
+        if commit_res.returncode != 0 and "nothing to commit" not in commit_res.stdout.lower() and "nothing to commit" not in commit_res.stderr.lower():
+            action.status = ExternalActionStatus.FAILED
+            action.error_message = f"Échec de git commit : {commit_res.stderr.strip() or commit_res.stdout.strip()}"
+            self.verifier.save_action(action)
+            return False, {}, action.error_message
 
         sha_res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=workspace_dir, capture_output=True, text=True)
         local_sha = sha_res.stdout.strip()

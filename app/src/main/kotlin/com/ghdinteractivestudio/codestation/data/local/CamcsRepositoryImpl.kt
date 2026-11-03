@@ -306,4 +306,38 @@ class CamcsRepositoryImpl : CamcsRepository {
             false
         }
     }
+
+    override suspend fun deleteMission(missionId: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val jsonBody = "{\"missionId\": \"$missionId\"}"
+            val req = Request.Builder()
+                .url("http://127.0.0.1:19223/api/camcs/missions/delete")
+                .post(jsonBody.toRequestBody("application/json".toMediaType()))
+                .build()
+            val resp = httpClient.newCall(req).execute()
+            val success = resp.isSuccessful
+            resp.close()
+            refreshMissionsInternal()
+            success
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    override suspend fun clearPastMissions(onlyPast: Boolean): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val jsonBody = "{\"onlyPast\": $onlyPast}"
+            val req = Request.Builder()
+                .url("http://127.0.0.1:19223/api/camcs/missions/clear")
+                .post(jsonBody.toRequestBody("application/json".toMediaType()))
+                .build()
+            val resp = httpClient.newCall(req).execute()
+            val success = resp.isSuccessful
+            resp.close()
+            refreshMissionsInternal()
+            success
+        } catch (_: Exception) {
+            false
+        }
+    }
 }
