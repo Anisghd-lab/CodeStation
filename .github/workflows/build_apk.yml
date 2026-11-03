@@ -3,6 +3,7 @@ name: Build CodeStation Android Native APK
 on:
   push:
     branches: [ main, master, feature/**, fix/** ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
@@ -94,3 +95,79 @@ jobs:
         with:
           name: test-reports
           path: app/build/reports/tests/
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.9'
+          cache-read-only: false
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION_NAME=$(grep -m1 'versionName' app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')
+          VERSION_CODE=$(grep -m1 'versionCode' app/build.gradle.kts | sed -E 's/[^0-9]*([0-9]+).*/\1/')
+          echo "VERSION_NAME=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          echo "VERSION_CODE=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
+          echo "Building CodeStation v${VERSION_NAME} (code ${VERSION_CODE})"
+
+      - name: Assemble Debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Prepare release artifacts
+        run: |
+          VERSION_NAME="${{ steps.version.outputs.VERSION_NAME }}"
+          mkdir -p release_artifacts
+          cp app/build/outputs/apk/debug/app-debug.apk release_artifacts/app-release.apk
+          cp app/build/outputs/apk/debug/app-debug.apk "release_artifacts/CodeStation-v${VERSION_NAME}.apk"
+          cd release_artifacts
+          sha256sum app-release.apk "CodeStation-v${VERSION_NAME}.apk" > app-release.apk.sha256
+          echo "=== SHA256 ==="
+          cat app-release.apk.sha256
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "CodeStation v${{ steps.version.outputs.VERSION_NAME }}"
+          body: |
+            ## CodeStation v${{ steps.version.outputs.VERSION_NAME }}
+
+            **Version code :** ${{ steps.version.outputs.VERSION_CODE }}
+
+            ### Téléchargement
+            - `app-release.apk` — APK standard
+            - `CodeStation-v${{ steps.version.outputs.VERSION_NAME }}.apk` — APK nommé avec version
+
+            ### Checksum SHA-256
+            Voir le fichier `app-release.apk.sha256` joint.
+          files: |
+            release_artifacts/app-release.apk
+            release_artifacts/CodeStation-v${{ steps.version.outputs.VERSION_NAME }}.apk
+            release_artifacts/app-release.apk.sha256
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
