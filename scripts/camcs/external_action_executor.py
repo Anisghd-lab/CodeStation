@@ -161,10 +161,7 @@ class ExternalActionExecutor:
         is_private = action.parameters.get("is_private", False)
         expected_files = action.parameters.get("expected_files", ["README.md"])
 
-        # SUBMITTED
-        self.update_action_status(action, ExternalActionStatus.SUBMITTED)
-
-        # Delegate execution to GitHubWorkflowExecutor
+        # Delegate execution directly to GitHubWorkflowExecutor using the already-connected local CLI session
         ok, details, err = self.github_workflow.execute_github_repo_creation_and_publish(
             mission_id=action.mission_id,
             task_id=action.task_id,
@@ -172,11 +169,9 @@ class ExternalActionExecutor:
             workspace_dir=workspace_dir,
             description=description,
             is_private=is_private,
-            expected_files=expected_files
+            expected_files=expected_files,
+            existing_action=action
         )
-
-        # VERIFYING
-        self.update_action_status(action, ExternalActionStatus.VERIFYING)
 
         if ok:
             action.status = ExternalActionStatus.CONFIRMED

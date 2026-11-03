@@ -35,7 +35,10 @@ data class CamcsSubtask(
     @SerialName("agentId") val agentId: String? = null,
     @SerialName("pid") val pid: Int? = null,
     @SerialName("startedAt") val startedAt: Double? = null,
-    @SerialName("completedAt") val completedAt: Double? = null
+    @SerialName("completedAt") val completedAt: Double? = null,
+    @SerialName("errorMessage") val errorMessage: String? = null,
+    @SerialName("fallbackCli") val fallbackCli: String? = null,
+    @SerialName("canRetry") val canRetry: Boolean = false
 )
 
 @Serializable
@@ -57,6 +60,12 @@ data class CamcsAgent(
     @SerialName("lastActivityAt") val lastActivityAt: Double? = null,
     @SerialName("lastOutput") val lastOutput: String? = null,
     @SerialName("activeTaskId") val activeTaskId: String? = null,
+    @SerialName("waitingForTaskId") val waitingForTaskId: String? = null,
+    @SerialName("waitingForTaskTitle") val waitingForTaskTitle: String? = null,
+    @SerialName("waitingForAgentName") val waitingForAgentName: String? = null,
+    @SerialName("dependencyStatus") val dependencyStatus: String? = null,
+    @SerialName("waitStartedAt") val waitStartedAt: Double? = null,
+    @SerialName("blockingReason") val blockingReason: String? = null,
     @SerialName("tasks") val tasks: List<CamcsSubtask> = emptyList()
 )
 
@@ -121,7 +130,16 @@ data class CamcsExternalAction(
     @SerialName("is_mandatory") val isMandatory: Boolean = true,
     @SerialName("verification_method") val verificationMethod: String = "",
     @SerialName("verified_at") val verifiedAt: Double? = null,
-    @SerialName("error_message") val errorMessage: String? = null
+    @SerialName("error_message") val errorMessage: String? = null,
+    @SerialName("account") val account: String? = null,
+    @SerialName("scopes") val scopes: List<String> = emptyList(),
+    @SerialName("auth_duration_ms") val authDurationMs: Double? = null,
+    @SerialName("last_event") val lastEvent: String? = null,
+    @SerialName("verified_url") val verifiedUrl: String? = null,
+    @SerialName("owner") val owner: String? = null,
+    @SerialName("repo_name") val repoName: String? = null,
+    @SerialName("current_step") val currentStep: String? = null,
+    @SerialName("completed_steps") val completedSteps: List<String> = emptyList()
 )
 
 @Serializable

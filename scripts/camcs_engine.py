@@ -305,6 +305,12 @@ class CamcsAgent:
         self.last_activity_at: float = time.time()
         self.last_output: str = ""
         self.active_task_id: Optional[str] = None
+        self.waiting_for_task_id: Optional[str] = None
+        self.waiting_for_task_title: Optional[str] = None
+        self.waiting_for_agent_name: Optional[str] = None
+        self.dependency_status: Optional[str] = None
+        self.wait_started_at: Optional[float] = None
+        self.blocking_reason: Optional[str] = None
         self.tasks: List[Dict[str, Any]] = []
 
     def to_dict(self) -> Dict[str, Any]:
@@ -327,6 +333,12 @@ class CamcsAgent:
             "lastActivityAt": self.last_activity_at,
             "lastOutput": self.last_output,
             "activeTaskId": self.active_task_id,
+            "waitingForTaskId": self.waiting_for_task_id,
+            "waitingForTaskTitle": self.waiting_for_task_title,
+            "waitingForAgentName": self.waiting_for_agent_name,
+            "dependencyStatus": self.dependency_status,
+            "waitStartedAt": self.wait_started_at,
+            "blockingReason": self.blocking_reason,
             "tasks": self.tasks
         }
 
@@ -1101,6 +1113,26 @@ class CamcsOrchestrationEngine:
                     self.record_mission_transition(mission.id, MissionState.BLOCKED, f"Tâches restantes bloquées par dépendances: {[t.id for t in remaining]}")
                 break
 
+            # Update waiting agents with rich dependency information
+            for ag in mission.agents:
+                ag_pending_tasks = [t for t in dag_tasks if t.agent_id == ag.id and t.id not in completed_task_ids and t not in ready_tasks]
+                if ag_pending_tasks and ag.id not in [rt.agent_id for rt in ready_tasks]:
+                    blocked_task = ag_pending_tasks[0]
+                    unmet_deps = [dep for dep in blocked_task.dependencies if dep not in completed_task_ids]
+                    if unmet_deps:
+                        dep_task = next((t for t in dag_tasks if t.id == unmet_deps[0]), None)
+                        dep_agent = next((a for a in mission.agents if a.id == (dep_task.agent_id if dep_task else "")), None)
+                        ag.status = AgentState.WAITING_FOR_DEPENDENCY
+                        ag.waiting_for_task_id = dep_task.id if dep_task else unmet_deps[0]
+                        ag.waiting_for_task_title = dep_task.title if dep_task else "Tâche prérequise"
+                        ag.waiting_for_agent_name = dep_agent.name if dep_agent else "Agent assigné"
+                        ag.dependency_status = dep_task.status if dep_task else "EN COURS"
+                        if not ag.wait_started_at:
+                            ag.wait_started_at = time.time()
+                        ag.blocking_reason = f"En attente de « {ag.waiting_for_task_title} » confiée à {ag.waiting_for_agent_name}"
+                        ag.current_subtask = ag.blocking_reason
+                        self._save_agent(ag)
+
             for task in ready_tasks:
                 if mission.status == MissionState.CANCELLED:
                     return
@@ -1108,6 +1140,12 @@ class CamcsOrchestrationEngine:
                 agent = next((a for a in mission.agents if a.id == task.agent_id), mission.agents[0])
                 agent.active_task_id = task.id
                 agent.current_subtask = task.title
+                agent.waiting_for_task_id = None
+                agent.waiting_for_task_title = None
+                agent.waiting_for_agent_name = None
+                agent.dependency_status = None
+                agent.wait_started_at = None
+                agent.blocking_reason = None
 
                 # Task starts
                 self.record_task_transition(mission.id, task.id, TaskState.RUNNING, progress=10)

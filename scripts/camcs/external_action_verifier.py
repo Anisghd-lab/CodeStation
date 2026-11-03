@@ -69,6 +69,16 @@ class ExternalAction:
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
         d["status"] = self.status.value if isinstance(self.status, ExternalActionStatus) else self.status
+        details = self.verification_details or {}
+        d["account"] = details.get("account")
+        d["scopes"] = details.get("scopes", [])
+        d["auth_duration_ms"] = details.get("auth_duration_ms")
+        d["last_event"] = details.get("last_event")
+        d["verified_url"] = details.get("verified_url") or details.get("url")
+        d["owner"] = details.get("owner")
+        d["repo_name"] = details.get("repoName")
+        d["current_step"] = details.get("current_step")
+        d["completed_steps"] = details.get("completed_steps", [])
         return d
 
 class ExternalActionVerifier:
