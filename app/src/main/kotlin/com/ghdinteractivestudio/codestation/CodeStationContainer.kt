@@ -31,6 +31,7 @@ interface AppContainer {
     val antigravityModelRepository: AntigravityModelRepository
     val eventStreamClient: com.ghdinteractivestudio.codestation.data.remote.CodeStationEventStreamClient
     val approvalDao: com.ghdinteractivestudio.codestation.data.local.ApprovalDao
+    val camcsJournalDao: com.ghdinteractivestudio.codestation.data.local.CamcsJournalDao
     val memoryRepository: MemoryRepository
     val camcsRepository: com.ghdinteractivestudio.codestation.domain.repository.CamcsRepository
 }
@@ -43,6 +44,10 @@ class CodeStationContainer(override val context: Context) : AppContainer {
 
     override val approvalDao: com.ghdinteractivestudio.codestation.data.local.ApprovalDao by lazy {
         database.approvalDao()
+    }
+
+    override val camcsJournalDao: com.ghdinteractivestudio.codestation.data.local.CamcsJournalDao by lazy {
+        database.camcsJournalDao()
     }
 
     override val preferencesRepository: PreferencesRepositoryImpl by lazy {

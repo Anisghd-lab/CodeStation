@@ -2,13 +2,18 @@ package com.ghdinteractivestudio.codestation.viewmodel
 
 import com.ghdinteractivestudio.codestation.domain.model.Bot
 import com.ghdinteractivestudio.codestation.domain.model.BotStatus
+import com.ghdinteractivestudio.codestation.domain.model.CollectiveMemoryStatus
 import com.ghdinteractivestudio.codestation.domain.model.ProviderType
 import com.ghdinteractivestudio.codestation.domain.model.ServerConfig
 import com.ghdinteractivestudio.codestation.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.codestation.domain.repository.BotRepository
+import com.ghdinteractivestudio.codestation.domain.repository.CamcsRepository
+import com.ghdinteractivestudio.codestation.domain.repository.MemoryRepository
 import com.ghdinteractivestudio.codestation.domain.repository.ServerRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
+import kotlinx.coroutines.delay
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -21,6 +26,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -69,6 +75,66 @@ class RosterViewModelTest {
 
         assertEquals(1, state.otherBots.size)
         assertEquals("Z-Bot", state.otherBots.first().name)
+    }
+
+    @Test
+    fun `pull to refresh actualise agents memoire et missions`() = runTest(testDispatcher) {
+        val memoryRepository: MemoryRepository = mockk(relaxed = true)
+        every { memoryRepository.memoryStatus } returns kotlinx.coroutines.flow.MutableStateFlow(CollectiveMemoryStatus())
+        val camcsRepository: CamcsRepository = mockk(relaxed = true)
+        coEvery { botRepository.refreshBots() } returns Result.success(sampleBots)
+        coEvery { serverRepository.testConnection() } returns Result.success(ServerConfig())
+        coEvery { memoryRepository.refreshStatus() } returns Result.success(CollectiveMemoryStatus())
+
+        val viewModel = RosterViewModel(botRepository, serverRepository, memoryRepository, camcsRepository)
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect() }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.refresh()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 1) { botRepository.refreshBots() }
+        coVerify(exactly = 1) { serverRepository.testConnection() }
+        coVerify(exactly = 1) { camcsRepository.refreshMissions() }
+        coVerify(atLeast = 1) { memoryRepository.refreshStatus() }
+        assertFalse("L'indicateur de rafraîchissement doit retomber", viewModel.uiState.value.isRefreshing)
+    }
+
+    @Test
+    fun `pull to refresh repete ne lance pas de requetes dupliquees`() = runTest(testDispatcher) {
+        val camcsRepository: CamcsRepository = mockk(relaxed = true)
+        coEvery { botRepository.refreshBots() } coAnswers {
+            delay(500)
+            Result.success(sampleBots)
+        }
+
+        val viewModel = RosterViewModel(botRepository, serverRepository, camcsRepository = camcsRepository)
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect() }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.refresh()
+        viewModel.refresh()
+        viewModel.refresh()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 1) { botRepository.refreshBots() }
+        assertFalse(viewModel.uiState.value.isRefreshing)
+    }
+
+    @Test
+    fun `un echec du backend camcs ne fait pas planter le refresh`() = runTest(testDispatcher) {
+        val camcsRepository: CamcsRepository = mockk(relaxed = true)
+        coEvery { camcsRepository.refreshMissions() } throws java.net.ConnectException("Connection refused")
+
+        val viewModel = RosterViewModel(botRepository, serverRepository, camcsRepository = camcsRepository)
+        backgroundScope.launch(testDispatcher) { viewModel.uiState.collect() }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.refresh()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 1) { camcsRepository.refreshMissions() }
+        assertFalse("L'indicateur doit retomber malgré l'erreur réseau", viewModel.uiState.value.isRefreshing)
     }
 
     @Test

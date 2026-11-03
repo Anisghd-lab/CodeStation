@@ -20,7 +20,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -69,6 +72,9 @@ class CodeStationEventStreamClient(
     }
     private val ssePrefs by lazy { context.getSharedPreferences("codestation_sse_prefs", Context.MODE_PRIVATE) }
     private var streamJob: Job? = null
+    private var reconnectJob: Job? = null
+    private val lifecycleLock = Any()
+    private val processedEntries = BoundedEntryIdCache()
     private var lastRev: Long = 0
     private var initialSyncCompleted = false
     private val botPreviousStatus = ConcurrentHashMap<String, String>()
@@ -82,40 +88,65 @@ class CodeStationEventStreamClient(
         .build()
 
     fun start() {
-        if (streamJob?.isActive == true) return
-        if (lastRev == 0L) {
-            lastRev = ssePrefs.getLong("last_rev", 0L)
-        }
-        scope.launch {
-            try {
-                messageDao.purgePollutedSessionNotices()
-            } catch (e: Exception) {
-                android.util.Log.w(TAG, "Notice cleanup failed: ${e.message}")
+        synchronized(lifecycleLock) {
+            if (streamJob?.isActive == true || reconnectJob?.isActive == true) return
+            if (lastRev == 0L) {
+                lastRev = ssePrefs.getLong("last_rev", 0L)
             }
-        }
-        android.util.Log.i(TAG, "Starting CodeStationEventStreamClient SSE loop (since=$lastRev)")
-        streamJob = scope.launch {
-            runEventLoop()
+            scope.launch {
+                try {
+                    messageDao.purgePollutedSessionNotices()
+                } catch (e: Exception) {
+                    android.util.Log.w(TAG, "Notice cleanup failed: ${e.message}")
+                }
+            }
+            android.util.Log.i(TAG, "Starting CodeStationEventStreamClient SSE loop (since=$lastRev)")
+            streamJob = scope.launch {
+                runEventLoop()
+            }
         }
     }
 
     fun reconnectNow() {
-        android.util.Log.i(TAG, "Force reconnecting CodeStationEventStreamClient SSE loop (since=$lastRev)")
-        streamJob?.cancel()
-        streamJob = scope.launch {
-            runEventLoop()
+        synchronized(lifecycleLock) {
+            // Un seul reconnect à la fois : onResume et le service peuvent le demander simultanément.
+            if (reconnectJob?.isActive == true) {
+                android.util.Log.d(TAG, "SSE reconnect already in progress, duplicate request ignored")
+                return
+            }
+            android.util.Log.i(TAG, "Force reconnecting CodeStationEventStreamClient SSE loop (since=$lastRev)")
+            val previous = streamJob
+            streamJob = null
+            reconnectJob = scope.launch {
+                // Join obligatoire : l'ancienne boucle peut être bloquée dans readUtf8Line() et,
+                // si elle n'était que cancel(), continuerait de traiter les mêmes événements
+                // en parallèle de la nouvelle connexion (doublons CodeBuddy/CAMCS).
+                previous?.cancelAndJoin()
+                ensureActive()
+                synchronized(lifecycleLock) {
+                    if (streamJob?.isActive != true) {
+                        streamJob = scope.launch {
+                            runEventLoop()
+                        }
+                    }
+                }
+            }
         }
     }
 
     fun stop() {
-        android.util.Log.i(TAG, "Stopping CodeStationEventStreamClient SSE loop")
-        streamJob?.cancel()
-        streamJob = null
+        synchronized(lifecycleLock) {
+            android.util.Log.i(TAG, "Stopping CodeStationEventStreamClient SSE loop")
+            streamJob?.cancel()
+            streamJob = null
+            reconnectJob?.cancel()
+            reconnectJob = null
+        }
     }
 
     private suspend fun runEventLoop() {
         var backoffMs = 1000L
-        while (scope.isActive) {
+        while (currentCoroutineContext().isActive) {
             try {
                 val config = serverRepository.getServerConfig()
                 val baseUrl = config.url.trimEnd('/')
@@ -149,7 +180,7 @@ class CodeStationEventStreamClient(
                     val source = response.body?.source() ?: return@use
                     val payloadBuilder = StringBuilder()
 
-                    while (scope.isActive && !source.exhausted()) {
+                    while (currentCoroutineContext().isActive && !source.exhausted()) {
                         val line = source.readUtf8Line() ?: break
                         val trimmed = line.trim()
 
@@ -162,6 +193,8 @@ class CodeStationEventStreamClient(
                         } else if (trimmed.isEmpty() && payloadBuilder.isNotEmpty()) {
                             val fullPayload = payloadBuilder.toString()
                             payloadBuilder.clear()
+                            // Un job annulé pendant readUtf8Line() ne doit jamais traiter le payload reçu.
+                            currentCoroutineContext().ensureActive()
                             val shouldContinue = handleServerEvent(fullPayload)
                             if (!shouldContinue) {
                                 break
@@ -302,6 +335,16 @@ class CodeStationEventStreamClient(
                     val dataObj = entryObj["data"]?.jsonObject ?: return true
                     val text = dataObj["text"]?.jsonPrimitive?.content ?: ""
                     val isFinal = dataObj["final"]?.jsonPrimitive?.booleanOrNull ?: false
+
+                    // Idempotence : le même événement rejoué (reconnexion `since=rev`) ne doit pas
+                    // recréer message, approbation ni trace. L'empreinte inclut le contenu afin
+                    // qu'une mise à jour réelle d'une même entrée reste traitée.
+                    val entryFingerprint = "$entryId|$kind|$isFinal|${text.length}|${text.hashCode()}"
+                    if (!processedEntries.markIfNew(entryFingerprint)) {
+                        android.util.Log.i(TAG, "Skipping already-processed entry id=$entryId (SSE replay)")
+                        return true
+                    }
+
                     val createdAt = entryObj["createdAt"]?.jsonPrimitive?.longOrNull
                         ?: entryObj["created_at"]?.jsonPrimitive?.longOrNull
                         ?: System.currentTimeMillis()
@@ -599,6 +642,30 @@ class CodeStationEventStreamClient(
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Failed to parse/process event payload: ${e.message}", e)
             return true
+        }
+    }
+
+    /**
+     * Cache borné des empreintes d'entrées déjà traitées (LRU simple, thread-safe).
+     * Évite qu'un rejeu SSE après reconnexion ne duplique messages, approbations et traces.
+     */
+    internal class BoundedEntryIdCache(private val capacity: Int = 512) {
+        private val entries = object : LinkedHashMap<String, Unit>(capacity, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Unit>?): Boolean = size > capacity
+        }
+
+        /** @return true si l'empreinte est nouvelle et vient d'être marquée comme traitée. */
+        @Synchronized
+        fun markIfNew(fingerprint: String): Boolean {
+            if (fingerprint.isBlank()) return true
+            if (entries.containsKey(fingerprint)) return false
+            entries[fingerprint] = Unit
+            return true
+        }
+
+        @Synchronized
+        fun clear() {
+            entries.clear()
         }
     }
 

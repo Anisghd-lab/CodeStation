@@ -8,8 +8,10 @@ import com.ghdinteractivestudio.codestation.domain.model.BotStatus
 import com.ghdinteractivestudio.codestation.domain.model.CollectiveMemoryStatus
 import com.ghdinteractivestudio.codestation.domain.model.ServerConfig
 import com.ghdinteractivestudio.codestation.domain.repository.BotRepository
+import com.ghdinteractivestudio.codestation.domain.repository.CamcsRepository
 import com.ghdinteractivestudio.codestation.domain.repository.MemoryRepository
 import com.ghdinteractivestudio.codestation.domain.repository.ServerRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -41,9 +43,11 @@ data class RosterUiState(
 class RosterViewModel(
     private val botRepository: BotRepository,
     private val serverRepository: ServerRepository,
-    private val memoryRepository: MemoryRepository? = null
+    private val memoryRepository: MemoryRepository? = null,
+    private val camcsRepository: CamcsRepository? = null
 ) : ViewModel() {
 
+    private var refreshJob: Job? = null
     private val _searchQuery = MutableStateFlow("")
     private val _activeFilter = MutableStateFlow(BotFilter.ALL)
     private val _isRefreshing = MutableStateFlow(false)
@@ -88,6 +92,7 @@ class RosterViewModel(
             pinnedBots = pinned,
             otherBots = others,
             serverConfig = serverConfig,
+            isLoading = false,
             isRefreshing = refreshing,
             searchQuery = query,
             activeFilter = filter
@@ -106,13 +111,37 @@ class RosterViewModel(
         _activeFilter.value = filter
     }
 
+    /**
+     * Actualisation réelle du Master : agents, connexion hôte, mémoire collective et missions CAMCS.
+     * Un seul rafraîchissement peut être en vol à la fois afin d'éviter toute requête dupliquée
+     * (geste de pull-to-refresh répété, tap sur « Tester / Reconnecter », etc.).
+     */
     fun refresh() {
-        viewModelScope.launch {
+        if (refreshJob?.isActive == true) return
+        refreshJob = viewModelScope.launch {
             _isRefreshing.value = true
-            botRepository.refreshBots()
-            serverRepository.testConnection()
-            memoryRepository?.refreshStatus()
-            _isRefreshing.value = false
+            try {
+                safely { botRepository.refreshBots() }
+                safely { serverRepository.testConnection() }
+                memoryRepository?.let { repo -> safely { repo.refreshStatus() } }
+                camcsRepository?.let { repo -> safely { repo.refreshMissions() } }
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
+    }
+
+    /**
+     * Isole chaque source : une erreur réseau (hôte absent, timeout) ne doit ni interrompre
+     * l'actualisation des autres sources, ni remonter jusqu'au scope du ViewModel.
+     */
+    private suspend fun safely(block: suspend () -> Unit) {
+        try {
+            block()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Échec de cette source uniquement : les données déjà affichées sont conservées.
         }
     }
 
@@ -138,11 +167,12 @@ class RosterViewModel(
         fun provideFactory(
             botRepository: BotRepository,
             serverRepository: ServerRepository,
-            memoryRepository: MemoryRepository? = null
+            memoryRepository: MemoryRepository? = null,
+            camcsRepository: CamcsRepository? = null
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return RosterViewModel(botRepository, serverRepository, memoryRepository) as T
+                return RosterViewModel(botRepository, serverRepository, memoryRepository, camcsRepository) as T
             }
         }
     }

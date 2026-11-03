@@ -52,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.text.font.FontFamily
@@ -60,6 +61,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ghdinteractivestudio.codestation.CodeStationApplication
+import com.ghdinteractivestudio.codestation.data.local.CamcsJournalEntity
 import com.ghdinteractivestudio.codestation.domain.model.CamcsAgent
 import com.ghdinteractivestudio.codestation.domain.model.CamcsCliStatus
 import com.ghdinteractivestudio.codestation.domain.model.CamcsCommunication
@@ -71,6 +74,7 @@ import com.ghdinteractivestudio.codestation.domain.model.CamcsEvent
 import com.ghdinteractivestudio.codestation.domain.model.CamcsExternalAction
 import com.ghdinteractivestudio.codestation.domain.model.CamcsExternalService
 import com.ghdinteractivestudio.codestation.domain.model.CamcsFileResponse
+import com.ghdinteractivestudio.codestation.domain.model.CamcsGitStatus
 import com.ghdinteractivestudio.codestation.domain.model.CamcsMission
 import com.ghdinteractivestudio.codestation.domain.model.CamcsMissionsResponse
 import com.ghdinteractivestudio.codestation.domain.model.CamcsProof
@@ -97,14 +101,17 @@ import com.ghdinteractivestudio.codestation.ui.theme.semibold
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -139,6 +146,23 @@ fun CamcsControlCenterScreen(
     var externalServices by remember { mutableStateOf<List<CamcsExternalService>>(emptyList()) }
     val liveEvents = remember { mutableStateListOf<CamcsEvent>() }
 
+    // Tâche 05 : journal global persistant (Room), indépendant du bot sélectionné.
+    val appContext = LocalContext.current.applicationContext
+    val journalDao = remember(appContext) {
+        (appContext as? CodeStationApplication)?.container?.camcsJournalDao
+    }
+
+    LaunchedEffect(journalDao) {
+        val dao = journalDao ?: return@LaunchedEffect
+        dao.getRecentStream(300).collect { rows ->
+            val persisted = rows.map { it.toEvent() }
+            // Conserver les événements reçus mais pas encore écrits en base.
+            val pending = liveEvents.filter { ev -> persisted.none { it.id == ev.id } }
+            liveEvents.clear()
+            liveEvents.addAll((pending + persisted).sortedByDescending { it.timestamp })
+        }
+    }
+
     var activeTab by remember { mutableIntStateOf(0) } // 0: Orchestration, 1: Journal Live, 2: Providers & CLIs, 3: Résultats & Livrables
     var selectedMissionId by remember { mutableStateOf(initialMissionId) }
     var isEngineConnected by remember { mutableStateOf(false) }
@@ -150,6 +174,8 @@ fun CamcsControlCenterScreen(
     var proofs by remember { mutableStateOf<List<CamcsProof>>(emptyList()) }
     var report by remember { mutableStateOf<CamcsReport?>(null) }
     var gitDiffText by remember { mutableStateOf("") }
+    // Tâche 08 : état Git réel du dépôt (lecture seule, rafraîchi périodiquement).
+    var gitStatus by remember { mutableStateOf<CamcsGitStatus?>(null) }
 
     // Selected Deliverable for in-app code/doc inspection
     var selectedDeliverableForView by remember { mutableStateOf<CamcsDeliverable?>(null) }
@@ -176,9 +202,62 @@ fun CamcsControlCenterScreen(
             .build()
     }
 
+    // Tâche 08 : traçabilité Git réelle via le moteur CAMCS (aucune écriture Git).
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            val fetched: CamcsGitStatus? = try {
+                withContext(Dispatchers.IO) {
+                    val request = Request.Builder()
+                        .url("http://127.0.0.1:19223/api/camcs/git/status")
+                        .build()
+                    httpClient.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            jsonParser.decodeFromString<CamcsGitStatus>(response.body?.string().orEmpty())
+                        } else {
+                            null
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                null
+            }
+            if (fetched != null) gitStatus = fetched
+            delay(5000)
+        }
+    }
+
     val cancellingMissions = remember { mutableStateMapOf<String, Boolean>() }
     val cancellingTasks = remember { mutableStateMapOf<String, Boolean>() }
     val deletingMissions = remember { mutableStateMapOf<String, Boolean>() }
+    // Anti double-tap : une seule action pause/reprise en vol par mission.
+    val missionActionsInFlight = remember { mutableStateMapOf<String, String>() }
+
+    fun requestMissionAction(missionId: String, action: String) {
+        if (missionActionsInFlight[missionId] != null) return
+        missionActionsInFlight[missionId] = action
+        CoroutineScope(Dispatchers.IO).launch {
+            val ok = executeMissionAction(httpClient, action, missionId)
+            withContext(Dispatchers.Main) {
+                missionActionsInFlight.remove(missionId)
+                // L'état n'est mis à jour qu'après confirmation réelle du moteur CAMCS.
+                if (ok) {
+                    missions = missions.map { m ->
+                        when {
+                            m.id != missionId -> m
+                            action == "pause" -> m.copy(
+                                status = "PAUSED",
+                                lastTransitionReason = "Mission mise en pause"
+                            )
+                            else -> m.copy(
+                                status = "RUNNING",
+                                lastTransitionReason = "Reprise de la mission"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
     var showClearHistoryDialog by remember { mutableStateOf(false) }
 
     val handleDeleteMission: (String) -> Unit = { mId ->
@@ -418,6 +497,11 @@ fun CamcsControlCenterScreen(
                                 val dataJson = line.substring(6).trim()
                                 try {
                                     val ev = jsonParser.decodeFromString<CamcsEvent>(dataJson)
+                                    // Persistance idempotente : le même événement rejoué
+                                    // (reconnexion SSE) est ignoré par la clé primaire.
+                                    journalDao?.insertIgnore(
+                                        listOf(CamcsJournalEntity.fromEvent(ev))
+                                    )
                                     withContext(Dispatchers.Main) {
                                         if (liveEvents.none { it.id == ev.id }) {
                                             liveEvents.add(0, ev)
@@ -782,8 +866,8 @@ fun CamcsControlCenterScreen(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(scrollState)
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             when (activeTab) {
                 0 -> {
@@ -808,18 +892,9 @@ fun CamcsControlCenterScreen(
                             currentClockTick = currentClockTick,
                             isCancelling = cancellingMissions[activeMission.id] == true,
                             isDeleting = deletingMissions[activeMission.id] == true,
-                            onPause = {
-                                missions = missions.map { m ->
-                                    if (m.id == activeMission.id) m.copy(status = "PAUSED") else m
-                                }
-                                executeAction(httpClient, "http://127.0.0.1:19223/api/camcs/missions/pause", activeMission.id)
-                            },
-                            onResume = {
-                                missions = missions.map { m ->
-                                    if (m.id == activeMission.id) m.copy(status = "RUNNING") else m
-                                }
-                                executeAction(httpClient, "http://127.0.0.1:19223/api/camcs/missions/resume", activeMission.id)
-                            },
+                            pendingAction = missionActionsInFlight[activeMission.id],
+                            onPause = { requestMissionAction(activeMission.id, "pause") },
+                            onResume = { requestMissionAction(activeMission.id, "resume") },
                             onCancel = {
                                 handleCancelMission(activeMission.id)
                             },
@@ -889,6 +964,7 @@ fun CamcsControlCenterScreen(
                         proofs = proofs,
                         report = report,
                         gitDiffText = gitDiffText,
+                        gitStatus = gitStatus,
                         onInspectDeliverable = { selectedDeliverableForView = it }
                     )
                 }
@@ -1169,6 +1245,7 @@ private fun MissionMasterCard(
     currentClockTick: Long,
     isCancelling: Boolean,
     isDeleting: Boolean = false,
+    pendingAction: String? = null,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onCancel: () -> Unit,
@@ -1206,9 +1283,9 @@ private fun MissionMasterCard(
                 )
             )
             .border(1.dp, Palette.glassBorder, RoundedCornerShape(22.dp))
-            .padding(16.dp)
+            .padding(14.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             // Header Row: Title & Status Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1334,6 +1411,7 @@ private fun MissionMasterCard(
             val isPaused = mission.status in listOf("PAUSED", "WAITING_FOR_APPROVAL")
             val canCancel = isCancellableState(mission.status) && !isTerminalState(mission.status)
             val canPause = mission.status in listOf("WORKING", "RUNNING", "STREAMING", "IN_PROGRESS", "AUTHENTICATING", "CONNECTED", "EXECUTION", "STARTING")
+            val actionPending = pendingAction != null
 
             if (canCancel || isPaused) {
                 Row(
@@ -1346,7 +1424,9 @@ private fun MissionMasterCard(
                         icon = if (isPaused) "play.fill" else "pause.fill",
                         action = if (isPaused) onResume else onPause,
                         modifier = Modifier.weight(1f),
-                        enabled = (canPause || isPaused) && !isCancelling
+                        enabled = (canPause || isPaused) && !isCancelling && !actionPending,
+                        isLoading = pendingAction == (if (isPaused) "resume" else "pause"),
+                        loadingText = if (isPaused) "Reprise..." else "Mise en pause..."
                     )
 
                     CamcsMissionActionButton(
@@ -1354,7 +1434,7 @@ private fun MissionMasterCard(
                         icon = "stop.fill",
                         action = onCancel,
                         modifier = Modifier.weight(1f),
-                        enabled = (canCancel || isPaused) && !isCancelling,
+                        enabled = (canCancel || isPaused) && !isCancelling && !actionPending,
                         isLoading = isCancelling,
                         loadingText = "Arrêt en cours..."
                     )
@@ -1400,8 +1480,8 @@ private fun CamcsMissionActionButton(
             .border(0.5.dp, Palette.glassBorder, pillShape)
             .clip(pillShape)
             .clickable(source, null, enabled = enabled && !isLoading, role = Role.Button, onClick = action)
-            .padding(horizontal = 8.dp, vertical = 8.dp)
-            .defaultMinSize(minHeight = 44.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp)
+            .defaultMinSize(minHeight = 40.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -1410,7 +1490,7 @@ private fun CamcsMissionActionButton(
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(13.dp),
+                    modifier = Modifier.size(12.dp),
                     color = Palette.text,
                     strokeWidth = 1.5.dp
                 )
@@ -1425,8 +1505,8 @@ private fun CamcsMissionActionButton(
                 )
             } else {
                 if (icon != null) {
-                    Symbol(icon, size = 13.dp, tint = Palette.text)
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Symbol(icon, size = 12.dp, tint = Palette.text)
+                    Spacer(modifier = Modifier.width(5.dp))
                 }
                 Text(
                     text = text,
@@ -1511,9 +1591,9 @@ private fun DispatchingPipelineCard(mission: CamcsMission) {
             .clip(RoundedCornerShape(18.dp))
             .background(Palette.surface.copy(alpha = 0.5f))
             .border(0.5.dp, Palette.glassBorder, RoundedCornerShape(18.dp))
-            .padding(14.dp)
+            .padding(12.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1678,14 +1758,14 @@ private fun LiveAgentCard(
                 if (isAgentActive) electricGreen.copy(alpha = 0.5f) else Palette.glassBorder,
                 RoundedCornerShape(18.dp)
             )
-            .padding(14.dp)
+            .padding(12.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             // Header Row: Avatar, Name, Role & Status
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 CharacterAvatar(shape = agent.shape, color = agent.color, size = 38.dp)
 
@@ -2171,7 +2251,7 @@ private fun LiveEventsStreamView(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "JOURNAL LIVE (${filteredEvents.size} ÉVÉNEMENTS)",
+                text = "JOURNAL GLOBAL PERSISTANT (${filteredEvents.size} ÉVÉNEMENTS)",
                 style = Type.caption.semibold.copy(fontSize = 11.sp, letterSpacing = 0.5.sp),
                 color = Palette.secondary
             )
@@ -2627,9 +2707,9 @@ private fun ExternalActionsIntegrityCard(actions: List<CamcsExternalAction>) {
             .clip(RoundedCornerShape(18.dp))
             .background(Palette.surface.copy(alpha = 0.75f))
             .border(0.5.dp, electricGreen.copy(alpha = 0.4f), RoundedCornerShape(18.dp))
-            .padding(14.dp)
+            .padding(12.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -2683,9 +2763,9 @@ private fun ExternalActionsIntegrityCard(actions: List<CamcsExternalAction>) {
                         .clip(RoundedCornerShape(12.dp))
                         .background(Palette.surface.copy(alpha = 0.5f))
                         .border(0.5.dp, statusColor.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
-                        .padding(12.dp)
+                        .padding(10.dp)
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -2937,15 +3017,40 @@ private fun EmptyMissionPlaceholder() {
     }
 }
 
-private fun executeAction(client: OkHttpClient, url: String, missionId: String) {
-    CoroutineScope(Dispatchers.IO).launch {
-        try {
-            val req = Request.Builder()
-                .url(url)
-                .post("""{"missionId": "$missionId"}""".toRequestBody("application/json".toMediaType()))
-                .build()
-            client.newCall(req).execute().close()
-        } catch (_: Exception) {}
+/**
+ * Commande réelle du moteur CAMCS. Retourne true uniquement si l'hôte répond
+ * HTTP 2xx avec `{"ok": true}` ; une panne réseau ne doit jamais faire croire
+ * à une pause/reprise réussie.
+ */
+private suspend fun executeMissionAction(
+    client: OkHttpClient,
+    action: String,
+    missionId: String
+): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val req = Request.Builder()
+            .url("http://127.0.0.1:19223/api/camcs/missions/$action")
+            .post("""{"missionId": "$missionId"}""".toRequestBody("application/json".toMediaType()))
+            .build()
+        client.newCall(req).execute().use { resp ->
+            isMissionActionConfirmed(resp.code, resp.body?.string().orEmpty())
+        }
+    } catch (_: Exception) {
+        false
+    }
+}
+
+/**
+ * Une action n'est confirmée que si l'hôte répond 2xx ET `ok != false`.
+ * Un `{"ok": false}` (mission non pausable, déjà terminée…) ne doit pas
+ * faire basculer l'UI en pause/reprise.
+ */
+internal fun isMissionActionConfirmed(httpCode: Int, body: String): Boolean {
+    if (httpCode !in 200..299) return false
+    return try {
+        Json.parseToJsonElement(body).jsonObject["ok"]?.jsonPrimitive?.booleanOrNull ?: true
+    } catch (_: Exception) {
+        true
     }
 }
 
@@ -3181,6 +3286,163 @@ private fun InterAgentCommunicationsCard(communications: List<CamcsCommunication
 }
 
 /**
+ * Tâche 08 : carte de traçabilité Git réelle (branche, fichiers, commit, état distant).
+ * Les valeurs proviennent exclusivement de `git status/rev-parse/log` via le moteur.
+ */
+@Composable
+private fun GitTraceabilityCard(status: CamcsGitStatus?) {
+    val dark = LocalDark.current
+    val electricGreen = if (dark) Color(0xFF00E676) else Color(0xFF059669)
+    val timeFormat = remember { SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()) }
+
+    val changedFiles = status?.let { it.modified + it.added + it.deleted + it.renamed } ?: emptyList()
+    val stateColor = when {
+        status == null -> Palette.secondary
+        !status.ok -> Palette.danger
+        status.clean -> electricGreen
+        else -> Palette.warning
+    }
+    val stateLabel = when {
+        status == null -> "…"
+        !status.ok -> "INDISPONIBLE"
+        status.clean -> "PROPRE"
+        else -> "MODIFIÉ"
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Palette.surface.copy(alpha = 0.7f))
+            .border(0.5.dp, Palette.glassBorder, RoundedCornerShape(16.dp))
+            .padding(12.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Symbol("arrow.left.arrow.right", size = 16.dp, tint = Palette.electricBlue)
+                    Text(
+                        text = "TRAÇABILITÉ GIT RÉELLE",
+                        style = Type.caption.semibold.copy(fontSize = 11.sp, letterSpacing = 0.5.sp),
+                        color = Palette.secondary
+                    )
+                }
+
+                Text(
+                    text = stateLabel,
+                    style = Type.caption.semibold.copy(fontSize = 10.sp),
+                    color = stateColor
+                )
+            }
+
+            if (status == null) {
+                Text(
+                    text = "Lecture du dépôt Git en cours…",
+                    style = Type.caption,
+                    color = Palette.secondary
+                )
+            } else if (!status.ok) {
+                Text(
+                    text = status.error ?: "État Git indisponible",
+                    style = Type.caption,
+                    color = Palette.danger
+                )
+            } else {
+                Text(
+                    text = "Branche : ${status.branch}",
+                    style = Type.footnote.semibold,
+                    color = Palette.text
+                )
+
+                Text(
+                    text = if (status.remoteAccessible) {
+                        "Distant : ${status.upstream} · +${status.ahead} / -${status.behind}"
+                    } else {
+                        "Distant : non configuré"
+                    },
+                    style = Type.caption,
+                    color = Palette.secondary
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    GitMetricChip("Modifiés", status.modified.size, Palette.warning, Modifier.weight(1f))
+                    GitMetricChip("Ajoutés", status.added.size, electricGreen, Modifier.weight(1f))
+                    GitMetricChip("Supprimés", status.deleted.size, Palette.danger, Modifier.weight(1f))
+                }
+
+                if (changedFiles.isNotEmpty()) {
+                    Text(
+                        text = changedFiles.take(6).joinToString("\n") +
+                            if (changedFiles.size > 6) "\n… +${changedFiles.size - 6} autres" else "",
+                        style = Type.caption.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            lineHeight = 14.sp
+                        ),
+                        color = Palette.secondary,
+                        maxLines = 7,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                status.lastCommit?.let { commit ->
+                    Text(
+                        text = "Dernier commit : ${commit.shortHash} · ${commit.subject}",
+                        style = Type.caption,
+                        color = Palette.text,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "Commit daté du ${commit.date}",
+                        style = Type.caption.copy(fontSize = 10.sp),
+                        color = Palette.secondary
+                    )
+                }
+
+                Text(
+                    text = "Dernière synchro : " + if (status.lastSyncAt > 0) {
+                        timeFormat.format(Date((status.lastSyncAt * 1000).toLong()))
+                    } else {
+                        "aucune références distantes"
+                    },
+                    style = Type.caption.copy(fontSize = 10.sp),
+                    color = Palette.secondary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GitMetricChip(label: String, value: Int, color: Color, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.14f))
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "$label $value",
+            style = Type.caption.semibold.copy(fontSize = 9.5.sp),
+            color = color,
+            maxLines = 1
+        )
+    }
+}
+
+/**
  * TAB 4: Real Deliverables, Execution Proofs, Tests and Final Sealed Report.
  */
 @Composable
@@ -3190,6 +3452,7 @@ private fun MissionDeliverablesAndResultsView(
     proofs: List<CamcsProof>,
     report: CamcsReport?,
     gitDiffText: String,
+    gitStatus: CamcsGitStatus? = null,
     onInspectDeliverable: (CamcsDeliverable) -> Unit
 ) {
     val dark = LocalDark.current
@@ -3593,7 +3856,10 @@ private fun MissionDeliverablesAndResultsView(
             }
         }
 
-        // 4. Git Diff & Modifications Physiques
+        // 4. Traçabilité Git réelle (branche, fichiers, commit, état distant)
+        GitTraceabilityCard(gitStatus)
+
+        // 5. Git Diff & Modifications Physiques
         Text(
             text = "DIFFÉRENTIEL GIT & MODIFICATIONS",
             style = Type.caption.semibold.copy(fontSize = 11.sp, letterSpacing = 0.5.sp),

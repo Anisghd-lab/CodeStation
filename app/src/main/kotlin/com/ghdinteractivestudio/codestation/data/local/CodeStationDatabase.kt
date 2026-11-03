@@ -10,9 +10,10 @@ import androidx.room.RoomDatabase
         BotEntity::class,
         ChatMessageEntity::class,
         ApprovalEntity::class,
-        ConversationEntity::class
+        ConversationEntity::class,
+        CamcsJournalEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class CodeStationDatabase : RoomDatabase() {
@@ -20,6 +21,7 @@ abstract class CodeStationDatabase : RoomDatabase() {
     abstract fun messageDao(): MessageDao
     abstract fun approvalDao(): ApprovalDao
     abstract fun conversationDao(): ConversationDao
+    abstract fun camcsJournalDao(): CamcsJournalDao
 
     companion object {
         @Volatile
@@ -34,6 +36,30 @@ abstract class CodeStationDatabase : RoomDatabase() {
         val MIGRATION_1_3 = object : androidx.room.migration.Migration(1, 3) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 applyMigration2To3(db)
+            }
+        }
+
+        /** Tâche 05 : ajout du journal global CAMCS persistant (aucune donnée existante touchée). */
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `camcs_journal` (
+                        `id` TEXT NOT NULL,
+                        `missionId` TEXT,
+                        `agentId` TEXT,
+                        `agentName` TEXT,
+                        `eventType` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        `content` TEXT NOT NULL,
+                        `status` TEXT NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_camcs_journal_missionId` ON `camcs_journal` (`missionId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_camcs_journal_agentId` ON `camcs_journal` (`agentId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_camcs_journal_timestamp` ON `camcs_journal` (`timestamp`)")
             }
         }
 
@@ -185,7 +211,7 @@ abstract class CodeStationDatabase : RoomDatabase() {
                     CodeStationDatabase::class.java,
                     "codestation.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_1_3)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_1_3, MIGRATION_3_4)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

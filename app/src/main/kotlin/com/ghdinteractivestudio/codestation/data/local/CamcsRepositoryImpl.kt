@@ -4,6 +4,7 @@ import com.ghdinteractivestudio.codestation.domain.model.CamcsEvent
 import com.ghdinteractivestudio.codestation.domain.model.CamcsMission
 import com.ghdinteractivestudio.codestation.domain.model.CamcsMissionsResponse
 import com.ghdinteractivestudio.codestation.domain.repository.CamcsRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -268,7 +269,14 @@ class CamcsRepositoryImpl : CamcsRepository {
     }
 
     override suspend fun refreshMissions() {
-        refreshMissionsInternal()
+        try {
+            refreshMissionsInternal()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Hôte CAMCS indisponible : conserver le dernier état connu sans propager
+            // l'erreur réseau à l'appelant (le refresh ne doit jamais tuer l'app).
+        }
     }
 
     override suspend fun stopTask(missionId: String, taskId: String?, agentId: String?): Boolean = withContext(Dispatchers.IO) {

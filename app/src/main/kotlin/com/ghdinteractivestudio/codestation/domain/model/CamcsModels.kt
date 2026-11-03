@@ -194,6 +194,34 @@ data class CamcsEvent(
 )
 
 @Serializable
+data class CamcsGitLastCommit(
+    @SerialName("hash") val hash: String = "",
+    @SerialName("shortHash") val shortHash: String = "",
+    @SerialName("subject") val subject: String = "",
+    @SerialName("date") val date: String = ""
+)
+
+@Serializable
+data class CamcsGitStatus(
+    @SerialName("ok") val ok: Boolean = false,
+    @SerialName("path") val path: String = "",
+    @SerialName("branch") val branch: String = "",
+    @SerialName("upstream") val upstream: String = "",
+    @SerialName("ahead") val ahead: Int = 0,
+    @SerialName("behind") val behind: Int = 0,
+    @SerialName("modified") val modified: List<String> = emptyList(),
+    @SerialName("added") val added: List<String> = emptyList(),
+    @SerialName("deleted") val deleted: List<String> = emptyList(),
+    @SerialName("renamed") val renamed: List<String> = emptyList(),
+    @SerialName("lastCommit") val lastCommit: CamcsGitLastCommit? = null,
+    @SerialName("clean") val clean: Boolean = true,
+    @SerialName("remoteAccessible") val remoteAccessible: Boolean = false,
+    @SerialName("lastSyncAt") val lastSyncAt: Double = 0.0,
+    @SerialName("generatedAt") val generatedAt: Double = 0.0,
+    @SerialName("error") val error: String? = null
+)
+
+@Serializable
 data class CamcsProviderStatus(
     @SerialName("id") val id: String,
     @SerialName("name") val name: String,

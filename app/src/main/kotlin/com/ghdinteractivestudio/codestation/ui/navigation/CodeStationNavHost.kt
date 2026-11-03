@@ -78,7 +78,8 @@ fun CodeStationNavHost(
                 factory = RosterViewModel.provideFactory(
                     container.botRepository,
                     container.serverRepository,
-                    container.memoryRepository
+                    container.memoryRepository,
+                    container.camcsRepository
                 )
             )
             RosterScreen(
@@ -266,7 +267,12 @@ fun CodeStationNavHost(
                         launchSingleTop = true
                     }
                 },
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onOpenControlCenter = {
+                    navController.navigate(Screen.CamcsControlCenter.route) {
+                        launchSingleTop = true
+                    }
+                }
             )
         }
 

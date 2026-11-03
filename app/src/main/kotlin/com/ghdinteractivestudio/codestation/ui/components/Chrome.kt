@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -112,6 +113,29 @@ fun ScreenHeader(
 
 @Composable
 fun BackButton(action: () -> Unit) = IconButton("Back", "chevron.left", action = action)
+
+/**
+ * Point d'entrée unique vers l'historique / Centre de contrôle CAMCS.
+ * Partagé par le Master et par l'écran Nouvelle tâche afin de réutiliser
+ * exactement le même mécanisme visuel et la même destination.
+ */
+@Composable
+fun CamcsHistoryButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier
+            .size(40.dp)
+            .glass(Capsule())
+            .border(1.dp, Palette.emeraldAccent.copy(alpha = 0.55f), Capsule())
+            .semantics { contentDescription = "Centre de contrôle CAMCS" }
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Symbol("clock.arrow.circlepath", size = 20.dp, tint = Palette.emeraldAccent)
+    }
+}
 
 @Composable
 fun PageHeader(

@@ -23,6 +23,7 @@ from typing import Dict, List, Optional, Any, Tuple
 
 # Modular CAMCS Real Execution Engine Components
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from camcs_git_status import collect_git_status, DEFAULT_REPO
 from camcs.task_classifier import TaskClassifier, TaskClassification, TaskProfile
 from camcs.state_machines import (
     MissionState, AgentState, TaskState,
@@ -1939,6 +1940,12 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
                     )
                     actions.append(act.to_dict())
             self._send_json(200, {"ok": True, "actions": actions})
+        elif self.path == "/api/camcs/git/status" or self.path.startswith("/api/camcs/git/status?"):
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            repo = params.get("path", [DEFAULT_REPO])[0]
+            status = collect_git_status(repo)
+            self._send_json(200 if status.get("ok") else 404, status)
         elif self.path in ["/api/camcs/health", "/health", "/api/health"]:
             self._send_json(200, {
                 "ok": True,

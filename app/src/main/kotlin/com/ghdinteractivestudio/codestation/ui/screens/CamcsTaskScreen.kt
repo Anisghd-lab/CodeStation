@@ -28,7 +28,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -58,12 +57,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ghdinteractivestudio.codestation.domain.model.Bot
 import com.ghdinteractivestudio.codestation.domain.model.CamcsGovernanceMode
+import com.ghdinteractivestudio.codestation.ui.components.CamcsHistoryButton
 import com.ghdinteractivestudio.codestation.ui.components.CardForm
 import com.ghdinteractivestudio.codestation.ui.components.CardSection
 import com.ghdinteractivestudio.codestation.ui.components.CharacterAvatar
 import com.ghdinteractivestudio.codestation.ui.components.CodeStationSwitch
 import com.ghdinteractivestudio.codestation.ui.components.PageHeader
 import com.ghdinteractivestudio.codestation.ui.components.PrimaryButton
+import com.ghdinteractivestudio.codestation.ui.components.Spinner
 import com.ghdinteractivestudio.codestation.ui.components.Symbol
 import com.ghdinteractivestudio.codestation.ui.theme.LocalDark
 import com.ghdinteractivestudio.codestation.ui.theme.Palette
@@ -99,9 +100,9 @@ fun CamcsTaskScreen(
     availableBots: List<Bot>,
     onLaunchTask: (objective: String, missionId: String?, governanceMode: CamcsGovernanceMode) -> Unit,
     onNavigateBack: () -> Unit,
+    onOpenControlCenter: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val dark = LocalDark.current
     val scrollState = rememberScrollState()
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -145,7 +146,10 @@ fun CamcsTaskScreen(
     ) {
         PageHeader(
             title = "Nouvelle tâche CAMCS",
-            pop = onNavigateBack
+            pop = onNavigateBack,
+            trailing = {
+                CamcsHistoryButton(onClick = onOpenControlCenter)
+            }
         )
 
         CardForm(
@@ -327,13 +331,12 @@ fun CamcsTaskScreen(
             Spacer(Modifier.height(16.dp))
         }
 
-        // 5. Docked Bottom Action Bar (Adapts to IME & System Navigation Bar)
+        // 5. Docked Bottom Action Bar — mêmes conventions que le Master :
+        // surface de verre thémée, PrimaryButton partagé, indicateur Spinner partagé.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    if (dark) Color(0xF2121622) else Color(0xF5FFFFFF)
-                )
+                .background(Palette.glassSurface)
                 .border(0.5.dp, Palette.glassDivider, RectangleShape)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
@@ -382,21 +385,17 @@ fun CamcsTaskScreen(
                 enabled = objective.isNotBlank() && !isLaunching,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
+                    .height(54.dp)
             ) {
                 if (isLaunching) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = Palette.onAccent,
-                            strokeWidth = 2.dp
-                        )
+                        Spinner(size = 16.dp, color = Palette.onAccent)
                         Text(
                             text = "Initialisation CAMCS...",
-                            style = Type.body.semibold,
+                            style = Type.body.semibold.copy(fontSize = 16.sp, letterSpacing = (-0.2).sp),
                             color = Palette.onAccent
                         )
                     }
@@ -408,7 +407,7 @@ fun CamcsTaskScreen(
                         Symbol("play.fill", size = 16.dp, tint = Palette.onAccent)
                         Text(
                             text = "Lancer l'orchestration CAMCS",
-                            style = Type.body.semibold,
+                            style = Type.body.semibold.copy(fontSize = 16.sp, letterSpacing = (-0.2).sp),
                             color = Palette.onAccent
                         )
                     }

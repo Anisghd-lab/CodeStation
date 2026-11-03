@@ -27,6 +27,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.ui.graphics.Color
 import com.ghdinteractivestudio.codestation.domain.model.Bot
@@ -49,6 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ghdinteractivestudio.codestation.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.codestation.ui.components.BotCard
+import com.ghdinteractivestudio.codestation.ui.components.CamcsHistoryButton
 import com.ghdinteractivestudio.codestation.ui.components.CamcsNewTaskCard
 import com.ghdinteractivestudio.codestation.ui.components.CharacterAvatar
 import com.ghdinteractivestudio.codestation.ui.components.CollectiveMemoryCard
@@ -75,6 +79,7 @@ import com.ghdinteractivestudio.codestation.ui.theme.medium
 import com.ghdinteractivestudio.codestation.ui.theme.semibold
 import com.ghdinteractivestudio.codestation.viewmodel.RosterViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RosterScreen(
     viewModel: RosterViewModel,
@@ -197,17 +202,8 @@ fun RosterScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // CAMCS History button with electric green accent and clock.arrow.circlepath
-                        Box(
-                            Modifier
-                                .size(40.dp)
-                                .glass(Capsule())
-                                .border(1.dp, Palette.emeraldAccent.copy(alpha = 0.55f), Capsule())
-                                .clickable(role = Role.Button, onClick = onOpenControlCenter),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Symbol("clock.arrow.circlepath", size = 20.dp, tint = Palette.emeraldAccent)
-                        }
+                        // Point d'entrée partagé vers l'historique / Centre de contrôle CAMCS
+                        CamcsHistoryButton(onClick = onOpenControlCenter)
 
                         // New bot/group menu button (+)
                         Box {
@@ -294,6 +290,24 @@ fun RosterScreen(
                 addAll(state.otherBots)
             }
 
+            val pullToRefreshState = rememberPullToRefreshState()
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh = { viewModel.refresh() },
+                state = pullToRefreshState,
+                modifier = Modifier.fillMaxSize(),
+                indicator = {
+                    PullToRefreshDefaults.Indicator(
+                        state = pullToRefreshState,
+                        isRefreshing = state.isRefreshing,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = topInset + 52.dp),
+                        containerColor = Palette.surface,
+                        color = Palette.emeraldAccent
+                    )
+                }
+            ) {
             LazyColumn(
                 Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
@@ -377,6 +391,7 @@ fun RosterScreen(
                         )
                     }
                 }
+            }
             }
         }
 
