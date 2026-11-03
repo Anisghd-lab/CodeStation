@@ -195,14 +195,14 @@ fun BoxScope.DynamicIslandBar(
     val insets = WindowInsets.statusBars
     val topInsetDp = with(density) { insets.getTop(density).toDp() }
     val pillHeight = 26.dp
-    val oneMmDp = with(density) {
+    val offsetMmDp = with(density) {
         android.util.TypedValue.applyDimension(
             android.util.TypedValue.COMPLEX_UNIT_MM,
-            1.0f,
+            0.4f,
             context.resources.displayMetrics
         ).toDp()
     }
-    val pillTop = (((topInsetDp - pillHeight) / 2) + oneMmDp).coerceAtLeast(0.dp)
+    val pillTop = (((topInsetDp - pillHeight) / 2) + offsetMmDp).coerceAtLeast(0.dp)
 
     AnimatedVisibility(
         visible = isVisible,

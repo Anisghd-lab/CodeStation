@@ -258,15 +258,15 @@ class DynamicIslandOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
         val pillHeightDp = (statusBarHeightDp * 0.36f).coerceIn(14f, 16f)
         val pillHeightPx = (pillHeightDp * density).toInt()
 
-        // Décalage vertical d'exactement 1 millimètre physique pour alignement parfait avec les icônes de notification
-        val oneMmPx = android.util.TypedValue.applyDimension(
+        // Décalage vertical de 0.4 mm pour alignement fin avec les icônes de notification
+        val offsetMmPx = android.util.TypedValue.applyDimension(
             android.util.TypedValue.COMPLEX_UNIT_MM,
-            1.0f,
+            0.4f,
             resources.displayMetrics
-        ).toInt().coerceAtLeast(3)
+        ).toInt()
 
-        // Centrage vertical avec la découpe caméra physique + abaissement d'1 mm
-        val pillTopYPx = (cameraCenterYPx - pillHeightPx / 2 + oneMmPx).coerceAtLeast(0)
+        // Centrage vertical avec la découpe caméra physique + ajustement de 0.4 mm
+        val pillTopYPx = (cameraCenterYPx - pillHeightPx / 2 + offsetMmPx).coerceAtLeast(0)
 
         // Positionnement immédiatement à gauche de la découpe caméra avec petit espace régulier (5dp)
         val spacingPx = (5 * density).toInt()
