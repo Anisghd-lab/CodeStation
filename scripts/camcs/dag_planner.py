@@ -101,20 +101,84 @@ class DagPlanner:
         if is_github_repo:
             # Objective requires a real remote GitHub repository creation & publication
             import re
-            target_repo_name = "CAMCS"
-            patterns = [
-                r'(?:nomm[ée]|nome|named)\s+(?:le\s+)?([A-Za-z0-9_\-\.]+)',
-                r'(?:repo|dépôt|depot|repository)\s+(?:github\s+)?(?:nomm[ée]\s+)?([A-Za-z0-9_\-\.]+)',
-                r'(?:sur|to)\s+github\s+(?:nomm[ée]\s+)?([A-Za-z0-9_\-\.]+)',
-                r'(?:cr[ée]e|create|initialise|build)\s+(?:un\s+)?(?:repo|dépôt|depot)?\s*([A-Za-z0-9_\-\.]+)'
-            ]
-            for p in patterns:
-                m = re.search(p, objective, re.IGNORECASE)
-                if m:
-                    cand = m.group(1).strip()
-                    if cand.lower() not in ["un", "le", "la", "github", "distant", "remote", "public", "privé", "private", "et", "and", "avec", "with"]:
-                        target_repo_name = cand
+            target_repo_name = None  # No default — must be explicitly extracted or fail
+
+            # French/English stop words and connective words that must NEVER be accepted as a standalone repo name
+            _CONNECTIVE_WORDS = {
+                "un", "une", "le", "la", "les", "de", "du", "des", "d", "l",
+                "en", "sur", "et", "ou", "à", "au", "aux", "ce", "cette", "ces",
+                "mon", "ton", "son", "notre", "votre", "leur", "pour", "par",
+                "dans", "avec", "sans", "sous", "vers", "chez",
+                "qui", "que", "quoi", "dont", "où", "tout", "tous", "toute", "toutes",
+                "très", "bien", "aussi", "puis", "ensuite", "alors", "après",
+                "nouveau", "nouvelle", "nouveaux", "nouvelles", "vrai", "véritable",
+                "github", "distant", "remote", "public", "privé", "private",
+                "a", "an", "the", "and", "or", "to", "on", "in", "for", "from",
+                "with", "at", "by", "this", "that", "these", "those",
+                "repo", "dépôt", "depot", "repository", "named", "nom", "nommé",
+                "nommée", "nome", "nommee", "nommer",
+                "créer", "creer", "create", "initialise", "initialiser", "publier", "publish",
+                "exécuter", "executer", "execute", "run", "vérifier", "verifier", "verify",
+                "complète", "complete", "complètes", "completes",
+                "application", "app", "projet", "project",
+                "explicite", "explicites", "précis", "precis", "quelconque"
+            }
+
+            def _is_connective(tok: str) -> bool:
+                cleaned = tok.strip(".,;:!?\"'()[]{}").lower()
+                return cleaned in _CONNECTIVE_WORDS or len(cleaned) <= 1
+
+            # Strategy 1: Explicit naming patterns
+            # e.g. "nommé GHD-CAMCS-TEST", "nommé le GHD-CAMCS-TEST"
+            m_exp = re.search(r'(?:nomm[ée]|nome|named)\s+(?:le\s+|la\s+|un\s+)?([A-Za-z0-9_\-\.]+)', objective, re.IGNORECASE)
+            if m_exp:
+                cand = m_exp.group(1).strip()
+                if not _is_connective(cand):
+                    target_repo_name = cand
+
+            # Strategy 2: "dépôt/repo (github) de/du/nommé <NAME>"
+            if not target_repo_name:
+                m_ctx = re.search(r'(?:repo|dépôt|depot|repository)\s+(?:github\s+)?(?:nomm[ée]\s+|de\s+|du\s+)?(.+?)(?:\s*[,;]|\s+puis\s+|\s+ensuite\s+|\s+et\s+ex[ée]cut|\s+sur\s+github|\s*$)', objective, re.IGNORECASE)
+                if m_ctx:
+                    raw_tail = m_ctx.group(1).strip()
+                    tokens = raw_tail.split()
+                    # Skip leading connectives
+                    valid_tokens = []
+                    started = False
+                    for tok in tokens:
+                        if not _is_connective(tok):
+                            started = True
+                            valid_tokens.append(tok.strip(".,;:!?\"'()[]{}"))
+                        elif started:
+                            # If we hit another connective after starting, stop
+                            break
+                    if valid_tokens:
+                        target_repo_name = "-".join(valid_tokens)
+
+            # Strategy 3: Quoted names "GHD-CAMCS-TEST" or 'GHD-CAMCS-TEST'
+            if not target_repo_name:
+                quoted = re.findall(r'["\']([A-Za-z0-9_\-\.]{2,})["\']', objective)
+                for q in quoted:
+                    if not _is_connective(q):
+                        target_repo_name = q
                         break
+
+            # Strategy 4: ALL-CAPS or hyphenated uppercase identifiers (e.g. GHD-CAMCS-TEST, CAMCS)
+            if not target_repo_name:
+                caps = re.findall(r'\b([A-Z0-9]+(?:[-_][A-Z0-9]+)+|[A-Z]{3,})\b', objective)
+                for c in caps:
+                    if not _is_connective(c) and c not in ("DAG", "CLI", "API", "SHA", "URL", "HTTPS", "GIT", "SSH", "HOST", "TEST"):
+                        target_repo_name = c
+                        break
+
+            # Fallback safe default if completely ambiguous
+            if not target_repo_name or _is_connective(target_repo_name):
+                target_repo_name = f"CAMCS-Mission-{mission_id[:8]}"
+                import logging
+                logging.warning(
+                    f"DAG Planner: Nom de dépôt ambigu ou non extrait. "
+                    f"Génération automatique : {target_repo_name}. Objectif : {objective[:200]}"
+                )
 
             # 1. Architecture specification & Tree Design
             t1_id = f"task-{m_short}-spec"
@@ -269,7 +333,7 @@ class DagPlanner:
                 is_mandatory=True,
                 acceptance_criteria="Rapport final complet report.md généré avec URL distante et empreintes scellées.",
                 expected_deliverable="report.md",
-                assigned_file=f"{workspace_dir}/report.md",
+                assigned_file=f"{workspace_dir}/docs/preliminary_report.md",
                 deliverable_type="LOCAL_FILE",
                 created_at=now
             )
@@ -389,7 +453,7 @@ class DagPlanner:
             is_mandatory=True,
             acceptance_criteria="Rapport final complet report.md généré et indexation mémoire validée.",
             expected_deliverable="report.md",
-            assigned_file=f"{workspace_dir}/report.md",
+            assigned_file=f"{workspace_dir}/docs/preliminary_report.md",
             created_at=now
         )
         tasks.append(t_rep)

@@ -2,6 +2,8 @@
 """
 CAMCS Real Execution Engine — Deliverable & Artifact Manager
 Tracks, verifies, hashes, and persists all generated files and execution proofs.
+Implements the strict deliverable lifecycle:
+  CREATED → WRITING → FINALIZED → HASHED → REGISTERED → VERIFIED
 """
 
 import os
@@ -12,6 +14,18 @@ import hashlib
 from typing import Dict, List, Optional, Any
 
 DB_PATH = os.path.expanduser("/root/.codestation/camcs.db")
+
+# Deliverable lifecycle states
+class DeliverableState:
+    CREATED = "CREATED"
+    WRITING = "WRITING"
+    FINALIZED = "FINALIZED"
+    HASHED = "HASHED"
+    REGISTERED = "REGISTERED"
+    VERIFIED = "VERIFIED"
+    SHA_MISMATCH = "SHA_MISMATCH"
+    PENDING = "PENDING"
+
 
 def compute_sha256(path: str) -> str:
     if not os.path.isfile(path):
@@ -25,9 +39,28 @@ def compute_sha256(path: str) -> str:
     except Exception:
         return ""
 
+
 class DeliverableManager:
     def __init__(self, db_path: str = DB_PATH):
         self.db_path = db_path
+        self._ensure_lifecycle_column()
+
+    def _ensure_lifecycle_column(self):
+        """Add lifecycle_state column if it doesn't exist."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cur = conn.cursor()
+            existing_cols = [c[1] for c in cur.execute("PRAGMA table_info(deliverables)").fetchall()]
+            if "lifecycle_state" not in existing_cols:
+                cur.execute("ALTER TABLE deliverables ADD COLUMN lifecycle_state TEXT DEFAULT 'REGISTERED'")
+            if "version" not in existing_cols:
+                cur.execute("ALTER TABLE deliverables ADD COLUMN version INTEGER DEFAULT 1")
+            if "previous_sha256" not in existing_cols:
+                cur.execute("ALTER TABLE deliverables ADD COLUMN previous_sha256 TEXT")
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
 
     def register_deliverable(
         self,
@@ -42,22 +75,60 @@ class DeliverableManager:
         validation_status: str = "PENDING",
         validation_details: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Registers a physical file deliverable in the database."""
-        deliv_id = f"deliv-{uuid.uuid4().hex[:8]}"
+        """
+        Registers a physical file deliverable in the database.
+        Implements transactional lifecycle: only hashes a FINALIZED file.
+        If a deliverable for the same mission+task+file already exists, creates a new version.
+        """
         file_name = os.path.basename(file_path)
-        sha256 = compute_sha256(file_path)
-        size_bytes = os.path.getsize(file_path) if os.path.isfile(file_path) else 0
         now = time.time()
 
         conn = sqlite3.connect(self.db_path)
         cur = conn.cursor()
+
+        # Check for existing deliverable for same file in same task
+        cur.execute("""
+            SELECT id, sha256, version FROM deliverables
+            WHERE mission_id = ? AND task_id = ? AND file_path = ?
+            ORDER BY version DESC LIMIT 1
+        """, (mission_id, task_id, file_path))
+        existing = cur.fetchone()
+
+        previous_sha = None
+        version = 1
+        if existing:
+            previous_sha = existing[1]
+            version = (existing[2] or 1) + 1
+
+        # Only compute SHA if the file exists and is non-empty (FINALIZED state)
+        sha256 = ""
+        lifecycle_state = DeliverableState.CREATED
+        size_bytes = 0
+
+        if os.path.isfile(file_path):
+            size_bytes = os.path.getsize(file_path)
+            if size_bytes > 0:
+                lifecycle_state = DeliverableState.FINALIZED
+                sha256 = compute_sha256(file_path)
+                if sha256:
+                    lifecycle_state = DeliverableState.HASHED
+
+                    # If there's a previous SHA and it differs, note the divergence
+                    if previous_sha and previous_sha != sha256:
+                        validation_details = (validation_details or "") + f" [SHA-256 changed: prev={previous_sha[:16]}... new={sha256[:16]}...]"
+
+                    lifecycle_state = DeliverableState.REGISTERED
+
+        deliv_id = f"deliv-{uuid.uuid4().hex[:8]}"
+
         cur.execute("""
             INSERT OR REPLACE INTO deliverables
-            (id, mission_id, task_id, agent_id, agent_name, file_path, file_name, doc_type, description, sha256, size_bytes, validation_status, validation_details, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, mission_id, task_id, agent_id, agent_name, file_path, file_name, doc_type, description, sha256, size_bytes, validation_status, validation_details, created_at, updated_at, lifecycle_state, version, previous_sha256)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             deliv_id, mission_id, task_id, agent_id, agent_name, file_path, file_name,
-            doc_type, description, sha256, size_bytes, validation_status, validation_details, now, now
+            doc_type, description, sha256, size_bytes, validation_status, validation_details, now, now,
+            lifecycle_state, version, previous_sha
         ))
         conn.commit()
         conn.close()
@@ -77,9 +148,63 @@ class DeliverableManager:
             "sizeBytes": size_bytes,
             "validationStatus": validation_status,
             "validationDetails": validation_details,
+            "lifecycleState": lifecycle_state,
+            "version": version,
+            "previousSha256": previous_sha,
             "createdAt": now,
             "updatedAt": now
         }
+
+    def verify_and_finalize_deliverable(self, deliv_id: str) -> Dict[str, Any]:
+        """
+        Re-hashes the file and transitions to VERIFIED if SHA matches,
+        or SHA_MISMATCH if it has changed since registration.
+        """
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM deliverables WHERE id = ?", (deliv_id,))
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            return {"error": f"Deliverable {deliv_id} not found"}
+
+        fpath = row["file_path"]
+        registered_sha = row["sha256"]
+
+        if not os.path.isfile(fpath):
+            cur.execute("""
+                UPDATE deliverables SET validation_status = 'REJECTED', lifecycle_state = 'SHA_MISMATCH',
+                validation_details = 'File not found on disk during verification', updated_at = ?
+                WHERE id = ?
+            """, (time.time(), deliv_id))
+            conn.commit()
+            conn.close()
+            return {"status": "REJECTED", "reason": "File not found"}
+
+        current_sha = compute_sha256(fpath)
+
+        if registered_sha and current_sha != registered_sha:
+            cur.execute("""
+                UPDATE deliverables SET validation_status = 'SHA_MISMATCH', lifecycle_state = 'SHA_MISMATCH',
+                validation_details = ?, previous_sha256 = ?, sha256 = ?, updated_at = ?
+                WHERE id = ?
+            """, (
+                f"SHA divergence detected: registered={registered_sha[:16]}... current={current_sha[:16]}...",
+                registered_sha, current_sha, time.time(), deliv_id
+            ))
+            conn.commit()
+            conn.close()
+            return {"status": "SHA_MISMATCH", "registered": registered_sha, "current": current_sha}
+
+        cur.execute("""
+            UPDATE deliverables SET validation_status = 'VERIFIED', lifecycle_state = 'VERIFIED',
+            validation_details = 'SHA-256 integrity confirmed', updated_at = ?
+            WHERE id = ?
+        """, (time.time(), deliv_id))
+        conn.commit()
+        conn.close()
+        return {"status": "VERIFIED", "sha256": current_sha}
 
     def register_proof(
         self,

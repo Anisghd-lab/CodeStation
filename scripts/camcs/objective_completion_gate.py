@@ -108,11 +108,18 @@ class ObjectiveCompletionGate:
             diagnostics["checks"]["deliverables_exist"] = {"passed": False, "count": 0}
             diagnostics["blocking_reasons"].append(msg)
         else:
+            # Deduplicate by file_path taking the latest registered version
+            latest_deliv_map = {}
+            for d in deliverables:
+                fpath = d.get("file_path") or d.get("filePath")
+                created = d.get("created_at") or 0
+                if fpath not in latest_deliv_map or created > (latest_deliv_map[fpath].get("created_at") or 0):
+                    latest_deliv_map[fpath] = d
+
             # Verify each physical deliverable
             verified_count = 0
             invalid_files = []
-            for d in deliverables:
-                fpath = d.get("file_path") or d.get("filePath")
+            for fpath, d in latest_deliv_map.items():
                 doc_type = d.get("doc_type") or d.get("docType")
                 expected_sha = d.get("sha256")
 
