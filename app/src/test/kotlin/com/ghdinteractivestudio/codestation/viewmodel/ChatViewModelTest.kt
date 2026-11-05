@@ -234,10 +234,7 @@ class ChatViewModelTest {
         coVerify {
             chatRepository.createConversation(
                 botId = "bot-1",
-                title = "Refactoriser l'authentification OAuth2",
-                cliId = null,
-                runnerId = null,
-                id = any()
+                title = "Refactoriser l'authentification OAuth2"
             )
         }
     }

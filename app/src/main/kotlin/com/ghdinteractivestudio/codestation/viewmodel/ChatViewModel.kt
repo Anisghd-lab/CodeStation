@@ -487,13 +487,11 @@ class ChatViewModel(
 
                 if (currentConvId.isNullOrBlank() || existingConv == null) {
                     val smartTitle = generateConversationTitle(text, currentAttachments.map { it.name })
-                    val newConv = chatRepository.createConversation(
-                        botId = botId,
-                        title = smartTitle,
-                        cliId = null,
-                        runnerId = null,
-                        id = currentConvId?.ifBlank { null }
-                    ).getOrNull()
+                    val newConv = if (currentConvId.isNullOrBlank()) {
+                        chatRepository.createConversation(botId, smartTitle).getOrNull()
+                    } else {
+                        chatRepository.createConversation(botId, smartTitle, null, null, currentConvId).getOrNull()
+                    }
                     currentConvId = newConv?.id ?: currentConvId
                     _activeConversationId.value = currentConvId
                 } else {
