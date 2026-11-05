@@ -82,7 +82,10 @@ fun ChatMessageItem(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                    modifier = Modifier
+                        .wrapContentWidth(align = Alignment.Start)
+                        .widthIn(max = maxBubbleWidth)
+                        .padding(start = 4.dp, bottom = 4.dp)
                 ) {
                     CharacterAvatar(
                         shape = message.author.avatarGlyph?.takeIf { it.isNotEmpty() } ?: "diamond",
@@ -92,8 +95,19 @@ fun ChatMessageItem(
                     Text(
                         message.author.displayName,
                         style = Type.caption2.semibold,
-                        color = Palette.secondary
+                        color = Palette.secondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
+                    if (message.timestamp > 0) {
+                        Text(
+                            text = formatMessageTime(message.timestamp),
+                            style = Type.caption2,
+                            color = Palette.tertiary,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
 
@@ -194,6 +208,16 @@ fun ChatMessageItem(
                         }
                     }
                 }
+            }
+
+            if (isUser && message.timestamp > 0) {
+                Text(
+                    text = formatMessageTime(message.timestamp),
+                    style = Type.caption2,
+                    color = Palette.tertiary,
+                    maxLines = 1,
+                    modifier = Modifier.padding(end = 6.dp, top = 2.dp)
+                )
             }
         }
     }
@@ -459,4 +483,9 @@ private fun formatFileSize(sizeBytes: Long): String {
         sizeBytes > 0 -> "$sizeBytes o"
         else -> ""
     }
+}
+
+private fun formatMessageTime(timestamp: Long): String {
+    if (timestamp <= 0L) return ""
+    return java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(timestamp))
 }

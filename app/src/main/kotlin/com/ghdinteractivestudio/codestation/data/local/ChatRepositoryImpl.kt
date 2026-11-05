@@ -61,8 +61,18 @@ class ChatRepositoryImpl(
         cliId: String?,
         runnerId: String?
     ): Result<com.ghdinteractivestudio.codestation.domain.model.Conversation> {
+        return createConversation(botId, title, cliId, runnerId, id = null)
+    }
+
+    override suspend fun createConversation(
+        botId: String,
+        title: String,
+        cliId: String?,
+        runnerId: String?,
+        id: String?
+    ): Result<com.ghdinteractivestudio.codestation.domain.model.Conversation> {
         return runCatching {
-            val convId = UUID.randomUUID().toString()
+            val convId = id?.ifBlank { null } ?: UUID.randomUUID().toString()
             val now = System.currentTimeMillis()
             val conv = com.ghdinteractivestudio.codestation.domain.model.Conversation(
                 id = convId,

@@ -13,6 +13,8 @@ interface ChatRepository {
     fun getConversationsStream(botId: String): Flow<List<Conversation>>
     suspend fun getConversationById(id: String): Conversation?
     suspend fun createConversation(botId: String, title: String = "Nouvelle discussion", cliId: String? = null, runnerId: String? = null): Result<Conversation>
+    suspend fun createConversation(botId: String, title: String, cliId: String?, runnerId: String?, id: String?): Result<Conversation> =
+        createConversation(botId, title, cliId, runnerId)
     suspend fun deleteConversation(conversationId: String): Result<Unit>
     suspend fun renameConversation(conversationId: String, title: String): Result<Unit>
     fun getPendingApprovalsStream(botId: String? = null): Flow<List<ApprovalRequest>>

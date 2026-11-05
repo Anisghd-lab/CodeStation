@@ -31,6 +31,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class ChatUiState(
     val bot: Bot? = null,
@@ -207,7 +210,13 @@ class ChatViewModel(
         val activeConvId = args[4] as String?
         @Suppress("UNCHECKED_CAST")
         val convList = args[5] as List<Conversation>
-        val activeTitle = convList.find { it.id == activeConvId }?.title ?: "Discussion"
+        val activeConv = convList.find { it.id == activeConvId }
+        val activeTitle = when {
+            activeConv != null -> activeConv.title.ifBlank { "Discussion sans titre" }
+            !activeConvId.isNullOrBlank() -> "Nouvelle discussion"
+            convList.isNotEmpty() -> convList.first().title.ifBlank { "Discussion sans titre" }
+            else -> "Discussion"
+        }
 
         ChatUiState(
             bot = bot,
@@ -255,6 +264,17 @@ class ChatViewModel(
 
         viewModelScope.launch {
             chatRepository.markChatRead(botId)
+        }
+
+        // Si aucune conversation spécifique n'a été demandée, initialiser avec la plus récente
+        if (initialConversationId == null) {
+            viewModelScope.launch {
+                chatRepository.getConversationsStream(botId).collect { list ->
+                    if (_activeConversationId.value == null && list.isNotEmpty()) {
+                        _activeConversationId.value = list.first().id
+                    }
+                }
+            }
         }
 
         // Observer l'état du bot : s'il passe à IDLE, libérer l'état de génération (hors transition de démarrage)
@@ -461,10 +481,28 @@ class ChatViewModel(
                 }
 
                 var currentConvId = _activeConversationId.value
-                if (currentConvId.isNullOrBlank()) {
-                    val newConv = chatRepository.createConversation(botId, "Discussion").getOrNull()
-                    currentConvId = newConv?.id
+                val existingConv = if (!currentConvId.isNullOrBlank()) {
+                    chatRepository.getConversationById(currentConvId)
+                } else null
+
+                if (currentConvId.isNullOrBlank() || existingConv == null) {
+                    val smartTitle = generateConversationTitle(text, currentAttachments.map { it.name })
+                    val newConv = chatRepository.createConversation(
+                        botId = botId,
+                        title = smartTitle,
+                        cliId = null,
+                        runnerId = null,
+                        id = currentConvId?.ifBlank { null }
+                    ).getOrNull()
+                    currentConvId = newConv?.id ?: currentConvId
                     _activeConversationId.value = currentConvId
+                } else {
+                    // Si la discussion existe mais porte un titre générique ou compte 0 message,
+                    // déduire et persister un titre significatif depuis ce premier prompt utilisateur
+                    if (isGenericConversationTitle(existingConv.title) || existingConv.messageCount == 0) {
+                        val smartTitle = generateConversationTitle(text, currentAttachments.map { it.name })
+                        chatRepository.renameConversation(existingConv.id, smartTitle)
+                    }
                 }
 
                 val result = chatRepository.sendMessage(botId, text, reply, domainAttachments, currentConvId)
@@ -637,6 +675,54 @@ class ChatViewModel(
     }
 
     companion object {
+        fun isGenericConversationTitle(title: String?): Boolean {
+            if (title.isNullOrBlank()) return true
+            val normalized = title.trim().lowercase()
+            return normalized in setOf(
+                "discussion",
+                "discussions",
+                "nouvelle discussion",
+                "discussion principale",
+                "discussion sans titre",
+                "nouvelle session",
+                "new chat",
+                "new conversation",
+                "untitled",
+                "sans titre"
+            )
+        }
+
+        fun generateConversationTitle(messageText: String, attachmentNames: List<String> = emptyList()): String {
+            val clean = messageText
+                .trim()
+                .replace(Regex("^/[a-zA-Z0-9_-]+\\s*"), "") // strip slash command e.g. /task, /fix
+                .replace(Regex("^@[a-zA-Z0-9_.-]+\\s*"), "") // strip bot mentions e.g. @codebuddy
+                .replace(Regex("[#*`_~>\\[\\]]"), "")       // strip markdown symbols
+                .replace(Regex("\\s+"), " ")                // normalize whitespace
+                .trim()
+
+            if (clean.isNotBlank()) {
+                val maxLen = 42
+                return if (clean.length <= maxLen) {
+                    clean.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                } else {
+                    val truncated = clean.take(maxLen)
+                    val lastSpace = truncated.lastIndexOf(' ')
+                    val candidate = if (lastSpace > 18) truncated.substring(0, lastSpace) else truncated
+                    candidate.trim().replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } + "…"
+                }
+            }
+
+            val firstAtt = attachmentNames.firstOrNull()?.trim()
+            if (!firstAtt.isNullOrBlank()) {
+                val cleanName = firstAtt.take(28)
+                return "Fichier : $cleanName"
+            }
+
+            val timeStr = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date())
+            return "Discussion $timeStr"
+        }
+
         fun provideFactory(
             botId: String,
             botRepository: BotRepository,

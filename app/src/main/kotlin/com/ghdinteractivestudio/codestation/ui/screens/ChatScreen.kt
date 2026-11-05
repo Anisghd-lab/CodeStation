@@ -419,12 +419,19 @@ fun ChatScreen(
 
                 // Centered Bot Identity & Active Conversation Selector
                 Box(
-                    Modifier.weight(1f),
+                    Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Row(
-                            modifier = Modifier.clickable { bot?.id?.let { onEditBot(it) } },
+                            modifier = Modifier
+                                .clickable { bot?.id?.let { onEditBot(it) } }
+                                .padding(horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(7.dp)
                         ) {
@@ -435,7 +442,8 @@ fun ChatScreen(
                                     style = Type.system(14f).semibold,
                                     color = Palette.text,
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
                                 )
                             }
                         }
@@ -452,7 +460,8 @@ fun ChatScreen(
                                 style = Type.system(10f).medium,
                                 color = Palette.accent,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
                             )
                             Symbol("chevron.down", size = 9.dp, tint = Palette.accent)
                         }
@@ -912,7 +921,7 @@ fun ChatScreen(
                             LazyColumn(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height((state.conversations.size * 60).coerceIn(60, 280).dp),
+                                    .height((state.conversations.size * 68).coerceIn(68, 340).dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 items(state.conversations, key = { it.id }) { conv ->
@@ -938,21 +947,68 @@ fun ChatScreen(
                                             size = 18.dp,
                                             tint = if (isActive) Palette.accent else Palette.secondary
                                         )
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                conv.title.ifBlank { "Discussion sans titre" },
-                                                style = Type.subheadline.semibold,
-                                                color = if (isActive) Palette.accent else Palette.text,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            if (!conv.cliSessionId.isNullOrBlank()) {
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
                                                 Text(
-                                                    "Session: ${conv.cliSessionId?.take(12)}...",
-                                                    style = Type.caption2,
-                                                    color = Palette.tertiary,
-                                                    maxLines = 1
+                                                    text = conv.title.ifBlank { "Discussion sans titre" },
+                                                    style = Type.subheadline.semibold,
+                                                    color = if (isActive) Palette.accent else Palette.text,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f, fill = false)
                                                 )
+                                                if (conv.updatedAt > 0) {
+                                                    Text(
+                                                        text = formatConversationDate(conv.updatedAt),
+                                                        style = Type.caption2,
+                                                        color = if (isActive) Palette.accent.copy(alpha = 0.8f) else Palette.tertiary,
+                                                        maxLines = 1
+                                                    )
+                                                }
+                                            }
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                val detailText = when {
+                                                    conv.lastMessageText.isNotBlank() -> conv.lastMessageText
+                                                    !conv.cliSessionId.isNullOrBlank() -> "Session: ${conv.cliSessionId?.take(12)}..."
+                                                    else -> "Nouvelle session"
+                                                }
+                                                Text(
+                                                    text = detailText,
+                                                    style = Type.caption2,
+                                                    color = Palette.secondary,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f, fill = false)
+                                                )
+                                                if (conv.messageCount > 0) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .clip(Capsule())
+                                                            .background(
+                                                                if (isActive) Palette.accent.copy(alpha = 0.2f)
+                                                                else Palette.text.copy(alpha = 0.08f)
+                                                            )
+                                                            .padding(horizontal = 6.dp, vertical = 1.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "${conv.messageCount}",
+                                                            style = Type.system(9f).semibold,
+                                                            color = if (isActive) Palette.accent else Palette.secondary,
+                                                            maxLines = 1
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
                                         // Bouton Renommer
@@ -1085,4 +1141,17 @@ private fun getChatUriDetails(context: Context, uri: Uri): Triple<String, String
         }
     }
     return Triple(name, mimeType, size)
+}
+
+private fun formatConversationDate(timestamp: Long): String {
+    if (timestamp <= 0L) return ""
+    val now = System.currentTimeMillis()
+    val diff = now - timestamp
+    return when {
+        diff < 60_000L -> "À l'instant"
+        diff < 3_600_000L -> "${diff / 60_000L} min"
+        diff < 86_400_000L -> java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(timestamp))
+        diff < 172_800_000L -> "Hier"
+        else -> java.text.SimpleDateFormat("dd/MM", java.util.Locale.getDefault()).format(java.util.Date(timestamp))
+    }
 }

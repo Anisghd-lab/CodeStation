@@ -57,6 +57,10 @@ class ChatViewModelTest {
         every { chatRepository.getConversationsStream(any()) } returns flowOf(emptyList())
         every { chatRepository.getMessagesByConversationStream(any(), any()) } returns flowOf(testMessages)
         coEvery { chatRepository.createConversation(any(), any()) } returns Result.success(Conversation(id = "conv-1", botId = "bot-1", title = "Discussion"))
+        coEvery { chatRepository.createConversation(any(), any(), any(), any()) } returns Result.success(Conversation(id = "conv-1", botId = "bot-1", title = "Discussion"))
+        coEvery { chatRepository.createConversation(any(), any(), any(), any(), any()) } returns Result.success(Conversation(id = "conv-1", botId = "bot-1", title = "Discussion"))
+        coEvery { chatRepository.getConversationById(any()) } returns null
+        coEvery { chatRepository.renameConversation(any(), any()) } returns Result.success(Unit)
         coEvery { chatRepository.sendMessage(any(), any(), any(), any(), any()) } returns Result.success(testMessages.first())
         coEvery { chatRepository.respondApproval(any(), any(), any()) } returns Result.success(Unit)
     }
@@ -186,5 +190,85 @@ class ChatViewModelTest {
         coVerify { chatRepository.sendMessage("bot-1", "Bonjour", any(), any(), any()) }
         // Verify deleteMessage was NOT called (preserving history)
         coVerify(exactly = 0) { chatRepository.deleteMessage("bot-msg-1") }
+    }
+
+    @Test
+    fun `test generateConversationTitle cleans commands, markdown and limits length`() {
+        val title1 = ChatViewModel.generateConversationTitle("/task Peux-tu analyser ce code ?")
+        assertEquals("Peux-tu analyser ce code ?", title1)
+
+        val title2 = ChatViewModel.generateConversationTitle("@codebuddy # Fix **critical** issue")
+        assertEquals("Fix critical issue", title2)
+
+        val longText = "Ceci est une très longue question portant sur l'architecture globale des microservices et la synchronisation des données distantes"
+        val title3 = ChatViewModel.generateConversationTitle(longText)
+        org.junit.Assert.assertTrue("Title should be truncated with ellipsis", title3.endsWith("…"))
+        org.junit.Assert.assertTrue("Title length should be bounded", title3.length <= 45)
+
+        val fileTitle = ChatViewModel.generateConversationTitle("", listOf("capture_ecran.png"))
+        assertEquals("Fichier : capture_ecran.png", fileTitle)
+    }
+
+    @Test
+    fun `test isGenericConversationTitle detects placeholders accurately`() {
+        org.junit.Assert.assertTrue(ChatViewModel.isGenericConversationTitle(null))
+        org.junit.Assert.assertTrue(ChatViewModel.isGenericConversationTitle(""))
+        org.junit.Assert.assertTrue(ChatViewModel.isGenericConversationTitle("Discussion"))
+        org.junit.Assert.assertTrue(ChatViewModel.isGenericConversationTitle("Nouvelle discussion"))
+        org.junit.Assert.assertTrue(ChatViewModel.isGenericConversationTitle("Discussion sans titre"))
+        org.junit.Assert.assertTrue(ChatViewModel.isGenericConversationTitle("new chat"))
+
+        org.junit.Assert.assertFalse(ChatViewModel.isGenericConversationTitle("Refactoring OAuth2"))
+        org.junit.Assert.assertFalse(ChatViewModel.isGenericConversationTitle("Architecture Système"))
+    }
+
+    @Test
+    fun `test sendMessage generates meaningful conversation title on first message`() = runTest(testDispatcher) {
+        val viewModel = ChatViewModel("bot-1", botRepository, chatRepository)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onInputChanged("Refactoriser l'authentification OAuth2")
+        viewModel.sendMessage()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify {
+            chatRepository.createConversation(
+                botId = "bot-1",
+                title = "Refactoriser l'authentification OAuth2",
+                cliId = null,
+                runnerId = null,
+                id = any()
+            )
+        }
+    }
+
+    @Test
+    fun `test sendMessage renames existing generic conversation on first message`() = runTest(testDispatcher) {
+        val genericConv = Conversation(id = "conv-gen-1", botId = "bot-1", title = "Nouvelle discussion", messageCount = 0)
+        coEvery { chatRepository.getConversationById("conv-gen-1") } returns genericConv
+
+        val viewModel = ChatViewModel("bot-1", botRepository, chatRepository, conversationId = "conv-gen-1")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onInputChanged("Optimiser la base de données")
+        viewModel.sendMessage()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify { chatRepository.renameConversation("conv-gen-1", "Optimiser la base de données") }
+    }
+
+    @Test
+    fun `test sendMessage preserves custom non-generic conversation title`() = runTest(testDispatcher) {
+        val customConv = Conversation(id = "conv-custom-1", botId = "bot-1", title = "Architecture Microservices", messageCount = 2)
+        coEvery { chatRepository.getConversationById("conv-custom-1") } returns customConv
+
+        val viewModel = ChatViewModel("bot-1", botRepository, chatRepository, conversationId = "conv-custom-1")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onInputChanged("Deuxième message dans la session")
+        viewModel.sendMessage()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 0) { chatRepository.renameConversation("conv-custom-1", any()) }
     }
 }

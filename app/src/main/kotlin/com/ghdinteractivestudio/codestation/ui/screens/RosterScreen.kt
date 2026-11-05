@@ -484,12 +484,16 @@ fun RosterScreen(
                                         Text(
                                             text = b.name,
                                             style = Type.body.semibold,
-                                            color = Palette.text
+                                            color = Palette.text,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
                                             text = "${b.provider.displayName} • ${b.model}",
                                             style = Type.caption,
-                                            color = Palette.secondary
+                                            color = Palette.secondary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                     Symbol("plus.circle.fill", size = 18.dp, tint = Palette.emeraldAccent)

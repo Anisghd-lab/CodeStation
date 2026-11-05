@@ -55,7 +55,8 @@ fun BotCard(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     text = bot.name,
@@ -63,13 +64,17 @@ fun BotCard(
                     color = Palette.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f, fill = false)
                 )
-                Text(
-                    text = formatRelativeTime(bot.lastActivityAt),
-                    style = Type.caption,
-                    color = Palette.tertiary
-                )
+                val timeLabel = formatRelativeTime(bot.lastActivityAt)
+                if (timeLabel.isNotEmpty()) {
+                    Text(
+                        text = timeLabel,
+                        style = Type.caption,
+                        color = Palette.tertiary,
+                        maxLines = 1
+                    )
+                }
             }
 
             Text(
@@ -84,7 +89,9 @@ fun BotCard(
 }
 
 private fun formatRelativeTime(timestamp: Long): String {
+    if (timestamp <= 0L) return ""
     val diffSec = (System.currentTimeMillis() - timestamp) / 1000
+    if (diffSec < 0) return "now"
     return when {
         diffSec < 60 -> "now"
         diffSec < 3600 -> "${diffSec / 60}m"
