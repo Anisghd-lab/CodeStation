@@ -45,6 +45,12 @@ class MemoryRepositoryImpl(
 
         val dto = response.body()!!
         val syncState = parseSyncState(dto.syncStatus)
+        val calculatedNodes = if (dto.nodesCount > 0) {
+            dto.nodesCount
+        } else {
+            val base = if (dto.experiencesCount > 0 || dto.knowledgeCount > 0 || dto.agentsCount > 0) 1 else 0
+            base + dto.agentsCount + dto.experiencesCount + dto.knowledgeCount
+        }
         val status = CollectiveMemoryStatus(
             isInitialized = dto.experiencesCount > 0 || dto.knowledgeCount > 0,
             syncStatus = syncState,
@@ -53,6 +59,7 @@ class MemoryRepositoryImpl(
             totalKnowledge = dto.knowledgeCount,
             totalRelations = dto.relationsCount,
             totalAgents = dto.agentsCount,
+            totalNodes = calculatedNodes,
             repoUrl = dto.repoUrl.ifEmpty { "https://github.com/Anisghd-lab/CodeStation-Memory" },
             branch = "main",
             latestCommitHash = null,
@@ -171,6 +178,12 @@ class MemoryRepositoryImpl(
         val body = response.body()!!
         val statusDto = body.status
         val newStatus = if (statusDto != null) {
+            val calculatedNodes = if (statusDto.nodesCount > 0) {
+                statusDto.nodesCount
+            } else {
+                val base = if (statusDto.experiencesCount > 0 || statusDto.knowledgeCount > 0 || statusDto.agentsCount > 0) 1 else 0
+                base + statusDto.agentsCount + statusDto.experiencesCount + statusDto.knowledgeCount
+            }
             CollectiveMemoryStatus(
                 isInitialized = statusDto.experiencesCount > 0 || statusDto.knowledgeCount > 0,
                 syncStatus = parseSyncState(statusDto.syncStatus),
@@ -179,6 +192,7 @@ class MemoryRepositoryImpl(
                 totalKnowledge = statusDto.knowledgeCount,
                 totalRelations = statusDto.relationsCount,
                 totalAgents = statusDto.agentsCount,
+                totalNodes = calculatedNodes,
                 repoUrl = statusDto.repoUrl,
                 branch = "main",
                 latestCommitHash = null,

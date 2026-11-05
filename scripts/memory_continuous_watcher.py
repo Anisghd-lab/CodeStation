@@ -690,11 +690,33 @@ class ContinuousMemoryEngine:
     def get_status(self) -> Dict[str, Any]:
         exp_count = len(glob.glob(os.path.join(MEMORY_REPO_PATH, "experiences", "*.json")))
         knw_count = len(glob.glob(os.path.join(MEMORY_REPO_PATH, "knowledge", "*.json")))
+        ag_count = len(glob.glob(os.path.join(MEMORY_REPO_PATH, "agents", "*.json")))
+        rel_count = 0
+        rel_file = os.path.join(MEMORY_REPO_PATH, "relations", "relations.json")
+        if os.path.exists(rel_file):
+            try:
+                with open(rel_file, "r", encoding="utf-8") as rf:
+                    data = json.load(rf)
+                    if isinstance(data, list):
+                        rel_count = len(data)
+            except Exception:
+                pass
+        # Total nodes in collective memory graph: 1 (Core) + agents + experiences + knowledge
+        total_nodes = 1 + ag_count + exp_count + knw_count
         return {
             "service": "CodeStation Continuous Memory Engine",
             "status": "OPERATIONAL",
+            "sync_status": "synchronized",
             "totalExperiences": exp_count,
+            "experiences_count": exp_count,
             "totalKnowledge": knw_count,
+            "knowledge_count": knw_count,
+            "totalAgents": ag_count,
+            "agents_count": ag_count,
+            "totalRelations": rel_count,
+            "relations_count": rel_count,
+            "totalNodes": total_nodes,
+            "nodes_count": total_nodes,
             "analyzedSessionsCount": self.analyzed_sessions_count,
             "lastSyncTime": self.last_run_time,
             "agentsActive": ["Collector", "Analyzer", "Extractor", "Curator", "Validator", "Retriever"]

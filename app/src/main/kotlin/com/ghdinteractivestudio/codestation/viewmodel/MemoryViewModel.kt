@@ -32,7 +32,65 @@ data class MemoryUiState(
     val isSyncing: Boolean = false,
     val syncFeedbackMessage: String? = null,
     val errorMessage: String? = null
-)
+) {
+    /**
+     * Exact count of stored experiences (either from remote sync status or local deduplicated items).
+     */
+    val realExperiencesCount: Int
+        get() = if (status.totalExperiences > 0) status.totalExperiences else allExperiences.size
+
+    /**
+     * Exact count of stored knowledge items.
+     */
+    val realKnowledgeCount: Int
+        get() = if (status.totalKnowledge > 0) status.totalKnowledge else allKnowledge.size
+
+    /**
+     * Exact count of mobilized agents in memory (from status, active bots, or distinct experience authors).
+     */
+    val realAgentsCount: Int
+        get() {
+            val authors = allExperiences.map { it.agent }.filter { it.isNotBlank() }.distinct()
+            return maxOf(status.totalAgents, bots.size, authors.size)
+        }
+
+    /**
+     * Effective relations count reflecting real connections in memory:
+     * Core to agents, inter-agent collaboration, experience-to-agent, experience-to-project,
+     * knowledge-to-experience and knowledge-to-agent links.
+     */
+    val realRelationsCount: Int
+        get() {
+            var calculated = 0
+            val agents = realAgentsCount
+            if (agents > 0) {
+                calculated += agents // Core to each agent
+                if (agents > 1) calculated += agents // Inter-agent highways
+            }
+            for (exp in allExperiences) {
+                if (exp.agent.isNotBlank()) calculated++
+                if (exp.project.isNotBlank()) calculated++
+            }
+            for (knw in allKnowledge) {
+                calculated += knw.derivedFromExperiences.size
+                calculated += knw.appliesToProjects.size
+                calculated++ // Knowledge associated with author/agent
+            }
+            return maxOf(status.totalRelations, calculated)
+        }
+
+    /**
+     * Accurate total node count in the collective neural graph:
+     * CodeStation Core Nucleus (1) + Real Agents + Experiences + Knowledge.
+     */
+    val realNodesCount: Int
+        get() {
+            val hasData = allExperiences.isNotEmpty() || allKnowledge.isNotEmpty() || realAgentsCount > 0
+            val baseCore = if (hasData) 1 else 0
+            val calculated = baseCore + realAgentsCount + realExperiencesCount + realKnowledgeCount
+            return maxOf(status.totalNodes, calculated)
+        }
+}
 
 class MemoryViewModel(
     private val memoryRepository: MemoryRepository,

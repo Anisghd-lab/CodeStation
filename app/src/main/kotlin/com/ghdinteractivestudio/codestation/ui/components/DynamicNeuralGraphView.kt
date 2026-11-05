@@ -241,8 +241,8 @@ fun DynamicNeuralGraphView(
     val violetSynapse = Color(0xFF8B5CF6)
     val silverSynapse = Color(0x60CBD5E1)
 
-    // Build or memoize the Dense Organic 3D Neural Network
-    val (nodes, edges, pulses) = remember(experiences, knowledge) {
+    // Build or memoize the Dense Organic 3D Neural Network strictly from real memory entities
+    val (nodes, edges, pulses) = remember(experiences, knowledge, bots) {
         val nodeList = mutableListOf<GraphNode3D>()
         val edgeList = mutableListOf<GraphEdge3D>()
         val pulseList = mutableListOf<SynapsePulse3D>()
@@ -414,108 +414,23 @@ fun DynamicNeuralGraphView(
             edgeList.add(GraphEdge3D(nearestAgent, nodeIdx, cyanSynapse.copy(alpha = 0.65f), isRealRelation = true))
         }
 
-        // 5. Dense Interneuron Neuropil (Short, dense, interconnected mesh)
-        val interneuronCount = 55
+        // 5. Pre-generate Continuous Synapse Pulses across real synaptic relations
         val rng = Random(1337)
-        val interneuronIndices = mutableListOf<Int>()
-        val clusterPalette = listOf(cyanSynapse, turquoiseSynapse, electricBlueSynapse, violetSynapse, silverSynapse)
-
-        for (i in 0 until interneuronCount) {
-            // Assign to one of the 5 clusters (0=Core, 1..4=Lobes)
-            val cluster = rng.nextInt(5)
-            val centerAnchor = when {
-                cluster == 0 || agentIndices.isEmpty() -> Triple(0f, 0f, 0f)
-                else -> {
-                    val agentNode = nodeList[agentIndices[(cluster - 1) % agentIndices.size]]
-                    Triple(agentNode.normX, agentNode.normY, agentNode.normZ)
-                }
+        for ((idx, edge) in edgeList.withIndex()) {
+            val pulseColor = when (idx % 4) {
+                0 -> Color(0xFF67E8F9) // Bright Cyan
+                1 -> Color(0xFF38BDF8) // Sky Blue
+                2 -> Color(0xFFC084FC) // Violet
+                else -> Color(0xFFFFFFFF) // Pure White
             }
-
-            // Scatter tightly around cluster center with organic Gaussian-like dispersion
-            val spread = if (cluster == 0) 0.24f else 0.28f
-            val dx = (rng.nextFloat() - 0.5f) * 2f * spread
-            val dy = (rng.nextFloat() - 0.5f) * 2f * spread
-            val dz = (rng.nextFloat() - 0.5f) * 2f * spread
-
-            val nx = (centerAnchor.first + dx).coerceIn(-0.82f, 0.82f)
-            val ny = (centerAnchor.second + dy).coerceIn(-0.82f, 0.82f)
-            val nz = (centerAnchor.third + dz).coerceIn(-0.82f, 0.82f)
-
-            val col = clusterPalette[cluster]
-            val radius = 2.0f + rng.nextFloat() * 1.8f
-            val nodeIdx = nodeList.size
-
-            nodeList.add(
-                GraphNode3D(
-                    id = "neuropil-$i",
-                    type = GraphNodeType.INTERNEURON,
-                    label = "Interneurone #$i",
-                    subtitle = "Synapse de transmission",
-                    normX = nx,
-                    normY = ny,
-                    normZ = nz,
-                    color = col,
-                    baseRadius = radius,
-                    isRealData = false,
-                    clusterId = cluster
+            pulseList.add(
+                SynapsePulse3D(
+                    edgeIndex = idx,
+                    speed = 0.50f + rng.nextFloat() * 0.75f,
+                    offsetProgress = rng.nextFloat(),
+                    color = pulseColor
                 )
             )
-            interneuronIndices.add(nodeIdx)
-        }
-
-        // Connect each interneuron to its 3 nearest neighbors (k-nearest neighbors)
-        // Creating authentic, dense, short synaptic ramifications
-        for (i in interneuronIndices) {
-            val ni = nodeList[i]
-            val neighbors = (0 until nodeList.size)
-                .filter { it != i }
-                .map { j ->
-                    val nj = nodeList[j]
-                    val d = hypot(hypot(ni.normX - nj.normX, ni.normY - nj.normY), ni.normZ - nj.normZ)
-                    j to d
-                }
-                .filter { it.second < 0.38f }
-                .sortedBy { it.second }
-                .take(3)
-
-            for ((neighborIdx, _) in neighbors) {
-                val edgeExists = edgeList.any {
-                    (it.sourceIndex == i && it.targetIndex == neighborIdx) ||
-                            (it.sourceIndex == neighborIdx && it.targetIndex == i)
-                }
-                if (!edgeExists) {
-                    val isRamif = (i % 2 == 0)
-                    edgeList.add(
-                        GraphEdge3D(
-                            sourceIndex = i,
-                            targetIndex = neighborIdx,
-                            color = ni.color.copy(alpha = 0.40f),
-                            isRealRelation = false,
-                            isRamification = isRamif
-                        )
-                    )
-                }
-            }
-        }
-
-        // 6. Pre-generate Continuous Synapse Pulses across the dense mesh
-        for ((idx, edge) in edgeList.withIndex()) {
-            if (edge.isRealRelation || idx % 3 == 0) {
-                val pulseColor = when (idx % 4) {
-                    0 -> Color(0xFF67E8F9) // Bright Cyan
-                    1 -> Color(0xFF38BDF8) // Sky Blue
-                    2 -> Color(0xFFC084FC) // Violet
-                    else -> Color(0xFFFFFFFF) // Pure White
-                }
-                pulseList.add(
-                    SynapsePulse3D(
-                        edgeIndex = idx,
-                        speed = 0.50f + rng.nextFloat() * 0.75f,
-                        offsetProgress = rng.nextFloat(),
-                        color = pulseColor
-                    )
-                )
-            }
         }
 
         Triple(nodeList, edgeList, pulseList)
@@ -571,45 +486,38 @@ fun DynamicNeuralGraphView(
             modifier = Modifier
                 .fillMaxSize()
                 .clipToBounds()
-                // Transform Gestures: Two-finger pan & pinch zoom (Strictly bounded)
+                // Unified Transform Gestures: Pinch-to-zoom, Pan when zoomed, and 3D Rotation at overview
                 .pointerInput(Unit) {
                     detectTransformGestures { _, pan, zoom, _ ->
-                        targetPanOffset = Offset(
-                            (targetPanOffset.x + pan.x).coerceIn(-50f, 50f),
-                            (targetPanOffset.y + pan.y).coerceIn(-35f, 35f)
-                        )
-                        targetZoomScale = (targetZoomScale * zoom).coerceIn(0.85f, 1.45f)
+                        if (zoom != 1.0f) {
+                            // Smooth pinch zoom with wide inspection range
+                            targetZoomScale = (targetZoomScale * zoom).coerceIn(0.75f, 3.2f)
+                        }
+                        if (pan != Offset.Zero) {
+                            if (targetZoomScale > 1.15f) {
+                                // Pan across the graph during close-up examination
+                                targetPanOffset = Offset(
+                                    (targetPanOffset.x + pan.x).coerceIn(-250f, 250f),
+                                    (targetPanOffset.y + pan.y).coerceIn(-180f, 180f)
+                                )
+                            } else {
+                                // Smooth 3D sphere rotation during global overview
+                                userRotY += pan.x * 0.0070f
+                                userRotX = (userRotX - pan.y * 0.0070f).coerceIn(-1.2f, 1.2f)
+                            }
+                        }
                     }
                 }
-                // Single-finger drag for 3D organic sphere rotation
-                .pointerInput(Unit) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        userRotY += dragAmount.x * 0.0070f
-                        userRotX = (userRotX - dragAmount.y * 0.0070f).coerceIn(-1.1f, 1.1f)
-                    }
-                }
-                // Tap Gestures: Single tap (ripple + hit test) & Double tap (dispersion)
-                .pointerInput(Unit) {
+                // Tap Gestures: Single tap (focus node) & Double tap (zoom onto node or reset)
+                .pointerInput(nodes, expansionProgress) {
                     detectTapGestures(
-                        onDoubleTap = {
-                            coroutineScope.launch {
-                                dispersionAnim.animateTo(1.5f, tween(220, easing = FastOutSlowInEasing))
-                                dispersionAnim.animateTo(0f, spring(dampingRatio = 0.60f, stiffness = 220f))
-                            }
-                        },
-                        onTap = { tapOffset ->
-                            rippleCenter = tapOffset
-                            coroutineScope.launch {
-                                rippleAnim.snapTo(0f)
-                                rippleAnim.animateTo(1f, tween(600, easing = FastOutSlowInEasing))
-                            }
-
+                        onDoubleTap = { tapOffset ->
                             val currentCenterX = size.width / 2f
                             val currentCenterY = size.height / 2f
                             val baseRadius = min(size.width, size.height).toFloat() * 0.34f
 
-                            val t = if (isLifecycleActive) timeParam else 0f
+                            val isInspecting = selectedNode != null || targetZoomScale > 1.15f
+                            val t = if (isLifecycleActive && !isInspecting) timeParam else 0f
                             val autoRotY = t * 0.14f
                             val autoRotX = sin(t * 0.10f) * 0.10f
                             val curRotX = autoRotX + userRotX
@@ -620,10 +528,70 @@ fun DynamicNeuralGraphView(
 
                             var closestNode: GraphNode3D? = null
                             var minDistance = Float.MAX_VALUE
-                            val hitRadiusThreshold = 38f
+                            val hitRadiusThreshold = 45f
 
                             for (node in nodes) {
-                                if (!node.isRealData) continue
+                                val pt = project3D(
+                                    node.normX, node.normY, node.normZ,
+                                    curRotX, curRotY,
+                                    baseRadius,
+                                    expansionProgress
+                                )
+                                val d = hypot(pt.screenX - transformedTapX, pt.screenY - transformedTapY)
+                                if (d < hitRadiusThreshold && d < minDistance) {
+                                    minDistance = d
+                                    closestNode = node
+                                }
+                            }
+
+                            if (closestNode != null) {
+                                // Double-tap on node: smoothly zoom and focus on it for examination
+                                selectedNode = closestNode
+                                onNodeSelected?.invoke(closestNode)
+                                targetZoomScale = 2.0f
+                                val pt = project3D(
+                                    closestNode.normX, closestNode.normY, closestNode.normZ,
+                                    curRotX, curRotY,
+                                    baseRadius,
+                                    expansionProgress
+                                )
+                                targetPanOffset = Offset(-pt.screenX * 0.5f, -pt.screenY * 0.5f)
+                            } else {
+                                // Double-tap empty area: smoothly reset camera to overview
+                                targetZoomScale = 1.0f
+                                targetPanOffset = Offset.Zero
+                                userRotX = 0.10f
+                                userRotY = -0.15f
+                                selectedNode = null
+                                onNodeSelected?.invoke(null)
+                            }
+                        },
+                        onTap = { tapOffset ->
+                            rippleCenter = tapOffset
+                            coroutineScope.launch {
+                                rippleAnim.snapTo(0f)
+                                rippleAnim.animateTo(1f, tween(500, easing = FastOutSlowInEasing))
+                            }
+
+                            val currentCenterX = size.width / 2f
+                            val currentCenterY = size.height / 2f
+                            val baseRadius = min(size.width, size.height).toFloat() * 0.34f
+
+                            val isInspecting = selectedNode != null || targetZoomScale > 1.15f
+                            val t = if (isLifecycleActive && !isInspecting) timeParam else 0f
+                            val autoRotY = t * 0.14f
+                            val autoRotX = sin(t * 0.10f) * 0.10f
+                            val curRotX = autoRotX + userRotX
+                            val curRotY = autoRotY + userRotY
+
+                            val transformedTapX = (tapOffset.x - currentCenterX - targetPanOffset.x) / targetZoomScale
+                            val transformedTapY = (tapOffset.y - currentCenterY - targetPanOffset.y) / targetZoomScale
+
+                            var closestNode: GraphNode3D? = null
+                            var minDistance = Float.MAX_VALUE
+                            val hitRadiusThreshold = 42f
+
+                            for (node in nodes) {
                                 val pt = project3D(
                                     node.normX, node.normY, node.normZ,
                                     curRotX, curRotY,
@@ -640,11 +608,16 @@ fun DynamicNeuralGraphView(
                             if (closestNode != null) {
                                 selectedNode = closestNode
                                 onNodeSelected?.invoke(closestNode)
+                                if (targetZoomScale < 1.30f) {
+                                    targetZoomScale = 1.45f
+                                }
                             } else {
-                                // Tapping empty space triggers dynamic expansion of ramifications
-                                isExpanded = !isExpanded
-                                selectedNode = null
-                                onNodeSelected?.invoke(null)
+                                if (selectedNode != null) {
+                                    selectedNode = null
+                                    onNodeSelected?.invoke(null)
+                                } else {
+                                    isExpanded = !isExpanded
+                                }
                             }
                         }
                     )
@@ -653,7 +626,8 @@ fun DynamicNeuralGraphView(
             // Strict hardware clipRect ensuring nothing can ever draw outside [0, width] x [0, height]
             clipRect(left = 0f, top = 0f, right = size.width, bottom = size.height) {
                 val center = Offset(size.width / 2f, size.height / 2f)
-                val t = if (isLifecycleActive) timeParam else 0f
+                val isInspecting = selectedNode != null || targetZoomScale > 1.15f
+                val t = if (isLifecycleActive && !isInspecting) timeParam else 0f
                 val dispersion = dispersionAnim.value
 
                 val autoRotY = t * 0.14f
@@ -1102,6 +1076,29 @@ fun DynamicNeuralGraphView(
         // ==========================================
         // OVERLAY CONTROLS (GLASSMORPHISM)
         // ==========================================
+
+        // Real Metrics Badge (Top-Start) reflecting genuine memory graph data
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(horizontal = 8.dp, vertical = 8.dp)
+                .glass(Capsule(), style = GlassStyle.Regular)
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(Palette.emeraldAccent)
+            )
+            Text(
+                text = "${nodes.size} Nœuds · ${edges.size} Relations",
+                style = Type.caption.semibold.copy(fontSize = 11.sp),
+                color = Palette.text
+            )
+        }
 
         // Action Controls (Top-Right): Recenter & Expand (40dp matching Roster buttons)
         Row(

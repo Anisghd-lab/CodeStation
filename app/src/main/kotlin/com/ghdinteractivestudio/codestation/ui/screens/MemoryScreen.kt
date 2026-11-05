@@ -188,30 +188,36 @@ fun MemoryScreen(
             item("metrics") {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     MetricCard(
-                        title = "Expériences",
-                        value = state.status.totalExperiences.toString(),
-                        accentColor = Palette.added,
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricCard(
-                        title = "Connaissances",
-                        value = state.status.totalKnowledge.toString(),
+                        title = "Nœuds",
+                        value = state.realNodesCount.toString(),
                         accentColor = Palette.electricBlue,
                         modifier = Modifier.weight(1f)
                     )
                     MetricCard(
                         title = "Relations",
-                        value = state.status.totalRelations.toString(),
+                        value = state.realRelationsCount.toString(),
                         accentColor = Color(0xFF9D4EDD),
                         modifier = Modifier.weight(1f)
                     )
                     MetricCard(
                         title = "Agents",
-                        value = state.status.totalAgents.toString(),
+                        value = state.realAgentsCount.toString(),
                         accentColor = Palette.warning,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricCard(
+                        title = "Expériences",
+                        value = state.realExperiencesCount.toString(),
+                        accentColor = Palette.added,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricCard(
+                        title = "Connaissances",
+                        value = state.realKnowledgeCount.toString(),
+                        accentColor = Color(0xFF38BDF8),
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -623,19 +629,20 @@ private fun MetricCard(
 ) {
     Column(
         modifier = modifier
-            .glass(RoundedRectangle(14.dp), style = GlassStyle.Card)
-            .padding(10.dp),
+            .glass(RoundedRectangle(12.dp), style = GlassStyle.Card)
+            .padding(horizontal = 4.dp, vertical = 7.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text(
             text = value,
-            style = Type.title2.semibold,
-            color = accentColor
+            style = Type.title3.semibold,
+            color = accentColor,
+            maxLines = 1
         )
         Text(
             text = title,
-            style = Type.caption.copy(fontSize = 11.sp),
+            style = Type.caption.copy(fontSize = 10.sp),
             color = Palette.secondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis

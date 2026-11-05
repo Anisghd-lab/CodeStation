@@ -365,6 +365,7 @@ data class MemoryStatusDto(
     @SerialName("knowledge_count") val knowledgeCount: Int = 0,
     @SerialName("agents_count") val agentsCount: Int = 0,
     @SerialName("relations_count") val relationsCount: Int = 0,
+    @SerialName("nodes_count") val nodesCount: Int = 0,
     @SerialName("github_repo") val repoUrl: String = "",
     @SerialName("local_cache_path") val localCachePath: String? = null,
     @SerialName("error_message") val errorMessage: String? = null

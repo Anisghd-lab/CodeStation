@@ -37,6 +37,7 @@ data class CollectiveMemoryStatus(
     val totalKnowledge: Int = 0,
     val totalRelations: Int = 0,
     val totalAgents: Int = 0,
+    val totalNodes: Int = 0,
     val repoUrl: String = "https://github.com/Anisghd-lab/CodeStation-Memory",
     val branch: String = "main",
     val latestCommitHash: String? = null,
