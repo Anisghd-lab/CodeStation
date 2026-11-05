@@ -1526,6 +1526,16 @@ class CamcsOrchestrationEngine:
                 self.record_task_transition(mission.id, task.id, TaskState.COMPLETED, progress=100, result_summary=f"Validé par {engine_name}")
                 completed_task_ids.add(task.id)
 
+                # If task was auto-repaired, save learned avoidance rule to Perpetual Memory
+                if getattr(task, "iteration_count", 0) > 0:
+                    self.memory_client.record_repair_experience(
+                        task_title=task.title,
+                        error_msg=getattr(task, "last_error", "Erreur résolue"),
+                        remediation_applied=f"Validé avec succès par {engine_name}",
+                        iteration_count=task.iteration_count,
+                        context=f"Mission: {mission.title} / Agent: {agent.name}"
+                    )
+
         # Phase 4: Quality Gate & Independent Audit
         if mission.status == MissionState.CANCELLED:
             return
@@ -1638,6 +1648,23 @@ class CamcsOrchestrationEngine:
             deliverables=all_delivs,
             proofs=[],
             success=True
+        )
+
+        # Record complete mission synthesis & architecture decisions
+        phases = sorted(list({t.phase for t in dag_tasks}))
+        gates = self.quality_gates.get_gates_for_mission(mission.id)
+        repairs = []
+        for t in dag_tasks:
+            repairs.extend(self.auto_repair_loop.get_task_repair_history(t.id))
+
+        self.memory_client.record_mission_synthesis(
+            mission_id=mission.id,
+            title=mission.title,
+            objective=mission.objective,
+            dag_phases=phases,
+            gates_passed=len([g for g in gates if getattr(g.status, "value", str(g.status)) == "PASSED"]),
+            repairs_resolved=len([r for r in repairs if r.get("actionTaken") in ("retry", "approved")]),
+            deliverables_count=verif_count
         )
 
         # Phase 6: Final Verification through ObjectiveCompletionGate
@@ -1853,6 +1880,16 @@ class CamcsOrchestrationEngine:
             if ok:
                 self._save_task(task)
                 self.record_task_transition(mission_id, task.id, TaskState.READY, result_summary="Escalade approuvée par l'opérateur")
+                # Record architectural decision in Perpetual Memory
+                self.memory_client.record_decision(
+                    title=f"Arbitrage Humain : {task.title}",
+                    decision=f"Autorisation de reprise avec +{extra_attempts} tentative(s)",
+                    rationale=task.last_error or "Résolution de blocage complexe",
+                    context=f"Mission: {m.title}",
+                    consequences="Déblocage du graphe DAG et poursuite de l'orchestration",
+                    error_avoidance=f"Tenir compte des instructions de reprise : {override_prompt or 'N/A'}",
+                    author="human-operator"
+                )
                 if m.status in (MissionState.WAITING_FOR_APPROVAL, "WAITING_FOR_APPROVAL", MissionState.PAUSED, "PAUSED"):
                     m.status = MissionState.RUNNING
                     self._save_mission_state(m)
@@ -2250,6 +2287,21 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
             reason = data.get("reason", None)
             ok = ENGINE.reject_task(mission_id, task_id, reason=reason)
             self._send_json(200, {"ok": ok, "missionId": mission_id, "taskId": task_id, "action": "rejected"})
+        elif self.path == "/api/camcs/memory/decision":
+            title = data.get("title", "Décision d'architecture")
+            decision = data.get("decision", "")
+            rationale = data.get("rationale", "")
+            context = data.get("context", "")
+            consequences = data.get("consequences", "")
+            error_avoidance = data.get("errorAvoidance", "")
+            tags = data.get("tags", [])
+            author = data.get("author", "camcs-architect")
+            ok = ENGINE.memory_client.record_decision(
+                title=title, decision=decision, rationale=rationale,
+                context=context, consequences=consequences,
+                error_avoidance=error_avoidance, tags=tags, author=author
+            )
+            self._send_json(200, {"ok": ok, "recorded": True, "title": title})
         elif self.path in ["/api/camcs/missions/delete", "/api/camcs/mission/delete"]:
             mission_id = data.get("missionId", "")
             ok = ENGINE.delete_mission(mission_id)
