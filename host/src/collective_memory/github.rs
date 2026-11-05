@@ -79,9 +79,13 @@ impl GitHubAdapter {
                 let sha = body["sha"].as_str().unwrap_or("unknown");
                 store.set_meta("remote_commit_sha", sha)?;
 
-                // Sync local directory into SQLite cache if local repo exists
+                // Sync local directory into SQLite cache and push to GitHub if local repo exists
                 if local_repo.exists() {
                     let _ = store.import_from_directory(local_repo);
+                    let _ = std::process::Command::new("git")
+                        .args(["push", "origin", "main"])
+                        .current_dir(local_repo)
+                        .output();
                 }
 
                 let now_iso = chrono::Utc::now().to_rfc3339();

@@ -482,8 +482,26 @@ class MemoryCurator:
         try:
             subprocess.run(["git", "add", "."], cwd=self.repo_path, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             subprocess.run(["git", "commit", "-m", message], cwd=self.repo_path, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self._sync_remote()
         except Exception:
             pass
+
+    def _sync_remote(self):
+        """Pushes pending commits to origin/main in a non-blocking background thread."""
+        def _do_push():
+            try:
+                subprocess.run(
+                    ["git", "push", "origin", "main"],
+                    cwd=self.repo_path,
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=20
+                )
+            except Exception:
+                pass
+        t = threading.Thread(target=_do_push, daemon=True)
+        t.start()
 
 
 class MemoryRetriever:
@@ -806,6 +824,7 @@ class MemoryHttpHandler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True, "newKnowledgeCount": added, "status": ENGINE.get_status()})
         elif self.path == "/api/memory/sync":
             ENGINE.curator._git_commit("Manual sync triggered via CodeStation")
+            ENGINE.curator._sync_remote()
             self._send_json(200, {"ok": True, "syncedAt": get_iso_now()})
         else:
             self._send_json(404, {"error": "Not found"})
@@ -821,9 +840,14 @@ class MemoryHttpHandler(BaseHTTPRequestHandler):
 
 
 def background_worker():
+    last_sync = 0.0
     while True:
         try:
             ENGINE.run_collection_cycle()
+            now = time.time()
+            if now - last_sync > 120.0:
+                last_sync = now
+                ENGINE.curator._sync_remote()
         except Exception:
             pass
         time.sleep(25)
