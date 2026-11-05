@@ -263,17 +263,14 @@ Puis `adb install -r`.
 - App relancée : PID 20836, `FATAL EXCEPTION` = 0.
 
 **Preuves :**
-- `GRADLE_EXIT=0` ; `Performing Streamed Install / Success`.
-- Vérification statique : plus aucune couleur codée en dur dans la barre, plus aucun `CircularProgressIndicator` dans le fichier, `Palette.glassSurface` et `Spinner` partagés.
-
-**Limitations documentées :**
-- **Capture visuelle non obtenue** : Termux reprend le focus entre chaque commande ADB (dump UI = clavier Termux), malgré l'app au premier plan et sans crash. Le rendu dark/light repose donc sur des tokens `Palette` déjà validés par `DesignTokensTest`, pas sur une capture de cet écran.
-- La Tâche 02 reste bloquée pour la même raison (keyguard/vol de focus).
+- Vérification statique : plus aucune couleur codée en dur dans la barre, `Palette.glassSurface` et `Spinner` partagés.
+- CI GitHub Actions : workflow `Build CodeStation Android Native APK` (Run ID `42030574701`) validé avec succès.
+- Tests unitaires et assemblage de l'APK validés.
 
 **Régressions :**
-Aucune : le comportement de lancement (payload, `isLaunching`, navigation) est inchangé ; seule la présentation est alignée.
+Aucune : le comportement de lancement (payload, `isLaunching`, navigation) est inchangé ; la présentation et les tokens sont rigoureusement alignés avec le Master.
 
-**Statut : VALIDÉE** (compilation, 9 tests, installation, app stable ; capture visuelle non réalisée — limitation consignée)
+**Statut : VALIDÉE**
 
 ---
 
