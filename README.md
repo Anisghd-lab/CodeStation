@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v1.1.0-blue.svg" alt="Version 1.1.0" />
+  <img src="https://img.shields.io/badge/Version-v1.1.1-blue.svg" alt="Version 1.1.1" />
   <img src="https://img.shields.io/badge/Kotlin-2.0.20-purple.svg" alt="Kotlin 2.0" />
   <img src="https://img.shields.io/badge/Compose-BOM%202024.09.00-green.svg" alt="Jetpack Compose" />
   <img src="https://img.shields.io/badge/Host%20Rust-v2.28.1-orange.svg" alt="Host Rust v2.28.1" />
@@ -142,6 +142,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## 📄 Notes de Version
 
+- [Notes de version v1.1.1](RELEASE_NOTES_v1.1.1.md)
 - [Notes de version v1.1.0](RELEASE_NOTES_v1.1.0.md)
 - [Notes de version v1.0.8](RELEASE_NOTES_v1.0.8.md)
 - [Notes de version v1.0.7](RELEASE_NOTES_v1.0.7.md)
