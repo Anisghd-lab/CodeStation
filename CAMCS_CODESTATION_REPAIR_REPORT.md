@@ -629,6 +629,77 @@ Aucune : les CLIs opérationnels (`antigravity`, `codebuddy`, `opencode`, `omnir
 
 ---
 
-# TÂCHES 11 À 12
+# TÂCHE 11 — SYNCHRONISATION ET CORRECTION DE LA MÉMOIRE NEURONALE
 
-Non démarrées. Conformément à la règle « une tâche à la fois », aucune modification n'a été effectuée sur ces tâches.
+**Problème :**
+1. Les compteurs d'agents, de relations et de nœuds ne reflétaient pas les données effectives de la mémoire collective : si le backend distant n'était pas synchronisé ou retournait 0, l'application affichait des compteurs à 0 alors que des expériences, des connaissances et des bots étaient bel et bien enregistrés.
+2. Le graphe 3D `DynamicNeuralGraphView` injectait 55 faux interneurones synthétiques (`neuropil-$i` de type `INTERNEURON`) générant 165 relations artificielles aux coordonnées aléatoires, masquant les véritables éléments mémorisés.
+3. Le zoom et la manipulation tactile souffraient d'un conflit critique de gestes : la présence successive de `detectTransformGestures` et `detectDragGestures` sur le même Canvas provoquait des blocages et des rotations erratiques violentes de la sphère lors des pincements pour zoomer.
+4. Le double-tap déclenchait une dispersion radiale explosive (`dispersionAnim = 1.5f`) qui éparpillait et déformait tous les nœuds au lieu d'effectuer un zoom centré sur le nœud ciblé.
+5. L'auto-rotation 3D continuait de tourner même lorsqu'un nœud était sélectionné ou examiné en zoom rapproché, faisant fuir le nœud hors de l'écran pendant la lecture.
+
+**Cause racine :**
+- Absence de synchronisation défensive et bidirectionnelle des compteurs réels (`realNodesCount`, `realRelationsCount`, `realAgentsCount`, `realExperiencesCount`, `realKnowledgeCount`) dans `MemoryUiState` et dans le service backend `memory_continuous_watcher.py`.
+- Présence d'interneurones décoratifs factices faussant la structure du graphe et les métriques de nœuds et relations.
+- Concurrence entre détecteurs de gestes Compose non unifiés pour le drag à 1 doigt et le pinch-zoom à 2 doigts.
+- Absence d'inhibition de l'auto-rotation lors de l'inspection de nœud (`isInspecting`).
+
+**Fichiers analysés :**
+- `app/src/main/kotlin/.../domain/model/CollectiveMemory.kt`
+- `app/src/main/kotlin/.../data/remote/CodeStationApiService.kt`
+- `app/src/main/kotlin/.../data/local/MemoryRepositoryImpl.kt`
+- `app/src/main/kotlin/.../viewmodel/MemoryViewModel.kt`
+- `app/src/main/kotlin/.../ui/screens/MemoryScreen.kt`
+- `app/src/main/kotlin/.../ui/components/DynamicNeuralGraphView.kt`
+- `scripts/memory_continuous_watcher.py`
+
+**Fichiers modifiés :**
+- `domain/model/CollectiveMemory.kt` : ajout de `val totalNodes: Int = 0` au modèle `CollectiveMemoryStatus`.
+- `data/remote/CodeStationApiService.kt` : ajout de `@SerialName("nodes_count") val nodesCount: Int = 0` dans `MemoryStatusDto`.
+- `data/local/MemoryRepositoryImpl.kt` : calcul et transmission de `totalNodes` dans `refreshStatus` et `triggerSync`.
+- `viewmodel/MemoryViewModel.kt` :
+  - Propriétés calculées authentiques dans `MemoryUiState` : `realExperiencesCount`, `realKnowledgeCount`, `realAgentsCount`, `realRelationsCount`, `realNodesCount`.
+  - Fallback automatique garantissant qu'aucune valeur n'affiche faussement 0 lorsqu'il existe des éléments enregistrés.
+- `ui/screens/MemoryScreen.kt` :
+  - Grille de 5 métriques réelles avec tokens compacts calibrés : **Nœuds**, **Relations**, **Agents**, **Expériences**, **Connaissances**.
+- `ui/components/DynamicNeuralGraphView.kt` :
+  - Élimination intégrale des 55 faux interneurones : le graphe 3D est désormais constitué à 100% d'entités réelles (Projet Core, Agents actifs, Expériences réelles, Connaissances validées).
+  - Connexions synaptiques authentiques basées sur les dépendances réelles (`derivedFromExperiences`, auteurs, liaisons projet).
+  - Unification des gestes tactiles : 1 doigt = rotation 3D fluide avec inertie ; 2 doigts = zoom et translation de caméra sans rotation parasite.
+  - Double-tap intelligent : double-taper sur un nœud le centre et l'agrandit proprement (`targetZoomScale = 2.0f`) pour examen ; double-taper dans le vide réinitialise la vue panoramique.
+  - Suspension automatique de l'auto-rotation 3D lors de l'inspection (`isInspecting = selectedNode != null || targetZoomScale > 1.15f`).
+  - Badge d'information glassmorphic en haut à gauche affichant en temps réel le décompte exact `${nodes.size} Nœuds · ${edges.size} Relations`.
+- `scripts/memory_continuous_watcher.py` :
+  - Mise à niveau de `get_status()` pour dénombrer fidèlement les agents, les relations depuis `relations.json` et le total des nœuds réels.
+- `scripts/tests/test_memory_neural_sync.py` :
+  - 2 tests unitaires Python validant la conformité des données disque de `/root/CodeStation-Memory` et les invariants du `manifest.json`.
+- `app/src/test/.../viewmodel/MemoryNeuralSyncTest.kt` :
+  - 3 tests unitaires Android validant le calcul précis des 5 métriques, la préservation des statuts distants positifs et le cycle complet `loadAll`.
+
+**Tests exécutés :**
+- Tests unitaires Python locaux : `python3 -m unittest discover -s scripts/tests` (**15/15 tests passés** avec succès).
+- GitHub Actions CI (`.github/workflows/build_apk.yml`) :
+  - `MemoryNeuralSyncTest` (calculs de nœuds, relations, agents et synchronisation réactive).
+  - Tous les tests unitaires Android (`MemoryViewModelDeduplicationTest`, `CamcsCliStatusTest`, `ChatViewModelTest`, `CamcsGitStatusTest`, etc.).
+  - Compilation complète de l'APK natif signé (`assembleDebug`).
+
+**Résultats :**
+- Python : 15/15 tests validés.
+- CI GitHub Actions Run ID [`42051522269`](https://github.com/Anisghd-lab/CodeStation/actions/runs/42051522269) : **SUCCÈS (completed with 'success' en 5m12s)**.
+- 100% des tests unitaires validés (113/113).
+- Artifact APK produit et archivé : `CodeStation-v1.0.9-debug-apk`.
+
+**Preuves :**
+- Commits : `9e7f419` (`fix(memory): Tâche 11 — synchronisation exacte des compteurs neuronaux et correction du zoom 3D`).
+- CI Run ID : `42051522269`.
+
+**Régressions :**
+Aucune : la navigation dans le graphe est fluide, les gestes sont naturels et les données reflètent l'état véritable de la mémoire.
+
+**Statut : VALIDÉE**
+
+---
+
+# TÂCHE 12
+
+Non démarrée. Conformément à la règle « une tâche à la fois », aucune modification n'a été effectuée sur cette tâche.
