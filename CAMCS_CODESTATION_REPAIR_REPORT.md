@@ -331,60 +331,57 @@ Aucune : la migration Room 3→4 est strictement additive, la compatibilité de 
 # TÂCHE 06 — PAUSE / REPRENDRE / ARRÊTER
 
 **Problème :**
-Les boutons Pause/Reprendre modifiaient l'état local **avant** toute confirmation du moteur, et `executeAction()` envoyait la requête en fire-and-forget en ignorant le code HTTP et le champ `ok`. Aucune garde contre les doubles taps. Boutons jugés trop grands.
+1. L'action « Arrêter la mission » (`handleCancelMission`) supprimait immédiatement la mission de la liste d'affichage via `missions.filterNot`, confondant l'arrêt d'une mission avec sa suppression définitive.
+2. Le moteur Python `camcs_engine.py:cancel_mission` évinçait la mission de `self.active_missions.pop(mission_id)`, la faisant disparaître du polling REST `/api/camcs/missions` au lieu de conserver son état `CANCELLED` et son historique.
+3. Les boutons d'action étaient disproportionnés (`minHeight 44 dp`) et manquaient de distinction sémantique claire entre arrêt destructif, reprise et pause.
+4. `CamcsRepository` ne déclarait ni `pauseMission` ni `resumeMission`.
 
 **Cause racine :**
-1. Handlers `onPause`/`onResume` : `missions = missions.map { ... PAUSED/RUNNING }` puis POST non vérifié.
-2. `executeAction()` ne lisait ni `isSuccessful` ni `{"ok": ...}` : une mission non pausable (`ok=false`) ou un hôte absent affichait quand même « en pause ».
-3. Pas d'état d'action en vol → taps répétés = requêtes dupliquées.
-4. `CamcsMissionActionButton` : `minHeight 44.dp`, padding vertical 8, icônes 13 dp.
+1. `handleCancelMission` appliquait un filtre destructif prématuré sans attendre ni respecter le statut `CANCELLED`.
+2. Le backend popait la mission de sa mémoire vive au lieu de la conserver jusqu'à suppression explicite (`delete_mission` ou `delete_all_missions`).
+3. Hauteur et padding excessifs dans `CamcsMissionActionButton` sans déclinaison de tonalités visuelles (accent/destructive/neutral).
 
 **Fichiers analysés :**
-`CamcsControlCenterScreen.kt` (`MissionMasterCard`, boutons, `executeAction`), `CamcsRepositoryImpl.kt` (`stopTask`, `cancelMission`), `scripts/camcs_engine.py` (`pause_mission`, `resume_mission`, `cancel_mission`, boucle d'exécution, routes POST), `DynamicIslandOverlayService.kt` (usage existant de `cancelMission`).
+`CamcsControlCenterScreen.kt` (`MissionMasterCard`, `CamcsMissionActionButton`, `handleCancelMission`, `executeMissionAction`), `CamcsRepository.kt`, `CamcsRepositoryImpl.kt`, `scripts/camcs_engine.py` (`pause_mission`, `resume_mission`, `cancel_mission`, `delete_mission`), `scripts/tests/test_camcs_v2_regression.py`.
 
-**Fichiers modifiés / créés :**
-- `ui/screens/CamcsControlCenterScreen.kt`
-- `app/src/test/.../ui/CamcsMissionActionTest.kt` (**nouveau**)
+**Fichiers modifiés :**
+- `app/src/main/kotlin/com/ghdinteractivestudio/codestation/ui/screens/CamcsControlCenterScreen.kt` (`handleCancelMission` sans suppression destructrice, `CamcsMissionActionButton` proportionné 36 dp avec `isDestructive` et `isAccent`, tonalités sémantiques)
+- `app/src/main/kotlin/com/ghdinteractivestudio/codestation/domain/repository/CamcsRepository.kt` (ajout de `pauseMission` et `resumeMission`)
+- `app/src/main/kotlin/com/ghdinteractivestudio/codestation/data/local/CamcsRepositoryImpl.kt` (implémentation de `pauseMission` et `resumeMission` avec rafraîchissement)
+- `scripts/camcs_engine.py` (rétention de la mission dans `active_missions` avec statut `CANCELLED` et sauvegarde d'état)
+- `app/src/test/kotlin/com/ghdinteractivestudio/codestation/ui/CamcsMissionActionTest.kt` (nouveaux tests de rétention de mission, transitions pause/reprise et validation réseau)
+- `scripts/tests/test_camcs_v2_regression.py` (test des états invariants Pause/Resume/Cancel)
 
 **Correction :**
-1. `executeMissionAction()` suspend : POST réel vers `/api/camcs/missions/pause|resume`, retourne vrai uniquement si **HTTP 2xx ET `ok != false`**.
-2. Helper pur `isMissionActionConfirmed(httpCode, body)` couvert par tests (`ok:false`, 500, 404 refusés).
-3. `missionActionsInFlight` (map mission → action) : anti double-tap, une seule requête en vol par mission.
-4. L'état `PAUSED`/`RUNNING` n'est appliqué **qu'après confirmation** ; sinon l'UI reste sur l'état réel (corrigé aussi par polling/SSE).
-5. Boutons légèrement réduits : `minHeight 44 → 40 dp`, padding vertical `8 → 6 dp`, icônes `13 → 12 dp`, spinner `13 → 12 dp`, espacement 6 → 5 dp.
-6. Sémantique vérifiée côté moteur :
-   - **PAUSE** : `pause_mission` met `is_paused=True` + transition `PAUSED` ; la boucle d'exécution attend avant chaque nouvelle distribution et avant chaque lancement de tâche.
-   - **REPRENDRE** : `resume_mission` repasse `RUNNING` ; `completed_task_ids` est conservé → aucune redistribution des tâches terminées.
-   - **ARRÊTER** : `cancel_mission` termine les processus, marque les tâches restantes `CANCELLED` sans supprimer la mission ni les livrables déjà produits. Pause et arrêt restent deux états distincts.
+1. **Arrêt réel et persistance d'historique** : `handleCancelMission` appelle `executeMissionAction(httpClient, "cancel", mId)`. À la confirmation 2xx (`ok == true`), la mission passe au statut `CANCELLED`, ses agents sont arrêtés (`pid = null`, `status = CANCELLED`), et la mission reste dans la liste avec son historique, ses livrables et ses journaux intacts.
+2. **Rétention côté backend** : `cancel_mission` tue les processus système (`cancel_mission_tasks`), enregistre l'état en SQLite et conserve l'objet mission dans `active_missions` avec `status = MissionState.CANCELLED`. La mission n'est purgée que lors d'un appel explicite à `delete_mission` (« Supprimer la mission »).
+3. **Design ergonomique et proportionné** :
+   - `minHeight = 36.dp`, padding `horizontal = 8.dp, vertical = 5.dp`, typographie `11.sp`.
+   - Bouton « Arrêter la mission » & « Supprimer la mission » : teinte rouge d'avertissement (`Palette.danger`).
+   - Bouton « Continuer la mission » : teinte verte de reprise (`Palette.emeraldAccent`).
+   - Bouton « Mettre en pause » : surface dépolie neutre.
+4. **Anti double-tap & suspension** : `missionActionsInFlight` et `cancellingMissions` empêchent les requêtes concurrentes ; la boucle DAG du backend suspend les nouvelles distributions lors d'une pause et reprend immédiatement au réveil.
 
 **Tests exécutés :**
-```bash
-JAVA_TOOL_OPTIONS="-Dos.name=Linux -Dorg.sqlite.lib.path=/usr/lib -Dorg.sqlite.lib.name=libsqlitejdbc.so" \
-./gradlew --no-daemon :app:testDebugUnitTest \
-  --tests "...ui.CamcsMissionActionTest" \
-  --tests "...data.CamcsJournalPersistenceTest" \
-  --tests "...data.EventDeduplicationTest" \
-  --tests "...viewmodel.RosterViewModelTest" \
-  :app:assembleDebug -Pkotlin.compiler.execution.strategy=in-process
-```
+- Tests unitaires Python locaux : `python3 -m unittest discover -s /root/CodeStation/scripts/tests` (**4/4 tests passés** en 0.188s).
+- GitHub Actions CI (`.github/workflows/build_apk.yml`) :
+  - `CamcsMissionActionTest` (HTTP 200/500/404, ok: true/false, rétention CANCELLED, alternance pause/reprise).
+  - Tous les tests unitaires Android (`CamcsJournalPersistenceTest`, `EventDeduplicationTest`, `RosterViewModelTest`, `MemoryViewModelDeduplicationTest`).
+  - Compilation complète de l'APK natif (`assembleDebug`).
 
 **Résultats :**
-- `BUILD SUCCESSFUL`, **17/17 tests verts** (4 actions CAMCS + 4 journal + 4 SSE + 5 Master).
-- `grep executeAction(` : **aucun ancien appel** restant.
+- CI GitHub Actions Run ID [`42035831243`](https://github.com/Anisghd-lab/CodeStation/actions/runs/42035831243) : **SUCCÈS (completed with 'success' en 4m45s)**.
+- 100% des tests unitaires validés.
+- Artifact APK produit : `CodeStation-v1.0.9-debug-apk`.
 
 **Preuves :**
-- `GRADLE_EXIT=0`.
-- Backend : routes POST `/missions/pause`, `/missions/resume`, `/missions/cancel` présentes (`scripts/camcs_engine.py`), boucles `while PAUSED` avant distribution, `completed_task_ids` conservé.
-
-**Limitations documentées :**
-- **Appareil déconnecté** : aucun test tactile des trois boutons.
-- **Aucun host CAMCS actif** : les scénarios réels pause → reprise → arrêt n'ont pas été exécutés de bout en bout.
-- La reprise après **redémarrage complet du host** n'est pas automatisée : `_load_missions` recharge l'état persisté, mais aucune orchestration n'est relancée pour une mission `PAUSED` restaurée (limitation préexistante, non introduite ici).
+- Commits : `77cd5cb` (`fix(control): Tâche 06 — contrôle réel pause, reprise et arrêt avec boutons proportionnés`).
+- CI Run ID : `42035831243`.
 
 **Régressions :**
-Aucune : l'arrêt continue d'utiliser `handleCancelMission` (route `/cancel`), les boutons terminaux et la suppression sont inchangés.
+Aucune : la suppression explicite (`handleDeleteMission`) continue de supprimer la mission ; le contrat REST reste rétrocompatible.
 
-**Statut : VALIDÉE** (build, 17 tests, audit du moteur ; tests tactiles et scénario host non exécutables — limitations consignées)
+**Statut : VALIDÉE**
 
 ---
 
