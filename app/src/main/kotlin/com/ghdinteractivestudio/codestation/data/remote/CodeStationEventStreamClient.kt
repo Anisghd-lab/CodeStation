@@ -533,7 +533,12 @@ class CodeStationEventStreamClient(
                             else -> botId
                         }
 
-                        val conversationId = dataObj["conversationId"]?.jsonPrimitive?.content.orEmpty()
+                        val rawConvId = dataObj["conversationId"]?.jsonPrimitive?.content.orEmpty()
+                        val conversationId = if (rawConvId.isNotBlank()) {
+                            rawConvId
+                        } else {
+                            conversationDao?.getLatestConversationForBot(botId)?.id.orEmpty()
+                        }
                         val entity = ChatMessageEntity(
                             id = entryId,
                             botId = botId,

@@ -7,7 +7,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 /// Current schema version (kv `schema`).
-const SCHEMA: i64 = 6;
+const SCHEMA: i64 = 7;
 
 /// 3: authorized devices (keys, not push tickets) with their push and Live Activity
 /// tickets. The old ticket-only `devices` table is dropped; phones re-register on connect.
@@ -15,6 +15,7 @@ const SCHEMA: i64 = 6;
 /// per-bot ones go.
 /// 5: threads merge into their chats (quote replies took their place, see [`migrate_5`]).
 /// 6: the dividers that announced a fresh agent session go; the chat no longer shows session resets.
+/// 7: backfill conversationId for agent and thought entries from their user turns so messages display in chat conversations.
 fn migrate(c: &Connection) -> Result<()> {
     let version: i64 =
         c.query_row("SELECT CAST(v AS INTEGER) FROM kv WHERE k = 'schema'", [], |r| r.get(0)).optional()?.unwrap_or(0);
@@ -30,7 +31,10 @@ fn migrate(c: &Connection) -> Result<()> {
     if version < 5 {
         migrate_5(c)?;
     }
-    migrate_6(c)
+    if version < 6 {
+        migrate_6(c)?;
+    }
+    migrate_7(c)
 }
 
 fn migrate_3(c: &Connection) -> Result<()> {
@@ -131,6 +135,30 @@ fn migrate_6(c: &Connection) -> Result<()> {
     Ok(())
 }
 
+fn migrate_7(c: &Connection) -> Result<()> {
+    c.execute_batch(
+        "BEGIN;
+         UPDATE entries
+         SET data = json_set(entries.data, '$.conversationId', (
+             SELECT json_extract(u.data, '$.conversationId')
+             FROM entries u
+             WHERE u.bot_id = entries.bot_id AND u.turn = entries.turn AND u.kind = 'user'
+               AND json_extract(u.data, '$.conversationId') IS NOT NULL
+             LIMIT 1
+         ))
+         WHERE (kind = 'agent' OR kind = 'thought')
+           AND json_extract(data, '$.conversationId') IS NULL
+           AND EXISTS (
+             SELECT 1 FROM entries u
+             WHERE u.bot_id = entries.bot_id AND u.turn = entries.turn AND u.kind = 'user'
+               AND json_extract(u.data, '$.conversationId') IS NOT NULL
+           );
+         INSERT INTO kv(k, v) VALUES('schema', '7') ON CONFLICT(k) DO UPDATE SET v = '7';
+         COMMIT;",
+    )?;
+    Ok(())
+}
+
 impl Store {
     pub fn open(path: &Path) -> Result<Self> {
         let c = Connection::open(path)?;
@@ -191,7 +219,7 @@ mod tests {
         }
         let s = Store::open(&db).unwrap();
         assert!(s.devices().unwrap().is_empty());
-        assert_eq!(s.kv_get("schema").as_deref(), Some("6"));
+        assert_eq!(s.kv_get("schema").as_deref(), Some("7"));
         drop(s);
         let s = Store::open(&db).unwrap();
         assert!(s.devices().unwrap().is_empty(), "reopening keeps the new table");
@@ -214,7 +242,7 @@ mod tests {
         let s = Store::open(&db).unwrap();
         let chat: Vec<String> = s.history("b", i64::MAX, 10).unwrap().into_iter().map(|e| e.id).collect();
         assert_eq!(chat, ["info"]);
-        assert_eq!(s.kv_get("schema").as_deref(), Some("6"));
+        assert_eq!(s.kv_get("schema").as_deref(), Some("7"));
     }
 
     #[test]
@@ -260,5 +288,28 @@ mod tests {
         assert_eq!(s.kv_get("read.root"), None);
         assert_eq!(s.kv_get("lane.session.b@b/root"), None);
         assert_eq!(s.kv_get("lane.session.b@b/routine-r1").as_deref(), Some("s2"), "a run's session stays");
+    }
+
+    #[test]
+    fn migrate_7_backfills_conversation_id() {
+        let db = temp_db();
+        {
+            let c = Connection::open(&db).unwrap();
+            Store::open(&db).unwrap();
+            c.execute_batch(
+                "UPDATE kv SET v = '6' WHERE k = 'schema';
+                 INSERT INTO entries(id, bot_id, rev, kind, turn, data, created_at, updated_at) VALUES
+                   ('u1', 'b1', 1, 'user', 1, '{\"text\":\"Hello\",\"conversationId\":\"conv-test-1\"}', 0, 0),
+                   ('a1', 'b1', 2, 'agent', 1, '{\"text\":\"Hi!\",\"final\":true}', 0, 0),
+                   ('t1', 'b1', 3, 'thought', 1, '{\"text\":\"thinking\"}', 0, 0);",
+            )
+            .unwrap();
+        }
+        let s = Store::open(&db).unwrap();
+        assert_eq!(s.kv_get("schema").as_deref(), Some("7"));
+        let a1 = s.entry("a1").unwrap();
+        assert_eq!(a1.data["conversationId"].as_str(), Some("conv-test-1"));
+        let t1 = s.entry("t1").unwrap();
+        assert_eq!(t1.data["conversationId"].as_str(), Some("conv-test-1"));
     }
 }

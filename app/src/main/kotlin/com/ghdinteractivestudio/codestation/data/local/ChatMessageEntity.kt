@@ -136,7 +136,7 @@ interface MessageDao {
     @Query("SELECT * FROM chat_messages WHERE conversationId = :conversationId ORDER BY timestamp ASC")
     fun getMessagesByConversationIdStream(conversationId: String): Flow<List<ChatMessageEntity>>
 
-    @Query("SELECT * FROM chat_messages WHERE botId = :botId AND (:conversationId IS NULL OR :conversationId = '' OR conversationId = :conversationId) ORDER BY timestamp ASC")
+    @Query("SELECT * FROM chat_messages WHERE botId = :botId AND (:conversationId IS NULL OR :conversationId = '' OR conversationId = :conversationId OR conversationId = '' OR conversationId IS NULL) ORDER BY timestamp ASC")
     fun getMessagesByBotAndConversationStream(botId: String, conversationId: String?): Flow<List<ChatMessageEntity>>
 
     @Query("DELETE FROM chat_messages WHERE conversationId = :conversationId")

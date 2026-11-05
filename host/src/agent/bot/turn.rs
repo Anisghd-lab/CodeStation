@@ -324,15 +324,24 @@ impl Actor {
                         if !files.iter().any(|f| f["name"] == file_name) {
                             files.push(json!(snap.meta));
                             e.data["files"] = json!(files);
+                            if let Some(ref cid) = self.turn_conversation_id {
+                                if e.data.get("conversationId").is_none() {
+                                    e.data["conversationId"] = serde_json::json!(cid);
+                                }
+                            }
                             self.hub.set_entry(id, &e.data);
                         }
                     }
                 } else if let Some(turn_num) = self.turn {
-                    self.add(EntryKind::Agent, turn_num, json!({
+                    let mut data = json!({
                         "text": summary_line,
                         "final": true,
                         "files": [snap.meta]
-                    }));
+                    });
+                    if let Some(ref cid) = self.turn_conversation_id {
+                        data["conversationId"] = serde_json::json!(cid);
+                    }
+                    self.add(EntryKind::Agent, turn_num, data);
                 }
             }
         }
@@ -359,6 +368,9 @@ impl Actor {
                 // A bot request's answer belongs to the bot that sent it and the exchange notice.
                 if !delegated {
                     e.data["final"] = true.into();
+                    if let Some(ref cid) = self.turn_conversation_id {
+                        e.data["conversationId"] = serde_json::json!(cid);
+                    }
                     self.hub.set_entry(&id, &e.data);
                 }
                 final_text = text;

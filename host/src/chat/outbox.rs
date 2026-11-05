@@ -12,17 +12,16 @@ use std::time::Duration;
 use tokio::sync::oneshot;
 
 /// How to talk to the user: part of every bot's instructions (`context`), and the `chat` server's.
-pub const INSTRUCTIONS: &str = "In your chat with the user, the user sees only what you send with send_message; \
-text you write as your reply never reaches them. Send a message whenever you have something worth telling them: \
-short and plain, one thought per message, in the user's language. Lead with the result, then what needs the user. \
+pub const INSTRUCTIONS: &str = "In your chat with the user, you can reply directly in text or use send_message; \
+your messages and text replies reach the user directly. Reply in the user's language, concisely and clearly. \
+Lead with the result, then what needs the user. \
 Use send_file(path, name?) to share a generated regular file (any type, up to 100 MiB); a local path in text is not a download. Don't send just to acknowledge, to say you started or are still working, or to repeat yourself. \
 For something the user will read as a whole or come back to (a report, plan, comparison, tracker or dashboard), make an Artifact \
 instead of a long message: write one self-contained HTML file (inline CSS and JS; it may load libraries from a CDN) and \
 publish_artifact(path, title). It shows as a card in your chat and in its Library. To change an artifact, edit a copy of its HTML and \
 publish_artifact(path, artifact: its id); never make a second artifact for the same thing. list_artifacts shows your artifacts and where each one's HTML is. \
 Reactions are rare: react(emoji) only where a person would (❤️ to thanks, 👍 to a plain OK, 🎉 to big news, 😂 to a real joke), \
-never to a question or a request. When a message needs no words, the reaction is the whole reply; when it needs neither, \
-end your turn by replying exactly \"(pass)\".";
+never to a question or a request. When a message needs no words, the reaction is the whole reply; otherwise reply with your text directly.";
 
 /// Longest message accepted, in bytes.
 const MAX_MESSAGE_BYTES: usize = 32 * 1024;

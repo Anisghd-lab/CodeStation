@@ -134,7 +134,10 @@ impl Actor {
                 }
             }
             "plan" => {
-                let data = json!({"entries": u["entries"].clone(), "author": self.cfg.id});
+                let mut data = json!({"entries": u["entries"].clone(), "author": self.cfg.id});
+                if let Some(ref cid) = self.turn_conversation_id {
+                    data["conversationId"] = serde_json::json!(cid);
+                }
                 match &self.plan_entry {
                     Some(id) => {
                         self.hub.set_entry(id, &data);
@@ -356,10 +359,13 @@ impl Actor {
             && *dirty
             && (force || flushed.elapsed() >= Duration::from_millis(50))
         {
-            let data = match kind {
+            let mut data = match kind {
                 SegKind::Text => json!({"text": buf, "final": false, "author": self.cfg.id}),
                 SegKind::Thought => json!({"text": buf, "author": self.cfg.id}),
             };
+            if let Some(ref cid) = self.turn_conversation_id {
+                data["conversationId"] = serde_json::json!(cid);
+            }
             self.hub.set_entry(entry_id, &data);
             *flushed = Instant::now();
             *dirty = false;
