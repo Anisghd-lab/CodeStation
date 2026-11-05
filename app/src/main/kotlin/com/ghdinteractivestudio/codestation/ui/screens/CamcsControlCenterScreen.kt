@@ -871,8 +871,8 @@ fun CamcsControlCenterScreen(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(scrollState)
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             when (activeTab) {
                 0 -> {
@@ -1279,7 +1279,7 @@ private fun MissionMasterCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(
                 if (dark) Brush.linearGradient(
                     listOf(Color(0xFF141926), Color(0xFF1A1F30), Color(0xFF121622))
@@ -1287,10 +1287,10 @@ private fun MissionMasterCard(
                     listOf(Color(0xFFFFFFFF), Color(0xFFF8FAFC))
                 )
             )
-            .border(1.dp, Palette.glassBorder, RoundedCornerShape(22.dp))
-            .padding(14.dp)
+            .border(1.dp, Palette.glassBorder, RoundedCornerShape(18.dp))
+            .padding(12.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             // Header Row: Title & Status Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1351,7 +1351,7 @@ private fun MissionMasterCard(
             }
 
             // Big Progress Bar with Percentage
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1364,7 +1364,7 @@ private fun MissionMasterCard(
                     )
                     Text(
                         text = "${mission.progress}%",
-                        style = Type.headline.semibold.copy(fontSize = 20.sp),
+                        style = Type.headline.semibold.copy(fontSize = 18.sp),
                         color = electricGreen
                     )
                 }
@@ -1372,15 +1372,15 @@ private fun MissionMasterCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
                         .background(Palette.surface)
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(progressAnimated.coerceIn(0f, 1f))
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
                             .background(
                                 Brush.horizontalGradient(
                                     listOf(Palette.electricBlue, electricGreen)
@@ -1404,7 +1404,7 @@ private fun MissionMasterCard(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 MetricCapsule(label = agentsMetricLabel, value = agentsMetricValue, modifier = Modifier.weight(1f), isSuccess = isMissionDone && completedAgentsCount == mission.agents.size)
                 MetricCapsule(label = "Tâches", value = "$completedSubtasks/$totalSubtasks", modifier = Modifier.weight(1f), isSuccess = completedSubtasks == totalSubtasks && totalSubtasks > 0)
@@ -1558,10 +1558,10 @@ private fun MetricCapsule(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(9.dp))
             .background(Palette.surface.copy(alpha = 0.6f))
-            .border(0.5.dp, Palette.glassBorder, RoundedCornerShape(10.dp))
-            .padding(horizontal = 6.dp, vertical = 7.dp),
+            .border(0.5.dp, Palette.glassBorder, RoundedCornerShape(9.dp))
+            .padding(horizontal = 5.dp, vertical = 5.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1616,12 +1616,12 @@ private fun DispatchingPipelineCard(mission: CamcsMission) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(Palette.surface.copy(alpha = 0.5f))
-            .border(0.5.dp, Palette.glassBorder, RoundedCornerShape(18.dp))
-            .padding(12.dp)
+            .border(0.5.dp, Palette.glassBorder, RoundedCornerShape(16.dp))
+            .padding(10.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1656,12 +1656,12 @@ private fun DispatchingPipelineCard(mission: CamcsMission) {
                 steps.forEachIndexed { index, step ->
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
                         modifier = Modifier.weight(1f)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(24.dp)
+                                .size(22.dp)
                                 .clip(CircleShape)
                                 .background(
                                     when {
@@ -1682,10 +1682,10 @@ private fun DispatchingPipelineCard(mission: CamcsMission) {
                             contentAlignment = Alignment.Center
                         ) {
                             if (step.isDone) {
-                                Symbol("checkmark", size = 11.dp, tint = electricGreen)
+                                Symbol("checkmark", size = 10.dp, tint = electricGreen)
                             } else if (step.isActive) {
                                 CircularProgressIndicator(
-                                    modifier = Modifier.size(12.dp),
+                                    modifier = Modifier.size(11.dp),
                                     color = Palette.electricBlue,
                                     strokeWidth = 1.5.dp
                                 )
@@ -1779,23 +1779,23 @@ private fun LiveAgentCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(Palette.surface.copy(alpha = 0.7f))
             .border(
                 0.5.dp,
                 if (isAgentActive) electricGreen.copy(alpha = 0.5f) else Palette.glassBorder,
-                RoundedCornerShape(18.dp)
+                RoundedCornerShape(16.dp)
             )
-            .padding(12.dp)
+            .padding(10.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             // Header Row: Avatar, Name, Role & Status
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                CharacterAvatar(shape = agent.shape, color = agent.color, size = 38.dp)
+                CharacterAvatar(shape = agent.shape, color = agent.color, size = 34.dp)
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -2802,12 +2802,12 @@ private fun ExternalActionsIntegrityCard(actions: List<CamcsExternalAction>) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(Palette.surface.copy(alpha = 0.75f))
-            .border(0.5.dp, electricGreen.copy(alpha = 0.4f), RoundedCornerShape(18.dp))
-            .padding(12.dp)
+            .border(0.5.dp, electricGreen.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+            .padding(10.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -2815,9 +2815,9 @@ private fun ExternalActionsIntegrityCard(actions: List<CamcsExternalAction>) {
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Symbol("globe", size = 18.dp, tint = electricGreen)
+                    Symbol("globe", size = 16.dp, tint = electricGreen)
                     Text(
                         text = "VÉRIFICATION DES ACTIONS EXTERNES & INTÉGRITÉ",
                         style = Type.caption.semibold.copy(fontSize = 11.sp, letterSpacing = 0.5.sp),
@@ -2829,7 +2829,7 @@ private fun ExternalActionsIntegrityCard(actions: List<CamcsExternalAction>) {
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
                         .background(electricGreen.copy(alpha = 0.18f))
-                        .padding(horizontal = 7.dp, vertical = 2.dp)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     val confirmedCount = actions.count { it.status == "CONFIRMED" }
                     Text(
@@ -2861,9 +2861,9 @@ private fun ExternalActionsIntegrityCard(actions: List<CamcsExternalAction>) {
                         .clip(RoundedCornerShape(12.dp))
                         .background(Palette.surface.copy(alpha = 0.5f))
                         .border(0.5.dp, statusColor.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
-                        .padding(10.dp)
+                        .padding(8.dp)
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
