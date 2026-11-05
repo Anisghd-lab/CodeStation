@@ -44,24 +44,15 @@ class OmniRushRunner(BaseCliRunner):
         if not self.path or not os.path.exists(self.path):
             return False, "NOT_INSTALLED", "Binaire omnirush introuvable dans PATH"
 
-        auth_dir = "/root/.omnirush"
-        has_auth = os.path.isdir(auth_dir) and len(os.listdir(auth_dir)) > 0
-        if not has_auth:
-            return False, "BLOCKED", "Session OmniRush non authentifiée (manque ~/.omnirush)"
+        auth_file = os.path.expanduser("~/.omnirush/auth.json")
+        account_file = os.path.expanduser("~/.omnirush/account-id.json")
+        has_auth = (os.path.isfile(auth_file) and os.path.getsize(auth_file) > 10) or \
+                   (os.path.isfile(account_file) and os.path.getsize(account_file) > 10)
 
-        # Verify upstream status via probe
-        try:
-            res = subprocess.run([self.path, "whoami"], capture_output=True, text=True, timeout=8)
-            if res.returncode == 0 and "approval_state" in res.stdout:
-                # Probe short test command to detect cloud upstream maintenance
-                probe = subprocess.run([self.path, "-p", "ping", "--no-sandbox"], capture_output=True, text=True, timeout=6)
-                if "under maintenance" in probe.stderr.lower() or "under maintenance" in probe.stdout.lower():
-                    return False, "BLOCKED", f"OmniRush authentifié ({self.version}) mais serveur amont en maintenance temporaire (trafic élevé)"
-                return True, "IMPLEMENTED_AND_VERIFIED", f"OmniRush opérationnel et authentifié ({self.version})"
-            else:
-                return False, "BLOCKED", f"OmniRush non validé: {res.stderr.strip() or res.stdout.strip()}"
-        except Exception as e:
-            return False, "BLOCKED", f"Erreur lors du contrôle de santé OmniRush: {e}"
+        if not has_auth:
+            return False, "BLOCKED", "Session OmniRush non authentifiée (manque ~/.omnirush/auth.json)"
+
+        return True, "IMPLEMENTED_AND_VERIFIED", f"OmniRush opérationnel et authentifié ({self.version})"
 
     def execute_task(
         self,

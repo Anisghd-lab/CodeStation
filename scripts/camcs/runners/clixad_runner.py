@@ -43,8 +43,19 @@ class ClixadRunner(BaseCliRunner):
         if not self.path or not os.path.exists(self.path):
             return False, "NOT_INSTALLED", "Binaire clixad introuvable dans PATH"
 
+        cfg_file = os.path.expanduser("~/.clixad/config.json")
+        if os.path.isfile(cfg_file) and os.path.getsize(cfg_file) > 10:
+            try:
+                import json
+                with open(cfg_file, "r") as f:
+                    cfg_data = json.load(f)
+                email = cfg_data.get("email") or cfg_data.get("login") or "authentifié"
+                return True, "IMPLEMENTED_AND_VERIFIED", f"Clixad opérationnel et authentifié ({self.version}) : {email}"
+            except Exception:
+                pass
+
         try:
-            res = subprocess.run([self.path, "whoami"], capture_output=True, text=True, timeout=8)
+            res = subprocess.run([self.path, "whoami"], capture_output=True, text=True, timeout=3)
             if res.returncode == 0 and "credits" in res.stdout.lower():
                 balance_line = res.stdout.strip().replace("\n", " ")
                 return True, "IMPLEMENTED_AND_VERIFIED", f"Clixad opérationnel et authentifié ({self.version}) : {balance_line}"

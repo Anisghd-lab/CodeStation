@@ -65,14 +65,18 @@ class CliRegistry:
         official_order = ["clixad", "antigravity", "opencode", "codebuddy", "omnirush", "freebuff"]
 
         for cid in official_order:
+            t_check = time.time()
             runner = self._runners[cid]
             is_healthy, status_enum, details = self.check_cli_health(cid, force_refresh)
-            
+            latency_ms = max(1, int((time.time() - t_check) * 1000))
+
             # Map to Android CamcsCliStatus format
             if is_healthy:
                 android_status = "AVAILABLE"
             elif status_enum == "NOT_INSTALLED":
                 android_status = "NOT_INSTALLED"
+            elif status_enum in ("BLOCKED", "PARTIALLY_IMPLEMENTED"):
+                android_status = "BLOCKED"
             else:
                 android_status = "NOT_INSTALLED" if not runner.path else "AVAILABLE"
 
@@ -108,7 +112,8 @@ class CliRegistry:
                 "capabilities": capabilities_map.get(cid, []),
                 "healthStatus": status_enum,
                 "healthDetails": details,
-                "isOperational": is_healthy
+                "isOperational": is_healthy,
+                "latencyMs": latency_ms
             })
 
         return results

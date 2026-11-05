@@ -53,6 +53,30 @@ CANDIDATES = [
         "custom_paths": ["/usr/local/bin/gemini", "/root/.npm-global/bin/gemini"],
         "integration": "Gemini ACP (--acp)",
         "doc_hint": "Install Gemini CLI (npm install -g @google/gemini-cli) and sign in."
+    },
+    {
+        "id": "clixad",
+        "name": "Clixad",
+        "bins": ["clixad"],
+        "custom_paths": ["/usr/bin/clixad", "/usr/local/bin/clixad"],
+        "integration": "Terminal Free Coding (-p) / Ad-supported",
+        "doc_hint": "Install Clixad (npm i -g clixad) and authenticate with clixad login."
+    },
+    {
+        "id": "omnirush",
+        "name": "OmniRush",
+        "bins": ["omnirush"],
+        "custom_paths": ["/usr/bin/omnirush", "/usr/local/bin/omnirush"],
+        "integration": "OmniRush AI Engine / One-shot (-p)",
+        "doc_hint": "Install OmniRush and run omnirush login."
+    },
+    {
+        "id": "freebuff",
+        "name": "Freebuff",
+        "bins": ["freebuff"],
+        "custom_paths": ["/usr/bin/freebuff", "/usr/local/bin/freebuff", "/root/.config/manicode/freebuff"],
+        "integration": "Interactive TUI (Curses) / Tree-sitter AST",
+        "doc_hint": "Install Freebuff and run freebuff login."
     }
 ]
 
@@ -96,12 +120,43 @@ def check_agent(candidate):
             authenticated = True
         elif candidate["id"] == "opencode":
             available = True
-            auth_file = os.path.expanduser("~/.opencode/auth.json")
-            if os.path.exists(auth_file):
+            cfg_paths = [
+                os.path.expanduser("~/.config/opencode/opencode.json"),
+                os.path.expanduser("~/.config/opencode/cli.json"),
+                os.path.expanduser("~/.opencode/auth.json")
+            ]
+            if any(os.path.exists(p) for p in cfg_paths):
                 authenticated = True
             else:
                 authenticated = False
-                unavailability_reason = "Credits épuisés ou compte non authentifié (run 'opencode auth login')"
+                unavailability_reason = "Configuration introuvable (run 'opencode auth login')"
+        elif candidate["id"] == "clixad":
+            available = True
+            clixad_cfg = os.path.expanduser("~/.clixad/config.json")
+            if os.path.isfile(clixad_cfg) and os.path.getsize(clixad_cfg) > 10:
+                authenticated = True
+            else:
+                authenticated = False
+                unavailability_reason = "Identifiants Clixad manquants (run 'clixad login')"
+        elif candidate["id"] == "omnirush":
+            available = True
+            omni_auth = os.path.expanduser("~/.omnirush/auth.json")
+            omni_acc = os.path.expanduser("~/.omnirush/account-id.json")
+            if (os.path.isfile(omni_auth) and os.path.getsize(omni_auth) > 10) or (os.path.isfile(omni_acc) and os.path.getsize(omni_acc) > 10):
+                authenticated = True
+            else:
+                authenticated = False
+                unavailability_reason = "Identifiants OmniRush manquants (run 'omnirush login')"
+        elif candidate["id"] == "freebuff":
+            freebuff_cred = os.path.expanduser("~/.config/manicode/credentials.json")
+            if os.path.isfile(freebuff_cred) and os.path.getsize(freebuff_cred) > 0:
+                authenticated = True
+                available = False  # Limited to interactive TUI
+                unavailability_reason = "Mode TUI interactif uniquement (en attente de mode non-interactif upstream)"
+            else:
+                authenticated = False
+                available = False
+                unavailability_reason = "Identifiants Freebuff manquants (~/.config/manicode/credentials.json)"
         elif candidate["id"] == "codex":
             codex_auth = os.path.expanduser("~/.codex/auth.json")
             if os.path.exists(codex_auth) and os.path.getsize(codex_auth) > 5:

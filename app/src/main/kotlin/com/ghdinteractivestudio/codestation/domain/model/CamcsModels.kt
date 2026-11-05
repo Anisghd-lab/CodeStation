@@ -175,12 +175,16 @@ data class CamcsCliStatus(
     @SerialName("name") val name: String,
     @SerialName("path") val path: String,
     @SerialName("version") val version: String,
-    @SerialName("status") val status: String = "AVAILABLE", // ACTIVE, AVAILABLE, NOT_INSTALLED
+    @SerialName("status") val status: String = "AVAILABLE", // ACTIVE, AVAILABLE, NOT_INSTALLED, BLOCKED
     @SerialName("isInstalled") val isInstalled: Boolean = true,
     @SerialName("activeAgent") val activeAgent: String? = null,
     @SerialName("accessibleModels") val accessibleModels: List<String> = emptyList(),
     @SerialName("activeSessions") val activeSessions: Int = 0,
-    @SerialName("capabilities") val capabilities: List<String> = emptyList()
+    @SerialName("capabilities") val capabilities: List<String> = emptyList(),
+    @SerialName("healthStatus") val healthStatus: String? = null,
+    @SerialName("healthDetails") val healthDetails: String? = null,
+    @SerialName("isOperational") val isOperational: Boolean = true,
+    @SerialName("latencyMs") val latencyMs: Long? = null
 )
 
 @Serializable

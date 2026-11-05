@@ -1004,6 +1004,20 @@ fun CamcsControlCenterScreen(
                         style = Type.footnote,
                         color = Palette.text
                     )
+                    if (!cli.healthDetails.isNullOrBlank()) {
+                        Text(
+                            text = "Diagnostic : ${cli.healthDetails}",
+                            style = Type.caption.semibold,
+                            color = if (cli.isOperational) Palette.emeraldAccent else Palette.warning
+                        )
+                    }
+                    if (cli.latencyMs != null && cli.latencyMs > 0) {
+                        Text(
+                            text = "Latence de détection : ${cli.latencyMs} ms",
+                            style = Type.caption,
+                            color = Palette.tertiary
+                        )
+                    }
                     if (cli.activeAgent != null) {
                         Text(
                             text = "⚡ Actuellement mobilisé par : ${cli.activeAgent}",
@@ -2659,18 +2673,34 @@ private fun ProvidersAndClisView(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
                             .background(
-                                when (cli.status) {
-                                    "ACTIVE" -> electricGreen.copy(alpha = 0.2f)
-                                    "AVAILABLE" -> Palette.emeraldAccent.copy(alpha = 0.15f)
-                                    else -> Palette.surface
+                                when {
+                                    cli.status == "ACTIVE" -> electricGreen.copy(alpha = 0.2f)
+                                    !cli.isOperational && cli.healthStatus == "PARTIALLY_IMPLEMENTED" -> Palette.warning.copy(alpha = 0.15f)
+                                    !cli.isOperational || cli.status == "BLOCKED" -> Palette.warning.copy(alpha = 0.15f)
+                                    cli.status == "NOT_INSTALLED" -> Palette.danger.copy(alpha = 0.15f)
+                                    else -> Palette.emeraldAccent.copy(alpha = 0.15f)
                                 }
                             )
                             .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
+                        val statusLabel = when {
+                            cli.status == "ACTIVE" -> "Actif"
+                            !cli.isOperational && cli.healthStatus == "PARTIALLY_IMPLEMENTED" -> "TUI seul"
+                            !cli.isOperational || cli.status == "BLOCKED" -> "Bloqué"
+                            cli.status == "NOT_INSTALLED" -> "Non installé"
+                            else -> "Opérationnel"
+                        }
+                        val statusColor = when {
+                            cli.status == "ACTIVE" -> electricGreen
+                            !cli.isOperational || cli.status == "BLOCKED" -> Palette.warning
+                            cli.status == "NOT_INSTALLED" -> Palette.danger
+                            else -> Palette.emeraldAccent
+                        }
+                        val latencyBadge = if (cli.latencyMs != null && cli.latencyMs > 0) " (${cli.latencyMs}ms)" else ""
                         Text(
-                            text = "${cli.version}  •  ${if (cli.status == "ACTIVE") "Actif" else "Disponible"}",
+                            text = "${cli.version}  •  $statusLabel$latencyBadge",
                             style = Type.caption.semibold.copy(fontSize = 10.sp),
-                            color = if (cli.status == "ACTIVE") electricGreen else Palette.emeraldAccent
+                            color = statusColor
                         )
                     }
                 }
