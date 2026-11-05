@@ -305,22 +305,23 @@ fun CamcsControlCenterScreen(
     val handleCancelMission: (String) -> Unit = { mId ->
         if (cancellingMissions[mId] != true) {
             cancellingMissions[mId] = true
-            // Immediately close tracking window for this mission
-            missions = missions.filterNot { it.id == mId }
-            if (selectedMissionId == mId) {
-                selectedMissionId = missions.firstOrNull()?.id
-            }
             CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val req = Request.Builder()
-                        .url("http://127.0.0.1:19223/api/camcs/missions/cancel")
-                        .post("""{"missionId": "$mId"}""".toRequestBody("application/json".toMediaType()))
-                        .build()
-                    httpClient.newCall(req).execute().close()
-                } catch (_: Exception) {
-                } finally {
-                    withContext(Dispatchers.Main) {
-                        cancellingMissions.remove(mId)
+                val ok = executeMissionAction(httpClient, "cancel", mId)
+                withContext(Dispatchers.Main) {
+                    cancellingMissions.remove(mId)
+                    if (ok) {
+                        missions = missions.map { m ->
+                            if (m.id == mId) {
+                                m.copy(
+                                    status = "CANCELLED",
+                                    lastTransitionReason = "Mission arrêtée par l'utilisateur",
+                                    lastTransitionTime = System.currentTimeMillis() / 1000.0,
+                                    agents = m.agents.map { ag ->
+                                        ag.copy(status = "CANCELLED", pid = null)
+                                    }
+                                )
+                            } else m
+                        }
                     }
                 }
             }
@@ -1430,7 +1431,8 @@ private fun MissionMasterCard(
                         modifier = Modifier.weight(1f),
                         enabled = (canPause || isPaused) && !isCancelling && !actionPending,
                         isLoading = pendingAction == (if (isPaused) "resume" else "pause"),
-                        loadingText = if (isPaused) "Reprise..." else "Mise en pause..."
+                        loadingText = if (isPaused) "Reprise..." else "Mise en pause...",
+                        isAccent = isPaused
                     )
 
                     CamcsMissionActionButton(
@@ -1440,7 +1442,8 @@ private fun MissionMasterCard(
                         modifier = Modifier.weight(1f),
                         enabled = (canCancel || isPaused) && !isCancelling && !actionPending,
                         isLoading = isCancelling,
-                        loadingText = "Arrêt en cours..."
+                        loadingText = "Arrêt en cours...",
+                        isDestructive = true
                     )
                 }
             } else if (isTerminalState(mission.status)) {
@@ -1456,7 +1459,8 @@ private fun MissionMasterCard(
                         modifier = Modifier.weight(1f),
                         enabled = !isDeleting,
                         isLoading = isDeleting,
-                        loadingText = "Suppression..."
+                        loadingText = "Suppression...",
+                        isDestructive = true
                     )
                 }
             }
@@ -1472,20 +1476,40 @@ private fun CamcsMissionActionButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     isLoading: Boolean = false,
-    loadingText: String = "Arrêt en cours..."
+    loadingText: String = "Arrêt en cours...",
+    isDestructive: Boolean = false,
+    isAccent: Boolean = false
 ) {
+    val dark = LocalDark.current
     val (source, pressed) = rememberPress()
     val pillShape = Capsule()
+
+    val bg = when {
+        isDestructive -> Palette.danger.copy(alpha = if (dark) 0.14f else 0.08f)
+        isAccent -> Palette.emeraldAccent.copy(alpha = if (dark) 0.16f else 0.10f)
+        else -> Palette.bubbleUser
+    }
+    val borderCol = when {
+        isDestructive -> Palette.danger.copy(alpha = 0.35f)
+        isAccent -> Palette.emeraldAccent.copy(alpha = 0.4f)
+        else -> Palette.glassBorder
+    }
+    val contentCol = when {
+        isDestructive -> Palette.danger
+        isAccent -> if (dark) Color(0xFF00E676) else Color(0xFF059669)
+        else -> Palette.text
+    }
+
     Box(
         modifier = modifier
             .pressScale(pressed)
             .graphicsLayer { alpha = if (enabled) (if (pressed) 0.85f else 1f) else 0.4f }
-            .background(Palette.bubbleUser, pillShape)
-            .border(0.5.dp, Palette.glassBorder, pillShape)
+            .background(bg, pillShape)
+            .border(0.5.dp, borderCol, pillShape)
             .clip(pillShape)
             .clickable(source, null, enabled = enabled && !isLoading, role = Role.Button, onClick = action)
-            .padding(horizontal = 8.dp, vertical = 6.dp)
-            .defaultMinSize(minHeight = 40.dp),
+            .padding(horizontal = 8.dp, vertical = 5.dp)
+            .defaultMinSize(minHeight = 36.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -1494,31 +1518,31 @@ private fun CamcsMissionActionButton(
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(12.dp),
-                    color = Palette.text,
+                    modifier = Modifier.size(11.dp),
+                    color = contentCol,
                     strokeWidth = 1.5.dp
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = loadingText,
-                    style = Type.caption.semibold,
-                    color = Palette.text,
+                    style = Type.caption.semibold.copy(fontSize = 11.sp),
+                    color = contentCol,
                     textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    softWrap = true
+                    maxLines = 1,
+                    softWrap = false
                 )
             } else {
                 if (icon != null) {
-                    Symbol(icon, size = 12.dp, tint = Palette.text)
+                    Symbol(icon, size = 11.dp, tint = contentCol)
                     Spacer(modifier = Modifier.width(5.dp))
                 }
                 Text(
                     text = text,
-                    style = Type.caption.semibold,
-                    color = Palette.text,
+                    style = Type.caption.semibold.copy(fontSize = 11.sp),
+                    color = contentCol,
                     textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    softWrap = true
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         }

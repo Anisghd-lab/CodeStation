@@ -1625,8 +1625,7 @@ class CamcsOrchestrationEngine:
                     self._save_task(t)
 
             self._save_mission_state(m)
-            # Remove from active memory so tracking window closes immediately
-            self.active_missions.pop(mission_id, None)
+            # Retain in active_missions with CANCELLED status so history and final deliverables remain accessible
 
         self.emit_event(
             mission_id, "mission.cancelled",

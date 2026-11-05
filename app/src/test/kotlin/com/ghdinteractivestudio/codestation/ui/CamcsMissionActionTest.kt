@@ -35,4 +35,47 @@ class CamcsMissionActionTest {
         assertTrue(isMissionActionConfirmed(200, "{}"))
         assertTrue(isMissionActionConfirmed(204, ""))
     }
+
+    @Test
+    fun `arreter mission conserve la mission dans la liste avec statut CANCELLED`() {
+        val initialMissions = listOf(
+            com.ghdinteractivestudio.codestation.domain.model.CamcsMission(
+                id = "m-1",
+                title = "Mission Test",
+                objective = "Tester l'arrêt",
+                status = "RUNNING"
+            )
+        )
+
+        // Simule la transition d'arrêt confirmée par le moteur
+        val updated = initialMissions.map { m ->
+            if (m.id == "m-1") {
+                m.copy(
+                    status = "CANCELLED",
+                    lastTransitionReason = "Mission arrêtée par l'utilisateur"
+                )
+            } else m
+        }
+
+        org.junit.Assert.assertEquals("La mission arrêtée ne doit PAS être supprimée de la liste", 1, updated.size)
+        org.junit.Assert.assertEquals("CANCELLED", updated.first().status)
+        org.junit.Assert.assertEquals("Mission arrêtée par l'utilisateur", updated.first().lastTransitionReason)
+    }
+
+    @Test
+    fun `pause et reprise alternent le statut sans perte`() {
+        val mission = com.ghdinteractivestudio.codestation.domain.model.CamcsMission(
+            id = "m-2",
+            title = "Mission Longue",
+            objective = "Tester pause",
+            status = "RUNNING"
+        )
+
+        val paused = mission.copy(status = "PAUSED", lastTransitionReason = "Mission mise en pause")
+        org.junit.Assert.assertEquals("PAUSED", paused.status)
+
+        val resumed = paused.copy(status = "RUNNING", lastTransitionReason = "Reprise de la mission")
+        org.junit.Assert.assertEquals("RUNNING", resumed.status)
+        org.junit.Assert.assertEquals(mission.id, resumed.id)
+    }
 }

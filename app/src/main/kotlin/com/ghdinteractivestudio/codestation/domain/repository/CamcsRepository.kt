@@ -13,6 +13,8 @@ interface CamcsRepository {
     /** Réinterroge l'hôte CAMCS. Retourne un échec (sans lever) si l'hôte est injoignable. */
     suspend fun refreshMissions(): Result<Unit>
     suspend fun stopTask(missionId: String, taskId: String? = null, agentId: String? = null): Boolean
+    suspend fun pauseMission(missionId: String): Boolean
+    suspend fun resumeMission(missionId: String): Boolean
     suspend fun cancelMission(missionId: String): Boolean
     suspend fun deleteMission(missionId: String): Boolean
     suspend fun clearPastMissions(onlyPast: Boolean = true): Boolean

@@ -116,5 +116,18 @@ class TestCamcsV2Regression(unittest.TestCase):
             self.assertFalse(valid)
             self.assertIn("Zéro livrable physique enregistré", reason)
 
+    def test_mission_pause_resume_cancel_states(self):
+        """Test non-regression Tâche 06: pause, resume, and cancel state invariants."""
+        from camcs.state_machines import MissionState, AgentState, TaskState
+
+        self.assertEqual(MissionState.PAUSED, "PAUSED")
+        self.assertEqual(MissionState.CANCELLED, "CANCELLED")
+        self.assertEqual(MissionState.RUNNING, "RUNNING")
+
+        # Terminal state invariant
+        self.assertIn(MissionState.CANCELLED, MissionState.TERMINAL_STATES)
+        self.assertNotIn(MissionState.PAUSED, MissionState.TERMINAL_STATES)
+        self.assertNotIn(MissionState.RUNNING, MissionState.TERMINAL_STATES)
+
 if __name__ == "__main__":
     unittest.main()
