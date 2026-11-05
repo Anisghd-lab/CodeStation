@@ -10,7 +10,8 @@ import kotlinx.coroutines.flow.StateFlow
 interface CamcsRepository {
     val activeMissionStream: StateFlow<CamcsMission?>
     val allMissionsStream: StateFlow<List<CamcsMission>>
-    suspend fun refreshMissions()
+    /** Réinterroge l'hôte CAMCS. Retourne un échec (sans lever) si l'hôte est injoignable. */
+    suspend fun refreshMissions(): Result<Unit>
     suspend fun stopTask(missionId: String, taskId: String? = null, agentId: String? = null): Boolean
     suspend fun cancelMission(missionId: String): Boolean
     suspend fun deleteMission(missionId: String): Boolean

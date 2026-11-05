@@ -85,6 +85,7 @@ class RosterViewModelTest {
         coEvery { botRepository.refreshBots() } returns Result.success(sampleBots)
         coEvery { serverRepository.testConnection() } returns Result.success(ServerConfig())
         coEvery { memoryRepository.refreshStatus() } returns Result.success(CollectiveMemoryStatus())
+        coEvery { camcsRepository.refreshMissions() } returns Result.success(Unit)
 
         val viewModel = RosterViewModel(botRepository, serverRepository, memoryRepository, camcsRepository)
         backgroundScope.launch(testDispatcher) { viewModel.uiState.collect() }
@@ -97,7 +98,10 @@ class RosterViewModelTest {
         coVerify(exactly = 1) { serverRepository.testConnection() }
         coVerify(exactly = 1) { camcsRepository.refreshMissions() }
         coVerify(atLeast = 1) { memoryRepository.refreshStatus() }
-        assertFalse("L'indicateur de rafraîchissement doit retomber", viewModel.uiState.value.isRefreshing)
+        val finalState = viewModel.uiState.value
+        assertFalse("L'indicateur de rafraîchissement doit retomber", finalState.isRefreshing)
+        org.junit.Assert.assertNull("Aucune erreur après rafraîchissement réussi", finalState.refreshError)
+        assertEquals("Tous les bots sont toujours affichés", 3, finalState.totalCount)
     }
 
     @Test
@@ -107,6 +111,7 @@ class RosterViewModelTest {
             delay(500)
             Result.success(sampleBots)
         }
+        coEvery { camcsRepository.refreshMissions() } returns Result.success(Unit)
 
         val viewModel = RosterViewModel(botRepository, serverRepository, camcsRepository = camcsRepository)
         backgroundScope.launch(testDispatcher) { viewModel.uiState.collect() }
@@ -122,9 +127,11 @@ class RosterViewModelTest {
     }
 
     @Test
-    fun `un echec du backend camcs ne fait pas planter le refresh`() = runTest(testDispatcher) {
+    fun `un echec du backend camcs ne fait pas planter le refresh et remonte l'erreur sans effacer les donnees`() = runTest(testDispatcher) {
         val camcsRepository: CamcsRepository = mockk(relaxed = true)
-        coEvery { camcsRepository.refreshMissions() } throws java.net.ConnectException("Connection refused")
+        coEvery { botRepository.refreshBots() } returns Result.success(sampleBots)
+        coEvery { serverRepository.testConnection() } returns Result.success(ServerConfig())
+        coEvery { camcsRepository.refreshMissions() } returns Result.failure(java.net.ConnectException("Connection refused"))
 
         val viewModel = RosterViewModel(botRepository, serverRepository, camcsRepository = camcsRepository)
         backgroundScope.launch(testDispatcher) { viewModel.uiState.collect() }
@@ -134,7 +141,15 @@ class RosterViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         coVerify(exactly = 1) { camcsRepository.refreshMissions() }
-        assertFalse("L'indicateur doit retomber malgré l'erreur réseau", viewModel.uiState.value.isRefreshing)
+        val state = viewModel.uiState.value
+        assertFalse("L'indicateur doit retomber malgré l'erreur réseau", state.isRefreshing)
+        assertNotNull("L'erreur réelle doit être exposée dans l'UI", state.refreshError)
+        assertTrue("L'erreur doit mentionner CAMCS", state.refreshError!!.contains("CAMCS"))
+        assertEquals("Les bots existants ne sont pas perdus", 3, state.totalCount)
+
+        viewModel.dismissRefreshError()
+        testDispatcher.scheduler.advanceUntilIdle()
+        org.junit.Assert.assertNull("L'erreur est effacée après dismiss", viewModel.uiState.value.refreshError)
     }
 
     @Test

@@ -34,11 +34,18 @@ data class RosterUiState(
     val serverConfig: ServerConfig = ServerConfig(),
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
+    val refreshError: String? = null,
     val searchQuery: String = "",
     val activeFilter: BotFilter = BotFilter.ALL
 ) {
     val totalCount: Int get() = (if (leadBot != null) 1 else 0) + pinnedBots.size + otherBots.size
 }
+
+/** État interne du Pull-to-Refresh : actualisation en cours + dernière erreur réelle remontée. */
+data class RefreshState(
+    val isRefreshing: Boolean = false,
+    val error: String? = null
+)
 
 class RosterViewModel(
     private val botRepository: BotRepository,
@@ -50,7 +57,8 @@ class RosterViewModel(
     private var refreshJob: Job? = null
     private val _searchQuery = MutableStateFlow("")
     private val _activeFilter = MutableStateFlow(BotFilter.ALL)
-    private val _isRefreshing = MutableStateFlow(false)
+    // État du Pull-to-Refresh : indicateur + dernière erreur réelle (un seul flux pour combine)
+    private val _refreshState = MutableStateFlow(RefreshState())
     private val _memoryStatus = MutableStateFlow(CollectiveMemoryStatus())
     val memoryStatus: StateFlow<CollectiveMemoryStatus> = _memoryStatus.asStateFlow()
 
@@ -70,8 +78,8 @@ class RosterViewModel(
         serverRepository.getServerConfigStream(),
         _searchQuery,
         _activeFilter,
-        _isRefreshing
-    ) { bots, serverConfig, query, filter, refreshing ->
+        _refreshState
+    ) { bots, serverConfig, query, filter, refresh ->
         // Filtrage par texte de recherche
         val filtered = bots.filter { bot ->
             query.isBlank() || bot.name.contains(query, ignoreCase = true) || bot.description.contains(query, ignoreCase = true)
@@ -93,7 +101,8 @@ class RosterViewModel(
             otherBots = others,
             serverConfig = serverConfig,
             isLoading = false,
-            isRefreshing = refreshing,
+            isRefreshing = refresh.isRefreshing,
+            refreshError = refresh.error,
             searchQuery = query,
             activeFilter = filter
         )
@@ -119,29 +128,44 @@ class RosterViewModel(
     fun refresh() {
         if (refreshJob?.isActive == true) return
         refreshJob = viewModelScope.launch {
-            _isRefreshing.value = true
+            _refreshState.value = RefreshState(isRefreshing = true, error = null)
+            val errors = mutableListOf<String>()
             try {
-                safely { botRepository.refreshBots() }
-                safely { serverRepository.testConnection() }
-                memoryRepository?.let { repo -> safely { repo.refreshStatus() } }
-                camcsRepository?.let { repo -> safely { repo.refreshMissions() } }
+                safely("Bots", errors) { botRepository.refreshBots() }
+                safely("Hôte", errors) { serverRepository.testConnection() }
+                memoryRepository?.let { repo -> safely("Mémoire", errors) { repo.refreshStatus() } }
+                camcsRepository?.let { repo -> safely("CAMCS", errors) { repo.refreshMissions() } }
             } finally {
-                _isRefreshing.value = false
+                _refreshState.value = RefreshState(
+                    isRefreshing = false,
+                    error = errors.takeIf { it.isNotEmpty() }?.joinToString(" · ")
+                )
             }
         }
+    }
+
+    /** Masque le bandeau d'erreur d'actualisation (action explicite de l'utilisateur). */
+    fun dismissRefreshError() {
+        _refreshState.value = _refreshState.value.copy(error = null)
     }
 
     /**
      * Isole chaque source : une erreur réseau (hôte absent, timeout) ne doit ni interrompre
      * l'actualisation des autres sources, ni remonter jusqu'au scope du ViewModel.
+     * Les échecs (exception OU `Result.failure`) sont collectés dans [errors] pour être affichés :
+     * les données déjà affichées sont conservées, mais l'erreur n'est jamais masquée.
      */
-    private suspend fun safely(block: suspend () -> Unit) {
+    private suspend fun safely(
+        source: String,
+        errors: MutableList<String>,
+        block: suspend () -> Result<*>
+    ) {
         try {
-            block()
+            block().onFailure { errors += "$source : ${it.message ?: it::class.simpleName}" }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
-        } catch (_: Exception) {
-            // Échec de cette source uniquement : les données déjà affichées sont conservées.
+        } catch (e: Exception) {
+            errors += "$source : ${e.message ?: e::class.simpleName}"
         }
     }
 

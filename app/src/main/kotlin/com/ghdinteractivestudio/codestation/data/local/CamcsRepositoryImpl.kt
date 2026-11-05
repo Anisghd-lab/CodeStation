@@ -36,6 +36,12 @@ class CamcsRepositoryImpl : CamcsRepository {
         .readTimeout(0, TimeUnit.MILLISECONDS) // SSE Stream infinite timeout
         .build()
 
+    // Client REST borné (dérivé du client partagé : même pool de connexions) pour les requêtes courtes.
+    private val restClient = httpClient.newBuilder()
+        .readTimeout(10, TimeUnit.SECONDS)
+        .callTimeout(15, TimeUnit.SECONDS)
+        .build()
+
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -98,17 +104,26 @@ class CamcsRepositoryImpl : CamcsRepository {
         }
     }
 
-    private suspend fun refreshMissionsInternal() = withContext(Dispatchers.IO) {
+    /**
+     * Requête REST de liste des missions (polling + Pull-to-Refresh du Master).
+     * Le client partagé a un readTimeout infini (nécessaire au flux SSE) : sans délai borné ici,
+     * un hôte qui accepte la connexion sans répondre bloquerait l'indicateur de rafraîchissement
+     * et la boucle de polling indéfiniment.
+     *
+     * @return `true` si l'hôte a répondu 2xx et que la liste a été mise à jour.
+     * @throws java.io.IOException en cas d'échec réseau (géré par les appelants).
+     */
+    private suspend fun refreshMissionsInternal(): Boolean = withContext(Dispatchers.IO) {
         val req = Request.Builder().url("http://127.0.0.1:19223/api/camcs/missions").build()
-        val resp = httpClient.newCall(req).execute()
-        if (resp.isSuccessful) {
+        restClient.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) return@use false
             val body = resp.body?.string() ?: ""
             val parsed = json.decodeFromString<CamcsMissionsResponse>(body)
             val sorted = parsed.missions.sortedByDescending { it.createdAt }
             _allMissionsStream.value = sorted
             updateActiveMissionFromList(sorted)
+            true
         }
-        resp.close()
     }
 
     private fun updateActiveMissionFromList(missions: List<CamcsMission>) {
@@ -268,14 +283,19 @@ class CamcsRepositoryImpl : CamcsRepository {
         } catch (_: Exception) {}
     }
 
-    override suspend fun refreshMissions() {
-        try {
-            refreshMissionsInternal()
+    override suspend fun refreshMissions(): Result<Unit> {
+        return try {
+            if (refreshMissionsInternal()) {
+                Result.success(Unit)
+            } else {
+                Result.failure(java.io.IOException("Hôte CAMCS : réponse HTTP non valide"))
+            }
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
-            // Hôte CAMCS indisponible : conserver le dernier état connu sans propager
-            // l'erreur réseau à l'appelant (le refresh ne doit jamais tuer l'app).
+        } catch (e: Exception) {
+            // Hôte CAMCS indisponible : le dernier état connu est conservé, l'erreur est
+            // retournée à l'appelant (jamais propagée en exception : le refresh ne tue pas l'app).
+            Result.failure(e)
         }
     }
 

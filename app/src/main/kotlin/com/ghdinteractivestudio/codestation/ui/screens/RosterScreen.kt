@@ -318,6 +318,35 @@ fun RosterScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                // Tâche 01 : échec réel d'une source lors de l'actualisation (jamais masqué)
+                state.refreshError?.let { error ->
+                    item("refresh_error_banner") {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clip(Capsule())
+                                .background(Palette.warning.copy(alpha = 0.12f))
+                                .clickable(role = Role.Button) { viewModel.dismissRefreshError() }
+                                .padding(horizontal = 14.dp, vertical = 8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Symbol("exclamationmark.triangle.fill", size = 14.dp, tint = Palette.warning)
+                                Text(
+                                    "Actualisation incomplète — $error",
+                                    style = Type.footnote,
+                                    color = Palette.warning,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+
                 if (!isConnected && !isConnecting) {
                     item("offline_banner") {
                         Box(
