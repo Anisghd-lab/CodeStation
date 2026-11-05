@@ -15,7 +15,10 @@ Only secure masked fingerprints (e.g., 'sk-or-***...c91') are exposed.
 
 import os
 import re
-import yaml
+try:
+    import yaml
+except ImportError:
+    yaml = None
 import json
 import hashlib
 from typing import Dict, List, Optional, Any
@@ -70,9 +73,19 @@ class SecretResolver:
         if os.path.exists(hosts_path):
             try:
                 with open(hosts_path, "r", encoding="utf-8") as f:
-                    data = yaml.safe_load(f)
-                    gh_entry = data.get("github.com", {})
-                    token = gh_entry.get("oauth_token", "")
+                    content = f.read()
+                    token = ""
+                    if yaml is not None:
+                        try:
+                            data = yaml.safe_load(content) or {}
+                            gh_entry = data.get("github.com", {})
+                            token = gh_entry.get("oauth_token", "")
+                        except Exception:
+                            pass
+                    if not token:
+                        m = re.search(r"oauth_token:\s*([^\s#]+)", content)
+                        if m:
+                            token = m.group(1).strip()
                     if token:
                         return ResolvedSecret(
                             service_id="github",
