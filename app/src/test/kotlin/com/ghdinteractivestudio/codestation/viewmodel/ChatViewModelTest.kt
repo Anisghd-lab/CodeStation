@@ -247,7 +247,7 @@ class ChatViewModelTest {
         val genericConv = Conversation(id = "conv-gen-1", botId = "bot-1", title = "Nouvelle discussion", messageCount = 0)
         coEvery { chatRepository.getConversationById("conv-gen-1") } returns genericConv
 
-        val viewModel = ChatViewModel("bot-1", botRepository, chatRepository, conversationId = "conv-gen-1")
+        val viewModel = ChatViewModel("bot-1", botRepository, chatRepository, initialConversationId = "conv-gen-1")
         testDispatcher.scheduler.advanceUntilIdle()
 
         viewModel.onInputChanged("Optimiser la base de données")
@@ -262,7 +262,7 @@ class ChatViewModelTest {
         val customConv = Conversation(id = "conv-custom-1", botId = "bot-1", title = "Architecture Microservices", messageCount = 2)
         coEvery { chatRepository.getConversationById("conv-custom-1") } returns customConv
 
-        val viewModel = ChatViewModel("bot-1", botRepository, chatRepository, conversationId = "conv-custom-1")
+        val viewModel = ChatViewModel("bot-1", botRepository, chatRepository, initialConversationId = "conv-custom-1")
         testDispatcher.scheduler.advanceUntilIdle()
 
         viewModel.onInputChanged("Deuxième message dans la session")
