@@ -185,11 +185,13 @@ data class CamcsCliStatus(
 
 @Serializable
 data class CamcsEvent(
-    @SerialName("id") val id: Long,
+    @SerialName("id") val id: Long = 0L,
     @SerialName("missionId") val missionId: String? = null,
     @SerialName("agentId") val agentId: String? = null,
+    @SerialName("agentName") val agentName: String? = null,
     @SerialName("type") val type: String,
-    @SerialName("message") val message: String,
+    @SerialName("message") val message: String = "",
+    @SerialName("status") val status: String? = null,
     @SerialName("timestamp") val timestamp: Double = 0.0
 )
 

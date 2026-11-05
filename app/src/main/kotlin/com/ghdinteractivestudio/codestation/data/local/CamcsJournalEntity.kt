@@ -37,16 +37,18 @@ data class CamcsJournalEntity(
         id = stableLongId(id),
         missionId = missionId,
         agentId = agentId,
+        agentName = agentName,
         type = eventType,
         message = content,
+        status = status,
         timestamp = timestamp / 1000.0
     )
 
     companion object {
         fun fromEvent(
             event: CamcsEvent,
-            agentName: String? = null,
-            status: String = statusFromEvent(event)
+            agentName: String? = event.agentName,
+            status: String = event.status ?: statusFromEvent(event)
         ): CamcsJournalEntity {
             val normalizedTs = normalizeTimestamp(event.timestamp)
             // Identifiant stable : un rejeu SSE (reconnexion) réinsère la même ligne
@@ -98,6 +100,10 @@ interface CamcsJournalDao {
     /** Journal global, du plus récent au plus ancien. */
     @Query("SELECT * FROM camcs_journal ORDER BY timestamp DESC LIMIT :limit")
     fun getRecentStream(limit: Int): Flow<List<CamcsJournalEntity>>
+
+    /** Événements d'une mission donnée, du plus récent au plus ancien. */
+    @Query("SELECT * FROM camcs_journal WHERE missionId = :missionId ORDER BY timestamp DESC LIMIT :limit")
+    fun getForMissionStream(missionId: String, limit: Int): Flow<List<CamcsJournalEntity>>
 
     /** Événements d'un agent donné, sans mélange avec les autres bots. */
     @Query("SELECT * FROM camcs_journal WHERE agentId = :agentId ORDER BY timestamp DESC LIMIT :limit")

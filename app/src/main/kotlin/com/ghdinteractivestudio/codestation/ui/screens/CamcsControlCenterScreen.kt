@@ -156,8 +156,12 @@ fun CamcsControlCenterScreen(
         val dao = journalDao ?: return@LaunchedEffect
         dao.getRecentStream(300).collect { rows ->
             val persisted = rows.map { it.toEvent() }
-            // Conserver les événements reçus mais pas encore écrits en base.
-            val pending = liveEvents.filter { ev -> persisted.none { it.id == ev.id } }
+            // Conserver les événements reçus mais pas encore écrits en base sans créer de doublon.
+            val pending = liveEvents.filter { ev ->
+                persisted.none { p ->
+                    p.id == ev.id || (p.timestamp == ev.timestamp && p.message == ev.message && p.type == ev.type)
+                }
+            }
             liveEvents.clear()
             liveEvents.addAll((pending + persisted).sortedByDescending { it.timestamp })
         }
@@ -497,15 +501,15 @@ fun CamcsControlCenterScreen(
                                 val dataJson = line.substring(6).trim()
                                 try {
                                     val ev = jsonParser.decodeFromString<CamcsEvent>(dataJson)
+                                    val entity = CamcsJournalEntity.fromEvent(ev)
                                     // Persistance idempotente : le même événement rejoué
                                     // (reconnexion SSE) est ignoré par la clé primaire.
-                                    journalDao?.insertIgnore(
-                                        listOf(CamcsJournalEntity.fromEvent(ev))
-                                    )
+                                    journalDao?.insertIgnore(listOf(entity))
+                                    val normalized = entity.toEvent()
                                     withContext(Dispatchers.Main) {
-                                        if (liveEvents.none { it.id == ev.id }) {
-                                            liveEvents.add(0, ev)
-                                            if (liveEvents.size > 200) liveEvents.removeLast()
+                                        if (liveEvents.none { it.id == normalized.id || (it.timestamp == normalized.timestamp && it.message == normalized.message && it.type == normalized.type) }) {
+                                            liveEvents.add(0, normalized)
+                                            if (liveEvents.size > 300) liveEvents.removeLast()
                                         }
 
                                         // CRITICAL SYNCHRONIZATION:
@@ -2212,10 +2216,15 @@ private fun LiveEventsStreamView(
 
     var filterCurrentMissionOnly by remember { mutableStateOf(true) }
     var selectedCategoryFilter by remember { mutableStateOf("TOUS") }
+    var selectedAgentFilter by remember { mutableStateOf<String?>(null) }
     var sortNewestFirst by remember { mutableStateOf(true) }
 
+    val availableAgents = remember(events) {
+        events.mapNotNull { it.agentId }.filter { it.isNotBlank() }.distinct()
+    }
+
     // Apply filters
-    val filteredEvents = remember(events, filterCurrentMissionOnly, activeMissionId, selectedCategoryFilter, sortNewestFirst) {
+    val filteredEvents = remember(events, filterCurrentMissionOnly, activeMissionId, selectedCategoryFilter, selectedAgentFilter, sortNewestFirst) {
         var list = events.filter { ev ->
             if (filterCurrentMissionOnly && activeMissionId != null) {
                 ev.missionId == null || ev.missionId == activeMissionId
@@ -2234,6 +2243,10 @@ private fun LiveEventsStreamView(
                     else -> true
                 }
             }
+        }
+
+        if (selectedAgentFilter != null) {
+            list = list.filter { it.agentId == selectedAgentFilter }
         }
 
         if (!sortNewestFirst) {
@@ -2328,6 +2341,36 @@ private fun LiveEventsStreamView(
                     )
                 }
             }
+
+            // Agents / Bots filter pills
+            if (availableAgents.isNotEmpty()) {
+                availableAgents.forEach { agId ->
+                    val isSelAgent = selectedAgentFilter == agId
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (isSelAgent) Palette.electricBlue.copy(alpha = 0.25f)
+                                else Palette.surface
+                            )
+                            .border(
+                                0.5.dp,
+                                if (isSelAgent) Palette.electricBlue else Palette.glassBorder,
+                                RoundedCornerShape(8.dp)
+                            )
+                            .clickable {
+                                selectedAgentFilter = if (isSelAgent) null else agId
+                            }
+                            .padding(horizontal = 8.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            text = "🤖 $agId",
+                            style = Type.caption.semibold.copy(fontSize = 10.sp),
+                            color = if (isSelAgent) Palette.electricBlue else Palette.secondary
+                        )
+                    }
+                }
+            }
         }
 
         if (filteredEvents.isEmpty()) {
@@ -2395,7 +2438,7 @@ private fun LiveEventsStreamView(
                             )
                         }
 
-                        // Message content & Timestamp
+                        // Message content, Timestamp & Agent attribution
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = ev.message,
@@ -2403,12 +2446,43 @@ private fun LiveEventsStreamView(
                                 color = Palette.text,
                                 softWrap = true
                             )
-                            val timeStr = timeFormat.format(Date((ev.timestamp * 1000).toLong()))
-                            Text(
-                                text = timeStr,
-                                style = Type.caption.copy(fontSize = 10.sp),
-                                color = Palette.tertiary
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(top = 2.dp)
+                            ) {
+                                val timeStr = timeFormat.format(Date((ev.timestamp * 1000).toLong()))
+                                Text(
+                                    text = timeStr,
+                                    style = Type.caption.copy(fontSize = 10.sp),
+                                    color = Palette.tertiary
+                                )
+                                if (!ev.agentId.isNullOrBlank()) {
+                                    Text(
+                                        text = "•",
+                                        style = Type.caption.copy(fontSize = 10.sp),
+                                        color = Palette.tertiary
+                                    )
+                                    Text(
+                                        text = ev.agentName ?: ev.agentId ?: "",
+                                        style = Type.caption.semibold.copy(fontSize = 10.sp),
+                                        color = Palette.electricBlue
+                                    )
+                                }
+                                if (!ev.status.isNullOrBlank() && ev.status != "INFO") {
+                                    Text(
+                                        text = "• ${ev.status}",
+                                        style = Type.caption.semibold.copy(fontSize = 9.5.sp),
+                                        color = when (ev.status) {
+                                            "COMPLETED" -> electricGreen
+                                            "FAILED" -> Palette.danger
+                                            "RUNNING" -> Palette.electricBlue
+                                            "BLOCKED" -> Palette.warning
+                                            else -> Palette.secondary
+                                        }
+                                    )
+                                }
+                            }
                         }
 
                         // Tap indicator

@@ -28,7 +28,9 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.concurrent.TimeUnit
 
-class CamcsRepositoryImpl : CamcsRepository {
+class CamcsRepositoryImpl(
+    private val journalDao: CamcsJournalDao? = null
+) : CamcsRepository {
 
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private val httpClient = OkHttpClient.Builder()
@@ -90,6 +92,7 @@ class CamcsRepositoryImpl : CamcsRepository {
                                 val dataJson = line.substring(6).trim()
                                 try {
                                     val ev = json.decodeFromString<CamcsEvent>(dataJson)
+                                    journalDao?.insertIgnore(listOf(CamcsJournalEntity.fromEvent(ev)))
                                     handleRealtimeEvent(ev, dataJson)
                                 } catch (_: Exception) {}
                             }

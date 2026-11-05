@@ -147,7 +147,7 @@ class CodeStationContainer(override val context: Context) : AppContainer {
     }
 
     override val camcsRepository: com.ghdinteractivestudio.codestation.domain.repository.CamcsRepository by lazy {
-        com.ghdinteractivestudio.codestation.data.local.CamcsRepositoryImpl()
+        com.ghdinteractivestudio.codestation.data.local.CamcsRepositoryImpl(journalDao = camcsJournalDao)
     }
 
     override val eventStreamClient: com.ghdinteractivestudio.codestation.data.remote.CodeStationEventStreamClient by lazy {
