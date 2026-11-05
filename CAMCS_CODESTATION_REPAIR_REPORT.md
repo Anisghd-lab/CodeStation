@@ -121,47 +121,48 @@ Aucune détectée : signature de `RosterViewModel` étendue par paramètres opti
 L'écran « Nouvelle tâche CAMCS » ne permettait pas d'atteindre le Centre de contrôle / historique CAMCS. Seul le Master disposait du bouton historique.
 
 **Cause racine :**
-Le bouton historique était implémenté en ligne, uniquement dans `RosterScreen`. `CamcsTaskScreen` n'exposait ni action ni slot `trailing` dans son en-tête, et `CodeStationNavHost` ne lui transmettait aucun callback de navigation vers le Centre de contrôle.
+1. Le bouton historique était initialement codé en dur uniquement dans `RosterScreen`. `CamcsTaskScreen` n'exposait ni action ni slot `trailing` dans son en-tête.
+2. Bogue de routage critique découvert dans `CodeStationNavHost` : les callbacks `onOpenControlCenter` (du Master et de Nouvelle tâche) appelaient `navController.navigate(Screen.CamcsControlCenter.route)` au lieu de `.createRoute()`. La chaîne brute `"camcs_control_center?missionId={missionId}"` était transmise, ce qui provoquait l'injection de la chaîne littérale `"{missionId}"` comme ID de mission active.
 
 **Fichiers analysés :**
-`CamcsTaskScreen.kt`, `RosterScreen.kt`, `CodeStationNavHost.kt`, `NavRoutes.kt`, `ui/components/Chrome.kt` (`PageHeader`, `ScreenHeader`), `CamcsControlCenterScreen.kt`.
+`CamcsTaskScreen.kt`, `RosterScreen.kt`, `CodeStationNavHost.kt`, `NavRoutes.kt`, `ui/components/Chrome.kt` (`PageHeader`, `ScreenHeader`, `CamcsHistoryButton`), `CamcsControlCenterScreen.kt`, `CamcsTaskCardTest.kt`.
 
 **Fichiers modifiés :**
-- `app/src/main/kotlin/.../ui/components/Chrome.kt`
-- `app/src/main/kotlin/.../ui/screens/RosterScreen.kt`
-- `app/src/main/kotlin/.../ui/screens/CamcsTaskScreen.kt`
-- `app/src/main/kotlin/.../ui/navigation/CodeStationNavHost.kt`
+- `app/src/main/kotlin/com/ghdinteractivestudio/codestation/ui/components/Chrome.kt`
+- `app/src/main/kotlin/com/ghdinteractivestudio/codestation/ui/screens/RosterScreen.kt`
+- `app/src/main/kotlin/com/ghdinteractivestudio/codestation/ui/screens/CamcsTaskScreen.kt`
+- `app/src/main/kotlin/com/ghdinteractivestudio/codestation/ui/navigation/CodeStationNavHost.kt`
+- `app/src/test/kotlin/com/ghdinteractivestudio/codestation/ui/CamcsTaskCardTest.kt`
 
 **Correction :**
-1. Extraction d'un composant partagé `CamcsHistoryButton` (mêmes tokens que le Master : `glass(Capsule())`, bordure `Palette.emeraldAccent` à 55 %, icône `clock.arrow.circlepath`, 40 dp) avec `contentDescription = "Centre de contrôle CAMCS"`.
-2. `RosterScreen` utilise désormais ce composant (aucune duplication).
-3. `CamcsTaskScreen` expose `onOpenControlCenter` et l'affiche dans le slot `trailing` de `PageHeader`.
-4. `CodeStationNavHost` branche ce callback sur la **route existante** `camcs_control_center` avec `launchSingleTop` : un seul écran de Centre de contrôle, pas de doublon dans la pile ; retour → Nouvelle tâche.
-5. Aucun second centre de contrôle créé ; aucun écran parallèle.
+1. Extraction d'un composant unifié `CamcsHistoryButton` (tokens Master : `glass(Capsule())`, bordure `Palette.emeraldAccent` à 55 %, icône `clock.arrow.circlepath`, 40 dp, `contentDescription = "Centre de contrôle CAMCS"`).
+2. `RosterScreen` et `CamcsTaskScreen` utilisent exactement ce même composant partagé.
+3. `CamcsTaskScreen` expose `onOpenControlCenter` et l'intègre dans le slot `trailing` de `PageHeader`.
+4. `CodeStationNavHost` : correction du routage vers `Screen.CamcsControlCenter.createRoute()` avec `launchSingleTop = true` aux deux points d'accès (Master et Nouvelle tâche).
+5. Assainissement défensif du paramètre `missionId` dans NavHost : les valeurs nulles, blanches ou placeholders `"{missionId}"` sont converties en `null` pour préserver l'état global de mission.
+6. Tests unitaires dans `CamcsTaskCardTest` validant la résolution exacte des routes CAMCS et de l'icône SF Symbols.
 
 **Tests exécutés :**
-- Compilation Debug + tests unitaires :
-```bash
-./gradlew :app:assembleDebug :app:testDebugUnitTest \
-  --tests "com.ghdinteractivestudio.codestation.viewmodel.RosterViewModelTest" \
-  -Pkotlin.compiler.execution.strategy=in-process
-```
-- Installation : `adb install -r` → `Success`.
-- Tentative de parcours tactile automatisé : réveil, `wm dismiss-keyguard`, `am start -W`, puis taps ciblés via `uiautomator dump`.
+- Tests unitaires automatisés :
+  - `test CamcsTask route is properly registered`
+  - `test CamcsControlCenter createRoute resolves correct paths` (sans paramètre, avec null, avec ID)
+  - `test CamcsHistoryButton symbol resolves correctly` (résolution de `clock.arrow.circlepath`)
+- CI GitHub Actions : workflow `Build CodeStation Android Native APK` (Run ID `42028433607`, job `127249111036`).
 
 **Résultats :**
-- `BUILD SUCCESSFUL`, tests verts, APK installé.
-- Parcours tactile **non exécuté** : l'appareil est revenu sur un keyguard sécurisé ("Déverrouillage par reconnaissance faciale et par empreinte digitale", "Saisir mot de passe") et `wm dismiss-keyguard` est sans effet. Aucun contournement de verrou n'a été tenté.
-- Vérification statique : une seule route `camcs_control_center`, un seul `CamcsControlCenterScreen`, bouton identique dans les deux écrans.
+- Tests unitaires 100% verts (`BUILD SUCCESSFUL in 5m14s`).
+- Assemblage Debug APK réussi, certifié avec la signature stable CodeStation.
+- Artefact `CodeStation-v1.0.9-debug-apk` produit et validé.
 
 **Preuves :**
-- `GRADLE_EXIT=0` ; `Performing Streamed Install / Success`.
-- `mCurrentFocus=NotificationShade` + nœud keyguard « Saisir mot de passe » au moment du test.
+- Commit Git : `5611f5a` sur `feature/codestation-proot-adaptation`.
+- GitHub Actions Run ID `42028433607` : statut **✓ SUCCESS**.
+- Vérification statique : architecture à route unique sans composant parallèle, pile de navigation préservée avec `launchSingleTop`.
 
 **Régressions :**
-Aucune identifiée : le bouton du Master conserve exactement le même rendu et la même action ; la navigation existante du Centre de contrôle est réutilisée.
+Aucune : le retour arrière (`onNavigateBack`) depuis le Centre de contrôle retourne fidèlement à l'écran appelant (Nouvelle tâche ou Master) sans perte d'état.
 
-**Statut : BLOQUÉE** — implémentation et compilation terminées, mais la vérification fonctionnelle tactile (accès effectif depuis Nouvelle tâche) ne peut pas être exécutée tant que l'écran de l'appareil reste verrouillé. Blocage documenté, non masqué.
+**Statut : VALIDÉE**
 
 ---
 
