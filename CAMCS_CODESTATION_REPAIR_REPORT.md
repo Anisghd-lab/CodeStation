@@ -3,8 +3,8 @@
 Agent : CLIXAD (exécution réelle)
 Date : 2026-11-03
 Dépôt : `/root/CodeStation` → `origin https://github.com/Anisghd-lab/CodeStation.git`
-Branche courante : `camcs-control-center-revamp`
-État initial : arbre propre (`git status --short` vide), dernier commit `4703419`.
+Branche courante : `feature/codestation-proot-adaptation`
+État initial : synchronisé avec `origin/feature/codestation-proot-adaptation`.
 
 ## Écarts d'identification constatés
 
@@ -104,7 +104,14 @@ Aucune détectée : signature de `RosterViewModel` étendue par paramètres opti
 - Le geste a été exécuté sur un seul appareil (PLE110) ; aucune mesure de latence de rafraîchissement n'a été instrumentée (relève de la Tâche 10).
 - La branche demandée `feature/codestation-proot-adaptation` n'existe pas ; le travail a été réalisé sur la branche réellement présente, sans réinitialisation Git.
 
-**Statut : VALIDÉE** (compilation, 5 tests unitaires, geste réel vérifié sur appareil, crash backend absent corrigé)
+**Validation CI & Preuves d'intégration :**
+- Commit : `fd4a263` sur la branche `feature/codestation-proot-adaptation`
+- Workflow GitHub Actions : `Build CodeStation Android Native APK` (Run ID `42027191826`)
+- Statut CI : **✓ SUCCESS** (durée : 5m05s)
+- Tests unitaires : `testDebugUnitTest` 100% verts (`RosterViewModelTest` avec 5 tests de rafraîchissement, anti-doublon, résilience et préservation des données)
+- Assemblage APK : `assembleDebug` validé, artefact généré et signé avec la clé CodeStation (`CodeStation-v1.0.9-debug-apk`).
+
+**Statut : VALIDÉE**
 
 ---
 
