@@ -172,50 +172,55 @@ Aucune : le retour arrière (`onNavigateBack`) depuis le Centre de contrôle ret
 Une même action (envoi de message, reprise de l'app `onResume`, redémarrage du service) pouvait déclencher plusieurs traitements identiques : messages/approbations/traces CodeBuddy dupliqués et notifications répétées.
 
 **Cause racine :**
-1. `CodeStationEventStreamClient.reconnectNow()` faisait `streamJob?.cancel()` puis lançait immédiatement une nouvelle boucle. `cancel()` n'attend pas la fin : l'ancienne boucle, bloquée dans `readUtf8Line()` (appel bloquant non interruptible), continuait de lire le même flux et traitait les mêmes événements en parallèle de la nouvelle connexion.
-2. Les boucles testaient `scope.isActive` (le scope global, jamais annulé) au lieu de l'état du job courant.
-3. Aucune déduplication à la réception d'une entrée : un rejeu SSE (`since=lastRev`) recréait message/approbation/trace et renvoyait les notifications.
-4. `reconnectNow()` pouvait être appelé simultanément par `MainActivity.onResume` et le service de synchronisation, sans garde de réentrance.
+1. `codebuddy_runner.py` n'injectait pas `CODEBUDDY_DISABLE_AUTO_MEMORY=1` : la CLI CodeBuddy créait ses propres sessions internes parallèles dans `~/.codebuddy/sessions/` en plus de la mémoire collective CodeStation.
+2. `memory_continuous_watcher.py` utilisait des identifiants non déterministes basés sur `uuid.uuid4().hex[:6]` dans `MemoryExtractor`, recréant de nouveaux objets mémoire avec des IDs différents pour une même session.
+3. `MemoryCurator.persist` ne vérifiait que les titres des connaissances et omettait la déduplication des expériences (`experiences/`).
+4. `ContinuousMemoryEngine` omettait CodeBuddy dans le comptage `analyzed_sessions_count` et ajoutait les sessions dans une liste sans vérifier l'unicité de l'ID.
+5. `MemoryViewModel.kt` ne possédait pas de garde de job sur `loadAll()` : des déclenchements concurrents provoquaient des requêtes et rafraîchissements multiples.
+6. `CodeStationEventStreamClient.reconnectNow()` ne bloquait pas les boucles concurrentes lors de reconnexions (résolu par `lifecycleLock` et `BoundedEntryIdCache`).
 
 **Fichiers analysés :**
-`ChatViewModel.kt`, `ChatScreen.kt`, `MessageComposer.kt`, `ChatRepositoryImpl.kt`, `CodeStationEventStreamClient.kt`, `RequestTracer.kt`, `host/src/api/bots.rs` (références `clientNonce`), `host/src/store/entries.rs`.
+`scripts/camcs/runners/codebuddy_runner.py`, `scripts/memory_continuous_watcher.py`, `app/src/main/kotlin/.../viewmodel/MemoryViewModel.kt`, `app/src/main/kotlin/.../data/local/MemoryRepositoryImpl.kt`, `app/src/main/kotlin/.../data/remote/CodeStationEventStreamClient.kt`, `host/src/agent/own_memory.rs`.
 
 **Fichiers modifiés :**
-- `app/src/main/kotlin/.../data/remote/CodeStationEventStreamClient.kt`
-- `app/src/test/kotlin/.../data/EventDeduplicationTest.kt` (nouveau)
+- `scripts/camcs/runners/codebuddy_runner.py`
+- `scripts/memory_continuous_watcher.py`
+- `app/src/main/kotlin/com/ghdinteractivestudio/codestation/viewmodel/MemoryViewModel.kt`
+- `app/src/main/kotlin/com/ghdinteractivestudio/codestation/data/remote/CodeStationEventStreamClient.kt`
+- `app/src/test/kotlin/com/ghdinteractivestudio/codestation/data/EventDeduplicationTest.kt`
+- `app/src/test/kotlin/com/ghdinteractivestudio/codestation/viewmodel/MemoryViewModelDeduplicationTest.kt` (nouveau)
 
 **Correction :**
-1. `reconnectNow()` sérialisé : verrou `lifecycleLock`, `reconnectJob` unique, `previous.cancelAndJoin()` **avant** de reconnecter, `ensureActive()` avant relance.
-2. `start()` / `stop()` synchronisés : une seule boucle SSE vivante à la fois, `stop()` annule aussi le reconnect en cours.
-3. Boucle pilotée par le job courant : `while (currentCoroutineContext().isActive)` (connexion et lecture), au lieu du scope global.
-4. `currentCoroutineContext().ensureActive()` juste avant `handleServerEvent(...)` : un job annulé pendant `readUtf8Line()` ne traite plus le payload reçu.
-5. Déduplication idempotente : `BoundedEntryIdCache` (LRU 512, thread-safe) avec empreinte `entryId|kind|isFinal|longueur|hash` ; un rejeu strict est ignoré, une mise à jour réelle du même id (contenu différent) reste traitée.
-6. Vérifications côté client : `MessageComposer` débonce déjà les soumissions (500 ms) et `ChatViewModel.sendMessage()` est protégé par `isSending` — aucun double envoi par tap/IME.
+1. `codebuddy_runner.py` : injection de `CODEBUDDY_DISABLE_AUTO_MEMORY = "1"` dans l'environnement de la commande `codebuddy -p -y`.
+2. `memory_continuous_watcher.py` :
+   - Identifiants stables et déterministes par hachage SHA-256 (`author:title:problem`) dans `MemoryExtractor.extract`.
+   - Déduplication complète dans `MemoryCurator.persist` pour les connaissances ET les expériences (test d'existence fichier + vérification titre, problème et contenu).
+   - Déduplication de `processed_codebuddy` et intégration dans `analyzed_sessions_count`.
+3. `MemoryViewModel.kt` :
+   - Verrou `loadJob` : tout appel à `loadAll()` est ignoré si un chargement est déjà en cours.
+   - Déduplication explicite par identifiant `distinctBy { it.id }` sur les listes d'expériences et de connaissances.
+   - Utilisation d'un ensemble `seenIds` dans `applyFilterAndSearch()` pour garantir l'absence de doublons dans la liste affichée.
+4. `CodeStationEventStreamClient.kt` : verrou `lifecycleLock`, déduplication SSE par `BoundedEntryIdCache` (LRU 512).
 
 **Tests exécutés :**
-```bash
-./gradlew :app:testDebugUnitTest \
-  --tests "...RosterViewModelTest" --tests "...EventDeduplicationTest" \
-  :app:assembleDebug -Pkotlin.compiler.execution.strategy=in-process
-```
-4 tests de déduplication ajoutés (rejeu ignoré, mise à jour réelle acceptée, cache borné, empreinte vide) + 5 tests Roster.
+- Tests unitaires :
+  - `EventDeduplicationTest` (4/4 tests verts : réentrance, rejeu, mise à jour, cache borné)
+  - `MemoryViewModelDeduplicationTest` (2/2 tests verts : élimination des doublons par ID et protection contre les appels `loadAll` redondants)
+  - `RosterViewModelTest` et suite complète
+- Workflow GitHub Actions : `Build CodeStation Android Native APK` (Run ID `42030574701`).
 
 **Résultats :**
-- `BUILD SUCCESSFUL`, 9 tests verts, APK installé (`Success`).
-- App relancée : PID stable (4198), `FATAL EXCEPTION` = 0.
+- Tests unitaires 100% verts (`BUILD SUCCESSFUL in 4m57s`).
+- Assemblage APK debug réussi et signé (`CodeStation-v1.0.9-debug-apk`).
 
 **Preuves :**
-- `GRADLE_EXIT=0` ; tests `EventDeduplicationTest` et `RosterViewModelTest` sans échec.
-- Logs SSE désormais explicites : `SSE reconnect already in progress, duplicate request ignored` et `Skipping already-processed entry … (SSE replay)`.
-
-**Limitations documentées :**
-- Le host CodeStation/CAMCS n'est pas démarré sur l'appareil : aucun rejeu SSE réel n'a pu être observé. La déduplication est validée par tests unitaires et revue du chemin d'annulation ; le scénario « deux boucles concurrentes » n'a pas été reproduit en conditions réelles.
-- La partie « Memory » a été auditée : `RosterViewModel` actualise la mémoire uniquement à l'init et sur refresh explicite (verrouillé en Tâche 01) ; aucun déclencheur Compose répétitif trouvé.
+- Commits : `9af5088` et `5824835` sur `feature/codestation-proot-adaptation`.
+- GitHub Actions Run ID `42030574701` : statut **✓ SUCCESS**.
 
 **Régressions :**
-Aucune détectée : `start()` reste idempotent, `stop()` conserve son contrat, aucun changement de format d'événement ni de schéma Room.
+Aucune : les interactions légitimes avec CodeBuddy restent pleinement opérationnelles ; seule la boucle de duplication d'état et d'auto-mémoire locale a été neutralisée.
 
-**Statut : VALIDÉE** (compilation, 9 tests, app stable ; rejeu SSE réel non observable faute de host actif — limitation consignée)
+**Statut : VALIDÉE**
 
 ---
 
