@@ -10,10 +10,12 @@ import time
 import sqlite3
 from typing import Dict, List, Optional, Any, Tuple
 from .runners import BaseCliRunner, compute_file_sha256
+from .quality_gates import QualityGateEngine, QualityGate, GateType, GateStatus
 
 class QualityAuditor:
     def __init__(self, db_path: str = "/root/.codestation/camcs.db"):
         self.db_path = db_path
+        self.gates_engine = QualityGateEngine(db_path)
 
     def audit_deliverables(
         self,

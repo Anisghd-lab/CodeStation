@@ -10,8 +10,8 @@
 
 | ID | Fonctionnalité | Type | Priorité | État | Commit | GitHub |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TASK-001** | Intelligent DAG Planner & Tri Topologique de Kahn | AMÉLIORATION D'UN MODULE EXISTANT | Critique (P0) | VALIDATED | En attente push | feature/festival-integration |
-| **TASK-002** | Système de Quality Gates Multi-types & Acceptance Verifiers | NOUVELLE FONCTIONNALITÉ | Critique (P0) | PENDING | — | — |
+| **TASK-001** | Intelligent DAG Planner & Tri Topologique de Kahn | AMÉLIORATION D'UN MODULE EXISTANT | Critique (P0) | PUSHED | eb06bdf | feature/festival-integration |
+| **TASK-002** | Système de Quality Gates Multi-types & Acceptance Verifiers | NOUVELLE FONCTIONNALITÉ | Critique (P0) | VALIDATED | En attente push | feature/festival-integration |
 | **TASK-003** | Moteur de Reprise après Interruption & Réconciliation de Session | NOUVELLE FONCTIONNALITÉ | Critique (P0) | PENDING | — | — |
 | **TASK-004** | Boucle Auto-Itérative Corrective avec Escalade Humaine | NOUVELLE FONCTIONNALITÉ | Haute (P1) | PENDING | — | — |
 | **TASK-005** | Intégration Mémoire Perpétuelle des Décisions & Expériences | AMÉLIORATION D'UN MODULE EXISTANT | Haute (P1) | PENDING | — | — |

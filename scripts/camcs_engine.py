@@ -50,6 +50,7 @@ from camcs.credential_registry import CredentialRegistry
 from camcs.external_service_registry import ExternalServiceRegistry
 from camcs.external_action_executor import ExternalActionExecutor
 from camcs.objective_completion_gate import ObjectiveCompletionGate
+from camcs.quality_gates import QualityGateEngine, QualityGate, GateType, GateStatus
 
 # Database for CAMCS persistence
 DB_PATH = os.path.expanduser("/root/.codestation/camcs.db")
@@ -429,6 +430,7 @@ class CamcsOrchestrationEngine:
         self.external_services = ExternalServiceRegistry(DB_PATH)
         self.external_executor = ExternalActionExecutor(DB_PATH)
         self.completion_gate = ObjectiveCompletionGate(DB_PATH)
+        self.quality_gates = QualityGateEngine(DB_PATH)
         self.active_missions: Dict[str, CamcsMission] = {}
         self.event_subscribers: List[queue.Queue] = []
         self._lock = threading.RLock()
@@ -1378,8 +1380,24 @@ class CamcsOrchestrationEngine:
                 f.write(f'''import unittest, os\n\nclass TestCamcsSolution(unittest.TestCase):\n    def test_mission_artifacts(self):\n        self.assertTrue(os.path.isdir("{src_dir}") or os.path.isdir("{os.path.join(mission_dir, 'app')}"))\n        self.assertTrue(os.path.isdir("{docs_dir}"))\n\nif __name__ == "__main__":\n    unittest.main()\n''')
 
         passed, test_code, t_out, t_err, t_dur = self.quality_auditor.run_automated_tests(test_file, tests_dir)
+        # Register testing quality gate
+        self.quality_gates.evaluate_command_gate(
+            mission_id=mission.id,
+            task_id="qa-suite",
+            gate_name="Mission Test Suite",
+            command=f"python3 -m unittest {test_file}",
+            cwd=tests_dir
+        )
         all_delivs = self.deliverable_mgr.get_mission_deliverables(mission.id)
         all_ok, verif_count, _ = self.quality_auditor.audit_deliverables(mission.id, all_delivs)
+        # Register deliverable quality gate
+        if all_delivs:
+            for d in all_delivs:
+                fpath = d.get("filePath") or d.get("file_path", "")
+                if fpath:
+                    self.quality_gates.evaluate_deliverable_gate(
+                        mission.id, d.get("taskId", "all"), fpath, d.get("sha256", "")
+                    )
 
         # Register execution proof for automated test run
         self.deliverable_mgr.register_proof(
@@ -1852,6 +1870,9 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
             elif sub_resource == "report":
                 report = ENGINE.deliverable_mgr.get_mission_report(mission_id)
                 self._send_json(200, {"ok": True, "missionId": mission_id, "report": report})
+            elif sub_resource == "gates":
+                gates = ENGINE.quality_gates.get_gates_for_mission(mission_id)
+                self._send_json(200, {"ok": True, "missionId": mission_id, "gates": [g.to_dict() for g in gates]})
             elif sub_resource == "diff":
                 proofs = ENGINE.deliverable_mgr.get_mission_proofs(mission_id)
                 diffs = [p.get("gitDiff", "") for p in proofs if p.get("gitDiff")]
@@ -1877,6 +1898,15 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
                     self._send_json(404, {"error": f"Mission {mission_id} non trouvée"})
                 else:
                     self._send_json(200, {"ok": True, "mission": m.to_dict()})
+        elif self.path.startswith("/api/camcs/tasks/"):
+            parts = self.path[len("/api/camcs/tasks/"):].split("/")
+            task_id = parts[0].split("?")[0]
+            sub_res = parts[1].split("?")[0] if len(parts) > 1 else ""
+            if sub_res == "gates":
+                gates = ENGINE.quality_gates.get_gates_for_task(task_id)
+                self._send_json(200, {"ok": True, "taskId": task_id, "gates": [g.to_dict() for g in gates]})
+            else:
+                self._send_json(404, {"error": "Sous-ressource de tâche non trouvée"})
         elif self.path.startswith("/api/camcs/file"):
             parsed = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed.query)
