@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v1.1.1-blue.svg" alt="Version 1.1.1" />
+  <img src="https://img.shields.io/badge/Version-v1.1.2-blue.svg" alt="Version 1.1.2" />
   <img src="https://img.shields.io/badge/Kotlin-2.0.20-purple.svg" alt="Kotlin 2.0" />
   <img src="https://img.shields.io/badge/Compose-BOM%202024.09.00-green.svg" alt="Jetpack Compose" />
   <img src="https://img.shields.io/badge/Host%20Rust-v2.28.1-orange.svg" alt="Host Rust v2.28.1" />
