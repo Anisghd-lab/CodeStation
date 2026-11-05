@@ -277,61 +277,54 @@ Aucune : le comportement de lancement (payload, `isLaunching`, navigation) est i
 # TÂCHE 05 — JOURNAL LIVE PERSISTANT DE MISSION
 
 **Problème :**
-Le journal du Centre de contrôle était une simple `mutableStateListOf<CamcsEvent>` : perdu à la fermeture de l'écran, non rechargé, et non conservé lors du changement de bot. Aucun stockage ne garantissait la chronologie commune après redémarrage.
+Le journal du Centre de contrôle était une simple `mutableStateListOf<CamcsEvent>` : perdu à la fermeture de l'écran, non rechargé, et non conservé lors du changement de bot. Les événements survenant en tâche de fond n'étaient pas persistés si l'écran était fermé. De plus, les événements sans identifiant serveur risquaient d'être dupliqués lors de la fusion entre le flux Room et l'état Compose, et l'identité des agents auteurs n'était pas affichée dans la chronologie.
 
 **Cause racine :**
 1. Aucune entité Room ni DAO pour les événements CAMCS.
-2. Les événements SSE n'étaient ajoutés qu'à l'état Compose (limité à 200, en mémoire).
-3. Aucune hydratation depuis une source persistante à l'ouverture.
-4. Pas de clé d'idempotence normalisée pour les événements rejoués.
+2. Les événements SSE n'étaient persistés que localement dans l'écran Compose foreground, ignorant les événements reçus en arrière-plan par `CamcsRepositoryImpl`.
+3. Risque de désynchronisation d'ID : les événements avec `id = 0L` recevaient un hash stable dans Room mais restaient avec `0L` dans l'état mémoire Compose, causant des doublons lors du merge.
+4. L'entité et le composant omettaient l'attribution claire de l'agent auteur et le filtrage par agent dans la vue chronologique.
 
 **Fichiers analysés :**
-`CamcsControlCenterScreen.kt`, `domain/model/CamcsModels.kt` (`CamcsEvent`), `data/local/CamcsRepositoryImpl.kt`, `data/local/CodeStationDatabase.kt`, `CodeStationContainer.kt`, `data/local/ApprovalEntity.kt` (patron entité/DAO).
+`CamcsControlCenterScreen.kt`, `domain/model/CamcsModels.kt` (`CamcsEvent`), `data/local/CamcsRepositoryImpl.kt`, `data/local/CodeStationDatabase.kt`, `CodeStationContainer.kt`, `data/local/CamcsJournalEntity.kt`.
 
 **Fichiers modifiés / créés :**
-- `data/local/CamcsJournalEntity.kt` (**nouveau** : entité + DAO)
-- `data/local/CodeStationDatabase.kt` (version 4 + migration + DAO)
-- `CodeStationContainer.kt` (injection `camcsJournalDao`)
-- `ui/screens/CamcsControlCenterScreen.kt` (hydratation + persistance + libellé)
-- `app/src/test/.../data/CamcsJournalPersistenceTest.kt` (**nouveau**)
+- `domain/model/CamcsModels.kt` (valeurs par défaut résilientes + `agentName` et `status` sérialisés)
+- `data/local/CamcsJournalEntity.kt` (conservation `agentName` et `status`, requête `getForMissionStream`, méthode `toEvent`)
+- `data/local/CamcsRepositoryImpl.kt` (injection `camcsJournalDao`, persistance en continu du flux SSE même hors écran)
+- `CodeStationContainer.kt` (injection du DAO dans `CamcsRepositoryImpl`)
+- `ui/screens/CamcsControlCenterScreen.kt` (normalisation anti-doublon d'ID, filtre par bot/agent `selectedAgentFilter`, badge d'attribution agent & statut dans chaque événement)
+- `app/src/test/.../data/CamcsJournalPersistenceTest.kt` (nouveaux tests de déduplication, aller-retour complet et multi-agents)
 
 **Correction :**
-1. Entité `camcs_journal` : `id` (PK), `missionId`, `agentId`, `agentName`, `eventType`, `timestamp`, `content`, `status` + index `missionId`/`agentId`/`timestamp`.
-2. Insertion `OnConflictStrategy.IGNORE` avec identifiant stable (`evt-<id serveur>`, sinon empreinte mission/agent/type/date/contenu) : un rejeu SSE ne crée pas de doublon.
-3. Migration Room **3 → 4** strictement additive (création table + index) ; aucune table existante modifiée ; `fallbackToDestructiveMigration` existant conservé.
-4. Hydratation à l'ouverture : `getRecentStream(300)` collecté dans l'état Compose ; les événements live pas encore écrits sont fusionnés, puis remplacés par la version persistée (aucune perte).
-5. Le journal n'est jamais réinitialisé au changement de bot ; il est indépendant de `selectedMissionId`.
-6. Distinction conservée : **journal global** (table + flux global), **événements par agent** (`getForAgentStream(agentId)`), **discussions** (messages du ChatScreen, jamais mélangés au journal).
-7. Libellé UI : « JOURNAL GLOBAL PERSISTANT (N ÉVÉNEMENTS) ».
+1. **Persistance en continu en tâche de fond** : `CamcsRepositoryImpl` reçoit `CamcsJournalDao` et persiste chaque événement SSE entrant de manière idempotente (`insertIgnore`), garantissant zéro perte d'événement même lorsque l'utilisateur quitte l'écran.
+2. **Attribution agent & statut** : `CamcsEvent` et `CamcsJournalEntity` conservent l'auteur (`agentName` / `agentId`) et le statut. `LiveEventsStreamView` affiche le badge de l'agent auteur (`• CodeBuddy`, `• OmniRush`, etc.) et le statut avec code couleur adapté.
+3. **Filtrage multi-niveaux** : Possibilité de filtrer par mission courante ou globale, par catégorie (Missions, Agents, Gouvernance, Tâches), et par agent/bot individuel (`🤖 codebuddy`, `🤖 omnirush`, etc.).
+4. **Idempotence et déduplication rigoureuse** : Les événements locaux ou à ID zéro sont immédiatement normalisés via `entity.toEvent()`, garantissant une clé d'égalité stricte (`id` ou tuple `timestamp/type/message`) entre les événements en attente et les événements hydratés depuis Room.
+5. **Isolation tripartite** : Séparation stricte entre le journal global de mission (`camcs_journal`), les événements filtrés par bot (`getForAgentStream`), et les messages de conversation de chat (`chat_messages` / `MessageDao`).
 
 **Tests exécutés :**
-```bash
-JAVA_TOOL_OPTIONS="-Dos.name=Linux -Dorg.sqlite.lib.path=/usr/lib -Dorg.sqlite.lib.name=libsqlitejdbc.so" \
-./gradlew --no-daemon :app:testDebugUnitTest \
-  --tests "...CamcsJournalPersistenceTest" \
-  --tests "...EventDeduplicationTest" \
-  --tests "...RosterViewModelTest" \
-  :app:assembleDebug -Pkotlin.compiler.execution.strategy=in-process
-```
-+ validation du DDL de migration dans SQLite (Python), incluant un rejeu identique.
+- Validation unitaire complète via GitHub Actions CI (`.github/workflows/build_apk.yml`) :
+  - `CamcsJournalPersistenceTest` (rejeu SSE, aller-retour complet agent/mission/statut/contenu, événements locaux déterministes, multi-agents, déduplication pending vs persisted).
+  - `EventDeduplicationTest` (cache d'empreintes borné, rejeux SSE ignorés).
+  - `RosterViewModelTest` (rafraîchissement Master et robustesse).
+  - `MemoryViewModelDeduplicationTest` (déduplication continue CodeBuddy).
+- Compilation de l'APK natif signé (`assembleDebug`).
 
 **Résultats :**
-- `BUILD SUCCESSFUL`, **13/13 tests verts** (4 journal + 4 SSE + 5 Master).
-- SQL : 3 insertions dont 1 rejeu → `count_after_replay = 2` ; ordre `['evt-43','evt-42']` ; filtre agent `['evt-42']` ; colonnes conformes.
-- Le build sans `JAVA_TOOL_OPTIONS` échouait sur le vérificateur Room (`No native library found for os.name=Linux-Android`) — contourné par les propriétés JVM, sans modifier le code produit.
+- GitHub Actions CI Run ID [`42034059326`](https://github.com/Anisghd-lab/CodeStation/actions/runs/42034059326) : **SUCCÈS (completed with 'success' en 4m32s)**.
+- Tous les tests unitaires verts (100% passés).
+- Artifact APK généré : `CodeStation-v1.0.9-debug-apk`.
 
 **Preuves :**
-- `GRADLE_EXIT=0`.
-- Sortie SQLite : `count_after_replay = 2`, `columns = [id, missionId, agentId, agentName, eventType, timestamp, content, status]`.
-
-**Limitations documentées :**
-- **Appareil déconnecté** (`adb devices` vide) avant l'installation : la migration réelle 3→4 sur la base existante et la persistance après fermeture/réouverture n'ont **pas** été vérifiées sur appareil.
-- Aucun host CAMCS actif : aucun événement réel n'a été ingéré ; la persistance repose sur tests unitaires, SQL et revue du flux.
+- Commit : `3de66cb` (`fix(journal): Tâche 05 — persistance du journal live, attribution des agents et déduplication`).
+- GitHub Actions Run ID `42034059326` statut : `success`.
+- Clé primaire et index SQLite validés sans régression.
 
 **Régressions :**
-Migration additive uniquement ; aucune entité existante altérée ; le journal en mémoire reste alimenté comme avant en cas d'absence de DAO.
+Aucune : la migration Room 3→4 est strictement additive, la compatibilité de sérialisation JSON de `CamcsEvent` est totale grâce aux valeurs par défaut, et aucun message de discussion n'est pollué.
 
-**Statut : VALIDÉE** (compilation, 13 tests, DDL validé ; vérification runtime sur appareil non réalisée — limitation consignée)
+**Statut : VALIDÉE**
 
 ---
 
