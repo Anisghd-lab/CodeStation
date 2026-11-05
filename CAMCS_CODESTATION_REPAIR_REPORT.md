@@ -489,6 +489,80 @@ Aucune : lecture seule stricte sans altération du dépôt ni du remote Git.
 
 ---
 
-# TÂCHES 09 À 12
+# TÂCHE 09 — TITRES DES DISCUSSIONS DES BOTS ET CORRECTION UI
+
+**Problème :**
+1. Les discussions avec les bots recevaient systématiquement des titres statiques et génériques (« Discussion » ou « Nouvelle discussion »), empêchant l'utilisateur de distinguer et retrouver ses sessions de travail.
+2. Lorsqu'une nouvelle discussion était initiée depuis `RosterScreen`, un UUID aléatoire était injecté dans la route de navigation sans être persisté dans la base SQLite Room (`conversations`), créant un état orphelin sans titre ni historique dans le sélecteur de sessions.
+3. Sur petits écrans ou lors de titres/noms longs, des chevauchements et débordements de texte se produisaient dans la barre de titre (`ChatScreen`), dans les lignes de discussion (`showConversationDialog`), dans les bulles de messages (`ChatMessageItem`), sur les cartes de bots (`BotCard`) et dans le sélecteur d'agents (`RosterScreen`).
+4. Absence d'horodatage propre dans les messages de chat et dans la liste des sessions.
+
+**Cause racine :**
+- `ChatViewModel.sendMessage()` créait initialement les discussions avec un titre codé en dur `"Discussion"` et ne mettait jamais à jour le titre lors du premier message utilisateur.
+- Absence d'un générateur intelligent de titre basé sur le prompt utilisateur (nettoyage markdown, commandes `/task`, mentions `@agent`).
+- Absence de contraintes `Modifier.weight(1f, fill = false)` et `TextOverflow.Ellipsis` dans les composants Compose contenant des `Row` avec des textes dynamiques.
+
+**Fichiers analysés :**
+- `app/src/main/kotlin/.../domain/repository/ChatRepository.kt`
+- `app/src/main/kotlin/.../data/local/ChatRepositoryImpl.kt`
+- `app/src/main/kotlin/.../viewmodel/ChatViewModel.kt`
+- `app/src/main/kotlin/.../ui/screens/ChatScreen.kt`
+- `app/src/main/kotlin/.../ui/components/ChatMessageItem.kt`
+- `app/src/main/kotlin/.../ui/components/BotCard.kt`
+- `app/src/main/kotlin/.../ui/screens/RosterScreen.kt`
+
+**Fichiers modifiés :**
+- `domain/repository/ChatRepository.kt` — surcharge de `createConversation` avec support de paramètre `id: String?`.
+- `data/local/ChatRepositoryImpl.kt` — implémentation rétrocompatible de la persistance de discussion avec ID ou UUID généré.
+- `viewmodel/ChatViewModel.kt` :
+  - `generateConversationTitle(messageText, attachmentNames)` : extraction intelligente et normalisation de titre explicite (suppression des commandes slash, mentions, markdown, limitation bornée avec ellipse, ou nom de pièce jointe).
+  - `isGenericConversationTitle(title)` : détection stricte des placeholders (`"Discussion"`, `"Nouvelle discussion"`, etc.).
+  - `sendMessage()` : création ou renommage persistant automatique au premier prompt utilisateur dans SQLite Room et backend REST.
+  - `init` : sélection automatique de la discussion la plus récente si aucune conversation spécifique n'est requise.
+  - `activeTitle` : calcul résilient du titre actif avec fallbacks élégants.
+- `ui/screens/ChatScreen.kt` :
+  - En-tête : application de `Modifier.weight(1f, fill = false)` et `TextOverflow.Ellipsis` sur le nom de l'agent et le titre de la discussion.
+  - Dialogue de sessions : affichage du titre avec ellipse, horodatage formaté (`formatConversationDate`), aperçu du dernier message et badge de comptage de messages.
+- `ui/components/ChatMessageItem.kt` :
+  - En-tête bot : contrainte de largeur et `TextOverflow.Ellipsis` sur `displayName`, affichage de l'horodatage `formatMessageTime`.
+  - Message utilisateur : affichage discret de l'horodatage en bas à droite de la bulle.
+- `ui/components/BotCard.kt` :
+  - Protection contre les timestamps négatifs ou nuls dans `formatRelativeTime`.
+  - Espacement horizontal propre (`spacedBy(8.dp)`) et `weight(1f, fill = false)` sur le nom du bot.
+- `ui/screens/RosterScreen.kt` :
+  - Sélecteur "Nouvelle Discussion" : contrainte `maxLines = 1, overflow = TextOverflow.Ellipsis` sur le nom du bot et son modèle.
+- `app/src/test/.../viewmodel/ChatViewModelTest.kt` :
+  - 5 tests unitaires validant le nettoyage de titre, la détection des génériques, la génération de titre sur premier message, le renommage automatique et la préservation des titres personnalisés.
+- `app/src/test/.../domain/OpenCodeGlmIntegrationTest.kt` :
+  - Couverture MockK rétrocompatible pour `createConversation`.
+
+**Tests exécutés :**
+- Tests unitaires Python locaux : `python3 -m unittest discover -s /root/CodeStation/scripts/tests` (**8/8 tests passés** en 3.495s).
+- Tests unitaires Android via GitHub Actions CI (Run `42043902194`) :
+  - `ChatViewModelTest` (tests de titrage, édition, message régénération, approbation).
+  - `OpenCodeGlmIntegrationTest`.
+  - `CamcsMissionActionTest`.
+  - `CamcsGitStatusTest`.
+  - `AdaptiveIconValidationTest`.
+  - Compilation complète de l'APK natif signé (`assembleDebug`).
+
+**Résultats :**
+- Python : 8/8 tests verts.
+- CI GitHub Actions Run ID [`42043902194`](https://github.com/Anisghd-lab/CodeStation/actions/runs/42043902194) : **SUCCÈS (completed with 'success' en 5m19s)**.
+- 100% des tests unitaires validés (107/107).
+- Artifact APK produit et archivé : `CodeStation-v1.0.9-debug-apk`.
+
+**Preuves :**
+- Commits : `035451b`, `a5a3223`, `c266b2c`.
+- CI Run ID : `42043902194`.
+
+**Régressions :**
+Aucune. Architecture Compose réactive respectée, persistance Room intègre, compatibilité ascendante garantie.
+
+**Statut : VALIDÉE**
+
+---
+
+# TÂCHES 10 À 12
 
 Non démarrées. Conformément à la règle « une tâche à la fois », aucune analyse ni modification anticipée n'a été effectuée sur ces tâches.
