@@ -96,7 +96,7 @@ fun CodeStationNavHost(
                     }
                 },
                 onOpenControlCenter = {
-                    navController.navigate(Screen.CamcsControlCenter.route) {
+                    navController.navigate(Screen.CamcsControlCenter.createRoute()) {
                         launchSingleTop = true
                     }
                 },
@@ -269,7 +269,7 @@ fun CodeStationNavHost(
                 },
                 onNavigateBack = { navController.popBackStack() },
                 onOpenControlCenter = {
-                    navController.navigate(Screen.CamcsControlCenter.route) {
+                    navController.navigate(Screen.CamcsControlCenter.createRoute()) {
                         launchSingleTop = true
                     }
                 }
@@ -287,7 +287,8 @@ fun CodeStationNavHost(
                 }
             )
         ) { backStackEntry ->
-            val missionId = backStackEntry.arguments?.getString("missionId")
+            val rawMissionId = backStackEntry.arguments?.getString("missionId")
+            val missionId = if (rawMissionId.isNullOrBlank() || rawMissionId == "{missionId}") null else rawMissionId
             CamcsControlCenterScreen(
                 initialMissionId = missionId,
                 onNavigateBack = { navController.popBackStack() }

@@ -16,6 +16,18 @@ class CamcsTaskCardTest {
     }
 
     @Test
+    fun `test CamcsControlCenter createRoute resolves correct paths`() {
+        assertEquals("camcs_control_center", Screen.CamcsControlCenter.createRoute())
+        assertEquals("camcs_control_center", Screen.CamcsControlCenter.createRoute(null))
+        assertEquals("camcs_control_center?missionId=m_42", Screen.CamcsControlCenter.createRoute("m_42"))
+    }
+
+    @Test
+    fun `test CamcsHistoryButton symbol resolves correctly`() {
+        assertNotNull("L'icône d'historique clock.arrow.circlepath doit être résolue", symbolRes("clock.arrow.circlepath"))
+    }
+
+    @Test
     fun `test CapsuleIconType contains all four required categories`() {
         val types = CapsuleIconType.entries
         assertEquals(4, types.size)
