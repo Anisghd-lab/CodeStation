@@ -1113,6 +1113,10 @@ class CamcsOrchestrationEngine:
             agents=raw_agents,
             workspace_dir=mission_dir
         )
+        try:
+            dag_tasks = self.dag_planner.topological_sort(dag_tasks)
+        except Exception as e:
+            self.broadcast_event("dag_warning", {"missionId": mission.id, "warning": str(e)})
         mission.tasks = dag_tasks
 
         # Persist all tasks to DB

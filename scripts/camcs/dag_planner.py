@@ -11,6 +11,12 @@ from typing import Dict, List, Optional, Any, Set
 from dataclasses import dataclass, field
 from .task_classifier import TaskClassifier, TaskClassification, TaskProfile
 
+class CycleDetectedError(Exception):
+    """Raised when a cyclic dependency is detected in the DAG."""
+    def __init__(self, cycle_path: List[str]):
+        self.cycle_path = cycle_path
+        super().__init__(f"Cycle detected in task DAG: {' -> '.join(cycle_path)}")
+
 @dataclass
 class DagTask:
     id: str
@@ -21,6 +27,8 @@ class DagTask:
     description: str
     prompt: str
     dependencies: List[str] = field(default_factory=list)
+    phase: str = "01-core"
+    sequence_order: int = 1
     status: str = "PENDING"  # PENDING, READY, RUNNING, VALIDATING, COMPLETED, FAILED, BLOCKED, CANCELLED
     progress: int = 0
     weight: int = 20
@@ -48,6 +56,8 @@ class DagTask:
             "title": self.title,
             "description": self.description,
             "dependencies": self.dependencies,
+            "phase": self.phase,
+            "sequenceOrder": self.sequence_order,
             "status": self.status,
             "progress": self.progress,
             "weight": self.weight,
@@ -459,6 +469,108 @@ class DagPlanner:
         tasks.append(t_rep)
 
         return tasks
+
+    def topological_sort(self, tasks: List[DagTask]) -> List[DagTask]:
+        """
+        Sorts tasks in dependency order using Kahn's algorithm (inspired by Festival fest/internal/deps/graph.go).
+        Raises CycleDetectedError if a cycle is detected.
+        Deterministic: ties broken by sequence_order or id.
+        """
+        if not tasks:
+            return []
+
+        task_map = {t.id: t for t in tasks}
+        in_degree = {t.id: 0 for t in tasks}
+        outgoing: Dict[str, List[str]] = {t.id: [] for t in tasks}
+
+        for t in tasks:
+            for dep in t.dependencies:
+                if dep in task_map:
+                    in_degree[t.id] += 1
+                    outgoing[dep].append(t.id)
+
+        # Queue contains all tasks with in_degree == 0
+        queue = [t for t in tasks if in_degree[t.id] == 0]
+        queue.sort(key=lambda x: (x.sequence_order, x.id))
+
+        result: List[DagTask] = []
+        visited: Set[str] = set()
+
+        while queue:
+            task = queue.pop(0)
+            if task.id in visited:
+                continue
+            visited.add(task.id)
+            result.append(task)
+
+            # Reduce in-degree of all dependent tasks
+            for dep_id in outgoing.get(task.id, []):
+                in_degree[dep_id] -= 1
+                if in_degree[dep_id] == 0:
+                    queue.append(task_map[dep_id])
+
+            # Re-sort queue for deterministic order
+            queue.sort(key=lambda x: (x.sequence_order, x.id))
+
+        if len(result) != len(tasks):
+            cycle = self.find_cycle(tasks)
+            raise CycleDetectedError(cycle)
+
+        return result
+
+    def has_cycle(self, tasks: List[DagTask]) -> bool:
+        """Returns True if the task list contains any cyclic dependency."""
+        try:
+            self.topological_sort(tasks)
+            return False
+        except CycleDetectedError:
+            return True
+
+    def find_cycle(self, tasks: List[DagTask]) -> List[str]:
+        """Finds and returns a cycle path in the graph using DFS."""
+        task_map = {t.id: t for t in tasks}
+        # Adjacency: dep -> dependent
+        adj: Dict[str, List[str]] = {t.id: [] for t in tasks}
+        for t in tasks:
+            for dep in t.dependencies:
+                if dep in task_map:
+                    adj[dep].append(t.id)
+
+        # 0 = unvisited, 1 = visiting, 2 = visited
+        visited: Dict[str, int] = {t.id: 0 for t in tasks}
+        cycle: List[str] = []
+
+        def dfs(node: str, stack: List[str]) -> bool:
+            visited[node] = 1
+            stack.append(node)
+            for neighbor in adj.get(node, []):
+                if visited.get(neighbor, 0) == 1:
+                    idx = stack.index(neighbor) if neighbor in stack else 0
+                    cycle.extend(stack[idx:] + [neighbor])
+                    return True
+                elif visited.get(neighbor, 0) == 0:
+                    if dfs(neighbor, stack):
+                        return True
+            stack.pop()
+            visited[node] = 2
+            return False
+
+        for t in tasks:
+            if visited[t.id] == 0:
+                if dfs(t.id, []):
+                    return cycle
+
+        return [t.id for t in tasks if t.dependencies]
+
+    def get_parallel_runnable_tasks(self, tasks: List[DagTask]) -> List[DagTask]:
+        """Returns all uncompleted tasks that have zero unsatisfied dependencies."""
+        completed_ids = {t.id for t in tasks if t.status == "COMPLETED"}
+        runnable: List[DagTask] = []
+        for t in tasks:
+            if t.status not in ("COMPLETED", "FAILED", "CANCELLED"):
+                if all(dep in completed_ids for dep in t.dependencies):
+                    runnable.append(t)
+        return runnable
 
     def get_ready_tasks(self, tasks: List[DagTask]) -> List[DagTask]:
         """Returns all tasks whose dependencies are COMPLETED and currently in PENDING state."""
