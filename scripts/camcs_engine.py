@@ -55,10 +55,10 @@ from camcs.quality_gates import QualityGateEngine, QualityGate, GateType, GateSt
 # Database for CAMCS persistence
 DB_PATH = os.path.expanduser("/root/.codestation/camcs.db")
 
-def init_db():
+def init_db(db_path: str = DB_PATH):
     """Initializes and migrates the CAMCS SQLite schema."""
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     cur.execute("""
         CREATE TABLE IF NOT EXISTS missions (
@@ -266,6 +266,10 @@ def init_db():
 
     # Schema migration: Ensure columns exist in missions
     try:
+        cur.execute("ALTER TABLE missions ADD COLUMN objective TEXT")
+    except Exception:
+        pass
+    try:
         cur.execute("ALTER TABLE missions ADD COLUMN orchestration_phase TEXT")
     except Exception:
         pass
@@ -413,24 +417,26 @@ class CamcsMission:
 
 
 class CamcsOrchestrationEngine:
-    def __init__(self):
+    def __init__(self, db_path: str = DB_PATH):
+        self.db_path = db_path
+        init_db(self.db_path)
         self.cli_registry = CliRegistry()
         self.provider_registry = ProviderRegistry()
         self.fallback_manager = ProviderFallbackManager(self.provider_registry)
         self.process_manager = ProcessManager(max_concurrent=2)
         self.agent_factory = AgentFactory(self.cli_registry, self.provider_registry)
         self.dag_planner = DagPlanner()
-        self.deliverable_mgr = DeliverableManager(DB_PATH)
-        self.quality_auditor = QualityAuditor(DB_PATH)
-        self.collab_hub = CollaborationHub(DB_PATH)
+        self.deliverable_mgr = DeliverableManager(db_path)
+        self.quality_auditor = QualityAuditor(db_path)
+        self.collab_hub = CollaborationHub(db_path)
         self.memory_client = CollectiveMemoryClient()
-        self.external_verifier = ExternalActionVerifier(DB_PATH)
+        self.external_verifier = ExternalActionVerifier(db_path)
         self.github_executor = GitHubWorkflowExecutor(self.external_verifier)
         self.credential_registry = CredentialRegistry()
-        self.external_services = ExternalServiceRegistry(DB_PATH)
-        self.external_executor = ExternalActionExecutor(DB_PATH)
-        self.completion_gate = ObjectiveCompletionGate(DB_PATH)
-        self.quality_gates = QualityGateEngine(DB_PATH)
+        self.external_services = ExternalServiceRegistry(db_path)
+        self.external_executor = ExternalActionExecutor(db_path)
+        self.completion_gate = ObjectiveCompletionGate(db_path)
+        self.quality_gates = QualityGateEngine(db_path)
         self.active_missions: Dict[str, CamcsMission] = {}
         self.event_subscribers: List[queue.Queue] = []
         self._lock = threading.RLock()
@@ -440,8 +446,12 @@ class CamcsOrchestrationEngine:
     def _load_missions_from_db(self):
         """Loads all missions, agents, and real tasks from SQLite with invariant enforcement."""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = sqlite3.connect(self.db_path)
             cur = conn.cursor()
+            cols = [c[1] for c in cur.execute("PRAGMA table_info(missions)").fetchall()]
+            if not cols or "objective" not in cols:
+                conn.close()
+                return
             cur.execute("""
                 SELECT id, title, objective, status, progress, orchestration_phase, created_at, completed_at, config_json
                 FROM missions ORDER BY created_at DESC
@@ -547,6 +557,99 @@ class CamcsOrchestrationEngine:
             conn.close()
         except Exception as e:
             print(f"[CamcsEngine] Error loading missions from DB: {e}", file=sys.stderr)
+
+    def reconcile_interrupted_missions(self, auto_resume: bool = True) -> List[Dict[str, Any]]:
+        """
+        Reconciles interrupted missions from SQLite upon engine startup or on-demand (inspired by Festival continuation & reconcile).
+        Detects unfinished tasks, checks already-produced deliverables, and resets or resumes work safely.
+        """
+        db = getattr(self, "db_path", DB_PATH)
+        reconciled = []
+        try:
+            conn = sqlite3.connect(db)
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT id, title, objective, governance_mode, status, progress, orchestration_phase
+                FROM missions
+                WHERE status IN ('RUNNING', 'DISPATCHING', 'PAUSED')
+            """)
+            interrupted_missions = cur.fetchall()
+
+            for m_row in interrupted_missions:
+                m_id, m_title, m_obj, m_gov, m_status, m_prog, m_phase = m_row
+                cur.execute("""
+                    SELECT id, agent_id, classification, title, description, prompt, dependencies_json,
+                           status, progress, weight, is_mandatory, assigned_file
+                    FROM tasks
+                    WHERE mission_id = ?
+                """, (m_id,))
+                task_rows = cur.fetchall()
+
+                mission_tasks: List[DagTask] = []
+                for tr in task_rows:
+                    deps = json.loads(tr[6]) if tr[6] else []
+                    t = DagTask(
+                        id=tr[0], mission_id=m_id, agent_id=tr[1], classification=tr[2],
+                        title=tr[3], description=tr[4], prompt=tr[5], dependencies=deps,
+                        status=tr[7], progress=tr[8], weight=tr[9], is_mandatory=bool(tr[10]),
+                        assigned_file=tr[11]
+                    )
+                    mission_tasks.append(t)
+
+                for t in mission_tasks:
+                    if t.status in ("RUNNING", "PENDING"):
+                        if t.assigned_file and os.path.exists(t.assigned_file) and os.path.getsize(t.assigned_file) > 0:
+                            t.status = TaskState.COMPLETED
+                            t.progress = 100
+                            t.result_summary = "Validé par réconciliation (livrable intact)"
+                            cur.execute("""
+                                UPDATE tasks SET status = ?, progress = ?, result_summary = ?
+                                WHERE id = ?
+                            """, (TaskState.COMPLETED, 100, t.result_summary, t.id))
+                        elif t.status == "RUNNING":
+                            t.status = TaskState.READY
+                            t.progress = 0
+                            t.result_summary = "Réconcilié après interruption: prêt pour reprise"
+                            cur.execute("""
+                                UPDATE tasks SET status = ?, progress = ?, result_summary = ?
+                                WHERE id = ?
+                            """, (TaskState.READY, 0, t.result_summary, t.id))
+
+                calc_prog = self.dag_planner.compute_mission_progress(mission_tasks)
+                all_done = self.dag_planner.all_mandatory_tasks_completed(mission_tasks)
+                new_status = MissionState.COMPLETED if all_done else MissionState.RUNNING
+
+                cur.execute("""
+                    UPDATE missions SET status = ?, progress = ?, updated_at = ?
+                    WHERE id = ?
+                """, (new_status, calc_prog, time.time(), m_id))
+
+                recon_msg = f"Réconciliation de session : {len(mission_tasks)} tâches analysées, statut '{new_status}', progression {calc_prog}%."
+                cur.execute("""
+                    INSERT INTO mission_journal (id, mission_id, event_type, message, payload_json, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (str(uuid.uuid4()), m_id, "mission.reconciliation", recon_msg, json.dumps({"tasksCount": len(mission_tasks), "status": new_status}), time.time()))
+
+                reconciled.append({
+                    "missionId": m_id,
+                    "title": m_title,
+                    "previousStatus": m_status,
+                    "newStatus": new_status,
+                    "tasksCount": len(mission_tasks),
+                    "progress": calc_prog
+                })
+
+            conn.commit()
+            conn.close()
+
+            if reconciled:
+                for item in reconciled:
+                    self.emit_event(item["missionId"], "mission.reconciliation", f"Mission réconciliée ({item['newStatus']})", item)
+
+        except Exception as e:
+            print(f"[CamcsEngine] Error in session reconciliation: {e}", file=sys.stderr)
+
+        return reconciled
 
     def subscribe_events(self) -> queue.Queue:
         q = queue.Queue(maxsize=300)
@@ -1118,7 +1221,7 @@ class CamcsOrchestrationEngine:
         try:
             dag_tasks = self.dag_planner.topological_sort(dag_tasks)
         except Exception as e:
-            self.broadcast_event("dag_warning", {"missionId": mission.id, "warning": str(e)})
+            self.emit_event(mission.id, "dag.warning", f"Topological sort warning: {e}", {"warning": str(e)})
         mission.tasks = dag_tasks
 
         # Persist all tasks to DB
@@ -2021,6 +2124,10 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
             mission_id = data.get("missionId", "")
             ok = ENGINE.resume_mission(mission_id)
             self._send_json(200, {"ok": ok})
+        elif self.path == "/api/camcs/missions/reconcile":
+            auto_resume = data.get("autoResume", False)
+            reconciled = ENGINE.reconcile_interrupted_missions(auto_resume=auto_resume)
+            self._send_json(200, {"ok": True, "reconciled": reconciled})
         elif self.path == "/api/camcs/missions/cancel":
             mission_id = data.get("missionId", "")
             ok = ENGINE.cancel_mission(mission_id)
