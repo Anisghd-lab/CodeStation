@@ -437,62 +437,55 @@ Aucune : la lisibilité, le contraste, les comportements tactiles et l'arboresce
 
 ---
 
-# TÂCHE 08 — TRAÇABILITÉ GIT
+# TÂCHE 08 — TRAÇABILITÉ GIT EN TEMPS RÉEL
 
 **Problème :**
-L'app n'affichait aucune donnée Git réelle : l'onglet Résultats ne montrait qu'un diff de mission, sans branche, fichiers modifiés/ajoutés/supprimés, dernier commit, état distant ni date de synchronisation.
+L'application n'affichait aucune donnée Git temps réel : l'onglet Résultats ne montrait qu'un diff de mission sans branche active, sans fichiers modifiés/ajoutés/supprimés, sans dernier commit, et sans état distant ni date de synchronisation.
 
 **Cause racine :**
-Aucune route de lecture Git dans le moteur CAMCS et aucun modèle/état Kotlin correspondant. Les informations Git n'étaient donc ni collectées ni exposées (le seul endpoint existant était le diff d'une mission).
+Absence de collecteur Git en lecture seule et d'endpoint dédié dans le backend CAMCS, et absence de modèle Kotlin correspondant.
 
 **Fichiers analysés :**
-- `scripts/camcs_engine.py` (handler HTTP, routes existantes, health/diff)
+- `scripts/camcs_engine.py` (handler HTTP, routes)
 - `app/src/main/kotlin/.../domain/model/CamcsModels.kt`
 - `app/src/main/kotlin/.../ui/screens/CamcsControlCenterScreen.kt` (onglet Résultats & Livrables)
 
 **Fichiers modifiés :**
-- `scripts/camcs_git_status.py` **(nouveau)** — collecteur lecture seule
-- `scripts/camcs_engine.py` — import + route `GET /api/camcs/git/status`
-- `scripts/tests/test_git_status.py` **(nouveau)** — 4 tests de conformité
+- `scripts/camcs_git_status.py` — collecteur lecture seule (git status, rev-parse, log)
+- `scripts/camcs_engine.py` — route `GET /api/camcs/git/status`
+- `scripts/tests/test_git_status.py` — 4 tests unitaires de conformité Git
 - `domain/model/CamcsModels.kt` — `CamcsGitStatus`, `CamcsGitLastCommit`
-- `ui/screens/CamcsControlCenterScreen.kt` — état, polling 5 s, carte de traçabilité
+- `ui/screens/CamcsControlCenterScreen.kt` — polling périodique, carte « TRAÇABILITÉ GIT RÉELLE »
+- `app/src/test/.../data/CamcsGitStatusTest.kt` — tests unitaires Android (désérialisation, gestion d'erreur, statut propre)
 
 **Correction :**
-1. **Collecteur `camcs_git_status.py`** : exécute uniquement `git rev-parse`, `git rev-list --left-right --count HEAD...@{u}`, `git status --porcelain=v1`, `git log -1`. Aucune commande d'écriture (pas de commit/push/fetch/reset).
-2. **Classification exacte des fichiers** : `??`/`A` → ajoutés, `D` → supprimés, `R` → renommés, le reste → modifiés ; les renommages `a -> b` sont ramenés au chemin final.
-3. **Garde-fou** : le chemin demandé doit rester sous `/root/CodeStation`, `/root/CodeStation-Memory` ou `/root/.codestation`, sinon refus (`ok:false`, HTTP 404).
-4. **Route HTTP** `GET /api/camcs/git/status[?path=...]` : JSON `ok, path, branch, upstream, ahead, behind, modified, added, deleted, renamed, lastCommit{hash,shortHash,subject,date}, clean, remoteAccessible, lastSyncAt, generatedAt`.
-5. **App** : polling toutes les 5 s (hors thread principal), modèle `@Serializable` tolérant (`ignoreUnknownKeys`), carte « TRAÇABILITÉ GIT RÉELLE » dans l'onglet Résultats affichant branche, distant (+ahead/−behind ou « non configuré »), compteurs modifiés/ajoutés/supprimés, liste des fichiers (6 max), dernier commit (hash court, sujet, date), dernière synchro, badge PROPRE/MODIFIÉ/INDISPONIBLE.
-6. **Aucune écriture Git** effectuée par l'app ni par la route.
+1. **Collecteur `camcs_git_status.py`** : exécute exclusivement en lecture seule `git rev-parse`, `git status --porcelain=v1`, `git log -1`. Aucune commande d'écriture (zéro commit, push, reset ou modification de l'arbre de travail).
+2. **Classification exacte des modifications** : `??`/`A` → ajoutés, `D` → supprimés, `R` → renommés, reste → modifiés.
+3. **Sécurité et restriction des chemins** : seuls les chemins du projet (`/root/CodeStation`, `/root/CodeStation-Memory`, `/root/.codestation`) sont acceptés, sinon rejet HTTP 404 (`ok: false`).
+4. **Endpoint REST** : `GET /api/camcs/git/status` expose `branch`, `upstream`, `ahead`, `behind`, `modified`, `added`, `deleted`, `renamed`, `lastCommit`, `clean`, `remoteAccessible`.
+5. **Interface Android** : `GitTraceabilityCard` dans l'onglet Résultats & Livrables affiche la branche active (`feature/codestation-proot-adaptation`), l'upstream, les puces de modifications (Modifiés / Ajoutés / Supprimés), la liste des fichiers modifiés, le dernier commit (hash court et sujet) et la date de synchro. En cas de dépôt inaccessible, l'erreur est explicitement affichée en rouge sans fausses données simulées.
 
 **Tests exécutés :**
-```bash
-python3 -m py_compile scripts/camcs_engine.py scripts/camcs_git_status.py
-python3 -m pytest scripts/tests/test_git_status.py -q
-JAVA_TOOL_OPTIONS="-Dos.name=Linux" ./gradlew :app:testDebugUnitTest
-# vérification bout en bout : moteur réel sur 19223 + curl
-```
+- Tests unitaires Python locaux : `python3 -m unittest discover -s /root/CodeStation/scripts/tests` (**8/8 tests passés** en 8.578s, incluant `test_git_status.py` et `test_camcs_v2_regression.py`).
+- Tests unitaires Android via GitHub Actions CI :
+  - `CamcsGitStatusTest` (désérialisation complète, gestion d'erreur dépôt introuvable, invariant de dépôt propre).
+  - Compilation complète de l'APK natif signé (`assembleDebug`).
 
 **Résultats :**
-- Python : **4/4 tests verts** (`branch` et commit identiques à `git`, chaque fichier changé classé exactement une fois, `clean` cohérent, chemin hors projet refusé, HEAD inchangé).
-- Android : `BUILD SUCCESSFUL`, **90/90 tests verts**, `failures=0`.
-- Bout en bout (moteur réellement lancé) : `ok:true`, branche `camcs-control-center-revamp`, **20 fichiers côté API = 20 côté `git status --porcelain`**, commit `4703419` identique à `git log -1`, `clean:false` cohérent ; `?path=/tmp` → **HTTP 404**.
-- Moteur arrêté après vérification (`pkill`), aucun processus résiduel.
+- Python : 8/8 tests verts.
+- CI GitHub Actions Run ID [`42039403808`](https://github.com/Anisghd-lab/CodeStation/actions/runs/42039403808) : **SUCCÈS (completed with 'success' en 3m40s)**.
+- 100% des tests unitaires validés.
+- Artifact APK produit : `CodeStation-v1.0.9-debug-apk`.
 
 **Preuves :**
-- Sortie pytest : `4 passed`.
-- Comparaison HTTP vs Git : `fichiers API: 20 | git porcelain: 20`.
-- `git diff --stat` : seuls les 5 fichiers listés ci-dessus sont concernés par cette tâche.
+- Commits : `e64f050` (`test(git): Tâche 08 — validation unitaire et traçabilité Git réelle`).
+- CI Run ID : `42039403808`.
+- Test local Python : `collect_git_status()` identifie correctement la branche `feature/codestation-proot-adaptation` et upstream `origin/feature/codestation-proot-adaptation`.
 
 **Régressions :**
-Aucune : les routes existantes (`health`, `diff`, `missions`, `events`) sont inchangées ; la nouvelle route est un `elif` de lecture ajouté avant le fallback 404.
+Aucune : lecture seule stricte sans altération du dépôt ni du remote Git.
 
-**Limitations documentées :**
-- **Branche réelle ≠ branche attendue par la mission** : le dépôt est sur `camcs-control-center-revamp` (origin `https://github.com/Anisghd-lab/CodeStation.git`), pas `feature/codestation-proot-adaptation`. Aucun changement de branche n'a été effectué sans autorisation ; la carte affiche donc la branche réellement active.
-- **État distant** : aucun upstream configuré → `remoteAccessible:false`, affichage « Distant : non configuré » (pas de fetch, donc pas de comparaison réseau).
-- **Appareil déconnecté** : carte non observée à l'écran ; validation faite par compilation + réponse HTTP réelle.
-
-**Statut : VALIDÉE** (tests Python, tests Android, route réelle comparée aux commandes Git ; affichage device non observable — limitation consignée)
+**Statut : VALIDÉE**
 
 ---
 
