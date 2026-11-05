@@ -16,6 +16,7 @@ import sqlite3
 import threading
 import subprocess
 import urllib.parse
+import hashlib
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timezone
@@ -278,9 +279,15 @@ class MemoryExtractor:
     """Extracts schema-conforming Experience and Knowledge instances."""
     def extract(self, analyzed: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         now_iso = get_iso_now()
-        uid = uuid.uuid4().hex[:6]
         author = analyzed.get("author", "code-agent")
         tags = analyzed.get("tags", ["cli", "learning"])
+        title_raw = analyzed.get("title", "Expérience CLI")
+        prob_raw = analyzed.get("problem", "")
+
+        # Tâche 03 : Identifiant déterministe par hachage de l'interaction (auteur, titre, problème)
+        # Évite la duplication avec des UUIDs aléatoires à chaque cycle d'analyse
+        content_key = f"{author}:{title_raw}:{prob_raw}"
+        uid = hashlib.sha256(content_key.encode("utf-8")).hexdigest()[:8]
 
         exp_id = f"exp-cs-{uid}"
         knw_id = f"knw-cs-{uid}"
@@ -346,12 +353,24 @@ class MemoryCurator:
                 exp_file = os.path.join(self.repo_path, "experiences", f"{experience['id']}.json")
                 knw_file = os.path.join(self.repo_path, "knowledge", f"{knowledge['id']}.json")
 
-                # Deduplication check: compare titles and content
+                # Tâche 03 : Déduplication stricte par fichier existant et comparaison de contenu
+                if os.path.exists(knw_file) or os.path.exists(exp_file):
+                    return False
+
                 for existing_knw_path in glob.glob(os.path.join(self.repo_path, "knowledge", "*.json")):
                     try:
                         with open(existing_knw_path, "r", encoding="utf-8") as f:
                             ex = json.load(f)
-                            if ex.get("title") == knowledge["title"]:
+                            if ex.get("title") == knowledge["title"] and ex.get("content") == knowledge.get("content"):
+                                return False  # Already curated
+                    except Exception:
+                        pass
+
+                for existing_exp_path in glob.glob(os.path.join(self.repo_path, "experiences", "*.json")):
+                    try:
+                        with open(existing_exp_path, "r", encoding="utf-8") as f:
+                            ex = json.load(f)
+                            if ex.get("title") == experience["title"] and ex.get("problem") == experience.get("problem") and ex.get("author_agent") == experience.get("author_agent"):
                                 return False  # Already curated
                     except Exception:
                         pass
@@ -545,7 +564,12 @@ class ContinuousMemoryEngine:
         self.curator = MemoryCurator()
         self.retriever = MemoryRetriever()
         self.last_run_time = 0.0
-        self.analyzed_sessions_count = len(self.state.get("processed_agy", [])) + len(self.state.get("processed_camcs", [])) + len(self.state.get("processed_opencode", []))
+        self.analyzed_sessions_count = (
+            len(self.state.get("processed_agy", [])) +
+            len(self.state.get("processed_camcs", [])) +
+            len(self.state.get("processed_opencode", [])) +
+            len(self.state.get("processed_codebuddy", []))
+        )
 
     def _load_state(self) -> Dict[str, Any]:
         if os.path.exists(STATE_FILE):
@@ -580,17 +604,19 @@ class ContinuousMemoryEngine:
                     if self.curator.persist(exp, knw):
                         new_items += 1
 
-            # Mark processed
+            # Mark processed without duplicate entries
             src = raw.get("source")
             sid = raw.get("id")
-            if src == "opencode":
-                self.state.setdefault("processed_opencode", []).append(sid)
-            elif src == "google_agy":
-                self.state.setdefault("processed_agy", []).append(sid)
-            elif src == "codebuddy":
-                self.state.setdefault("processed_codebuddy", []).append(sid)
-            elif src == "camcs":
-                self.state.setdefault("processed_camcs", []).append(sid)
+            if sid:
+                bucket = None
+                if src == "opencode": bucket = "processed_opencode"
+                elif src == "google_agy": bucket = "processed_agy"
+                elif src == "codebuddy": bucket = "processed_codebuddy"
+                elif src == "camcs": bucket = "processed_camcs"
+                if bucket:
+                    lst = self.state.setdefault(bucket, [])
+                    if sid not in lst:
+                        lst.append(sid)
 
         self.analyzed_sessions_count += len(raw_sessions)
         self.last_run_time = time.time()

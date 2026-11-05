@@ -11,6 +11,7 @@ import com.ghdinteractivestudio.codestation.domain.model.MemorySearchResultItem
 import com.ghdinteractivestudio.codestation.domain.model.MemorySyncState
 import com.ghdinteractivestudio.codestation.domain.repository.BotRepository
 import com.ghdinteractivestudio.codestation.domain.repository.MemoryRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,6 +41,7 @@ class MemoryViewModel(
 
     private val _uiState = MutableStateFlow(MemoryUiState())
     val uiState: StateFlow<MemoryUiState> = _uiState.asStateFlow()
+    private var loadJob: Job? = null
 
     init {
         // Observe repository memoryStatus
@@ -58,15 +60,17 @@ class MemoryViewModel(
     }
 
     fun loadAll() {
-        viewModelScope.launch {
+        if (loadJob?.isActive == true) return
+        loadJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             try {
                 memoryRepository.refreshStatus()
                 val expResult = memoryRepository.getExperiences(50, 0)
                 val knwResult = memoryRepository.getKnowledge(50, 0)
 
-                val exps = expResult.getOrDefault(emptyList())
-                val knws = knwResult.getOrDefault(emptyList())
+                // Tâche 03 : Déduplication stricte des expériences et connaissances par identifiant
+                val exps = expResult.getOrDefault(emptyList()).distinctBy { it.id }
+                val knws = knwResult.getOrDefault(emptyList()).distinctBy { it.id }
 
                 _uiState.update { current ->
                     current.copy(
@@ -170,11 +174,13 @@ class MemoryViewModel(
         val knwList = _uiState.value.allKnowledge
 
         val results = mutableListOf<MemorySearchResultItem>()
+        val seenIds = mutableSetOf<String>()
 
         // 1. Filter Knowledge
         if (filter == "ALL" || filter == "KNOWLEDGE" || filter == "VALIDATED") {
             for (k in knwList) {
                 if (filter == "VALIDATED" && k.validationStatus != "validated_solution") continue
+                if (!seenIds.add(k.id)) continue
                 if (q.isNotEmpty()) {
                     val matchTitle = k.title.lowercase().contains(q)
                     val matchContent = k.content.lowercase().contains(q)
@@ -198,6 +204,7 @@ class MemoryViewModel(
         if (filter == "ALL" || filter == "EXPERIENCES" || filter == "VALIDATED") {
             for (e in expList) {
                 if (filter == "VALIDATED" && e.validationStatus != "validated_solution") continue
+                if (!seenIds.add(e.id)) continue
                 if (q.isNotEmpty()) {
                     val matchTitle = e.title.lowercase().contains(q)
                     val matchProb = e.problem.lowercase().contains(q)

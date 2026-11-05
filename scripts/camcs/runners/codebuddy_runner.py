@@ -66,6 +66,9 @@ class CodeBuddyRunner(BaseCliRunner):
 
         env = os.environ.copy()
         env["PATH"] = "/usr/local/bin:/usr/bin:/bin:/root/.local/bin:" + env.get("PATH", "")
+        # Tâche 03 : Désactiver l'auto-mémoire interne de CodeBuddy pour éviter les boucles d'interactions
+        # répétitives dans CodeStation-Memory (la mémoire est centralisée par ContinuousMemoryEngine).
+        env["CODEBUDDY_DISABLE_AUTO_MEMORY"] = "1"
 
         cmd = [self.path or "codebuddy", "-p", "-y", prompt]
         cmd_str = f"codebuddy -p -y \"{prompt[:80]}...\""
