@@ -14,8 +14,8 @@
 | **TASK-002** | Système de Quality Gates Multi-types & Acceptance Verifiers | NOUVELLE FONCTIONNALITÉ | Critique (P0) | PUSHED | c9cc15a | feature/festival-integration |
 | **TASK-003** | Moteur de Reprise après Interruption & Réconciliation de Session | NOUVELLE FONCTIONNALITÉ | Critique (P0) | PUSHED | 4bb6dcc | feature/festival-integration |
 | **TASK-004** | Boucle Auto-Itérative Corrective avec Escalade Humaine | NOUVELLE FONCTIONNALITÉ | Haute (P1) | PUSHED | 09619c4 | feature/festival-integration |
-| **TASK-005** | Intégration Mémoire Perpétuelle des Décisions & Expériences | AMÉLIORATION D'UN MODULE EXISTANT | Haute (P1) | VALIDATED | En attente push | feature/festival-integration |
-| **TASK-006** | Enrichissement UI du Centre de Contrôle CAMCS (Quality Gates & Phases Glassmorphism) | AMÉLIORATION D'UNE FONCTIONNALITÉ EXISTANTE | Haute (P1) | PENDING | — | — |
+| **TASK-005** | Intégration Mémoire Perpétuelle des Décisions & Expériences | AMÉLIORATION D'UN MODULE EXISTANT | Haute (P1) | PUSHED | 1ad3e66 | feature/festival-integration |
+| **TASK-006** | Enrichissement UI du Centre de Contrôle CAMCS (Quality Gates & Phases Glassmorphism) | AMÉLIORATION D'UNE FONCTIONNALITÉ EXISTANTE | Haute (P1) | VALIDATED | En attente push | feature/festival-integration |
 
 ---
 

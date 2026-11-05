@@ -84,16 +84,14 @@ class TestMemoryDecisionSync(unittest.TestCase):
         self.assertGreaterEqual(len(results), 1)
         self.assertIn("Synthèse de Mission Validée", results[0]["title"])
 
-    def test_live_server_interaction_if_available(self):
-        # If live server is running on port 19224, test real API interaction
-        try:
-            import urllib.request
-            urllib.request.urlopen("http://127.0.0.1:19224/api/memory/status", timeout=1.0)
-            server_available = True
-        except Exception:
-            server_available = False
+    def test_live_server_interaction_mocked(self):
+        """Vérifie le formatage et l'envoi de payload JSON au serveur HTTP."""
+        from unittest.mock import patch, MagicMock
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.__enter__.return_value = mock_resp
 
-        if server_available:
+        with patch("urllib.request.urlopen", return_value=mock_resp) as mock_urlopen:
             ok = self.live_client.record_decision(
                 title="Test Architectural Decision Sync",
                 decision="Valider le client de mémoire collective CAMCS",
@@ -103,6 +101,7 @@ class TestMemoryDecisionSync(unittest.TestCase):
                 tags=["camcs-test", "festival-audit"]
             )
             self.assertTrue(ok)
+            self.assertTrue(mock_urlopen.called)
 
 
 if __name__ == "__main__":

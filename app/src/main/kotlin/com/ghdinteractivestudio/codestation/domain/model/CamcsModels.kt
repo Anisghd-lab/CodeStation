@@ -38,7 +38,12 @@ data class CamcsSubtask(
     @SerialName("completedAt") val completedAt: Double? = null,
     @SerialName("errorMessage") val errorMessage: String? = null,
     @SerialName("fallbackCli") val fallbackCli: String? = null,
-    @SerialName("canRetry") val canRetry: Boolean = false
+    @SerialName("canRetry") val canRetry: Boolean = false,
+    @SerialName("phase") val phase: String? = null,
+    @SerialName("sequenceOrder") val sequenceOrder: Int = 1,
+    @SerialName("iterationCount") val iterationCount: Int = 0,
+    @SerialName("maxIterations") val maxIterations: Int = 3,
+    @SerialName("escalationReason") val escalationReason: String? = null
 )
 
 @Serializable
@@ -414,4 +419,44 @@ data class CamcsExternalService(
 data class CamcsServicesResponse(
     @SerialName("ok") val ok: Boolean = true,
     @SerialName("services") val services: List<CamcsExternalService> = emptyList()
+)
+
+@Serializable
+data class CamcsQualityGate(
+    @SerialName("id") val id: String = "",
+    @SerialName("missionId") val missionId: String = "",
+    @SerialName("taskId") val taskId: String = "",
+    @SerialName("name") val name: String = "",
+    @SerialName("type") val type: String = "COMMAND",
+    @SerialName("status") val status: String = "PENDING",
+    @SerialName("passed") val passed: Boolean = false,
+    @SerialName("details") val details: String? = null,
+    @SerialName("evaluatedAt") val evaluatedAt: Double = 0.0,
+    @SerialName("executionDurationMs") val executionDurationMs: Long = 0L
+)
+
+@Serializable
+data class CamcsQualityGatesResponse(
+    @SerialName("ok") val ok: Boolean = true,
+    @SerialName("missionId") val missionId: String = "",
+    @SerialName("gates") val gates: List<CamcsQualityGate> = emptyList()
+)
+
+@Serializable
+data class CamcsRepairAttempt(
+    @SerialName("taskId") val taskId: String = "",
+    @SerialName("missionId") val missionId: String = "",
+    @SerialName("iteration") val iteration: Int = 0,
+    @SerialName("maxIterations") val maxIterations: Int = 3,
+    @SerialName("errorSummary") val errorSummary: String? = null,
+    @SerialName("failureContext") val failureContext: String? = null,
+    @SerialName("actionTaken") val actionTaken: String = "",
+    @SerialName("timestamp") val timestamp: Double = 0.0
+)
+
+@Serializable
+data class CamcsTaskRepairsResponse(
+    @SerialName("ok") val ok: Boolean = true,
+    @SerialName("taskId") val taskId: String = "",
+    @SerialName("repairs") val repairs: List<CamcsRepairAttempt> = emptyList()
 )

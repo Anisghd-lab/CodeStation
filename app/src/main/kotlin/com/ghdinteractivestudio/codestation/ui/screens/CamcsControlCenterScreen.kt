@@ -81,6 +81,8 @@ import com.ghdinteractivestudio.codestation.domain.model.CamcsProof
 import com.ghdinteractivestudio.codestation.domain.model.CamcsProofsResponse
 import com.ghdinteractivestudio.codestation.domain.model.CamcsProviderStatus
 import com.ghdinteractivestudio.codestation.domain.model.CamcsProvidersResponse
+import com.ghdinteractivestudio.codestation.domain.model.CamcsQualityGate
+import com.ghdinteractivestudio.codestation.domain.model.CamcsQualityGatesResponse
 import com.ghdinteractivestudio.codestation.domain.model.CamcsReport
 import com.ghdinteractivestudio.codestation.domain.model.CamcsReportResponse
 import com.ghdinteractivestudio.codestation.domain.model.CamcsServicesResponse
@@ -174,6 +176,7 @@ fun CamcsControlCenterScreen(
 
     // Real Execution Deliverables, Communications, Proofs & Reports
     var deliverables by remember { mutableStateOf<List<CamcsDeliverable>>(emptyList()) }
+    var qualityGates by remember { mutableStateOf<List<CamcsQualityGate>>(emptyList()) }
     var communications by remember { mutableStateOf<List<CamcsCommunication>>(emptyList()) }
     var proofs by remember { mutableStateOf<List<CamcsProof>>(emptyList()) }
     var report by remember { mutableStateOf<CamcsReport?>(null) }
@@ -352,6 +355,19 @@ fun CamcsControlCenterScreen(
         }
     }
 
+    val handleApproveTask: (missionId: String, taskId: String) -> Unit = { mId, tId ->
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val json = "{\"missionId\": \"$mId\", \"taskId\": \"$tId\", \"extraAttempts\": 2}"
+                val req = Request.Builder()
+                    .url("http://127.0.0.1:19223/api/camcs/tasks/approve")
+                    .post(json.toRequestBody("application/json".toMediaType()))
+                    .build()
+                httpClient.newCall(req).execute().close()
+            } catch (_: Exception) {}
+        }
+    }
+
     // 0. Non-freezing live monotonic clock tick
     LaunchedEffect(Unit) {
         while (isActive) {
@@ -445,6 +461,14 @@ fun CamcsControlCenterScreen(
                                 gitDiffText = jsonParser.decodeFromString<CamcsDiffResponse>(diffBody).diff
                             }
                             diffResp.close()
+
+                            val gatesReq = Request.Builder().url("http://127.0.0.1:19223/api/camcs/missions/$currMid/gates").build()
+                            val gatesResp = httpClient.newCall(gatesReq).execute()
+                            if (gatesResp.isSuccessful) {
+                                val gBody = gatesResp.body?.string() ?: ""
+                                qualityGates = jsonParser.decodeFromString<CamcsQualityGatesResponse>(gBody).gates
+                            }
+                            gatesResp.close()
                         } catch (_: Exception) {}
                     }
                 }
@@ -911,6 +935,25 @@ fun CamcsControlCenterScreen(
                         // Visual Dispatching Workflow Pipeline with real states
                         DispatchingPipelineCard(mission = activeMission)
 
+                        // Human Escalation Alert (if WAITING_FOR_APPROVAL / NEEDS_APPROVAL)
+                        if (activeMission.status in listOf("WAITING_FOR_APPROVAL", "NEEDS_APPROVAL")) {
+                            HumanEscalationApprovalCard(
+                                mission = activeMission,
+                                onApprove = {
+                                    val blockedTask = activeMission.agents.flatMap { it.tasks }.firstOrNull { it.status in listOf("NEEDS_APPROVAL", "BLOCKED") }
+                                    handleApproveTask(activeMission.id, blockedTask?.id ?: "")
+                                },
+                                onReject = {
+                                    handleCancelMission(activeMission.id)
+                                }
+                            )
+                        }
+
+                        // Quality Gates Verification Section
+                        if (qualityGates.isNotEmpty()) {
+                            QualityGatesVerificationCard(gates = qualityGates)
+                        }
+
                         // External Actions & Remote Services Integrity
                         if (activeMission.externalActions.isNotEmpty()) {
                             ExternalActionsIntegrityCard(actions = activeMission.externalActions)
@@ -966,6 +1009,7 @@ fun CamcsControlCenterScreen(
                     MissionDeliverablesAndResultsView(
                         mission = activeMission,
                         deliverables = deliverables,
+                        qualityGates = qualityGates,
                         proofs = proofs,
                         report = report,
                         gitDiffText = gitDiffText,
@@ -3577,6 +3621,7 @@ private fun GitMetricChip(label: String, value: Int, color: Color, modifier: Mod
 private fun MissionDeliverablesAndResultsView(
     mission: CamcsMission?,
     deliverables: List<CamcsDeliverable>,
+    qualityGates: List<CamcsQualityGate> = emptyList(),
     proofs: List<CamcsProof>,
     report: CamcsReport?,
     gitDiffText: String,
@@ -3715,6 +3760,11 @@ private fun MissionDeliverablesAndResultsView(
                     }
                 }
             }
+        }
+
+        // Quality Gates Multi-Types Inspection
+        if (qualityGates.isNotEmpty()) {
+            QualityGatesVerificationCard(gates = qualityGates)
         }
 
         // 2. Registre Centralisé des Livrables
@@ -4213,4 +4263,212 @@ private fun DeliverableFileViewerDialog(
             }
         }
     )
+}
+
+@Composable
+private fun HumanEscalationApprovalCard(
+    mission: CamcsMission,
+    onApprove: () -> Unit,
+    onReject: () -> Unit
+) {
+    val dark = LocalDark.current
+    val accentGold = if (dark) Color(0xFFFFB703) else Color(0xFFD97706)
+    val electricGreen = if (dark) Color(0xFF00E676) else Color(0xFF059669)
+    val dangerRed = if (dark) Color(0xFFFF5252) else Color(0xFFDC2626)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Palette.surface.copy(alpha = 0.85f))
+            .border(1.5.dp, accentGold.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
+            .padding(14.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Symbol("exclamationmark.triangle", size = 20.dp, tint = accentGold)
+                Text(
+                    text = "ARBITRAGE OPÉRATEUR REQUIS (AUTO-RÉPARATION)",
+                    style = Type.caption.semibold.copy(fontSize = 11.5.sp, letterSpacing = 0.4.sp),
+                    color = accentGold
+                )
+            }
+
+            Text(
+                text = mission.blockedReason
+                    ?: "Une tâche a atteint son quota d'auto-réparations. Votre arbitrage est requis pour poursuivre la mission.",
+                style = Type.body.copy(fontSize = 12.5.sp),
+                color = Palette.text
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(electricGreen.copy(alpha = 0.2f))
+                        .border(1.dp, electricGreen.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                        .clickable { onApprove() }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Approuver (+2 essais)",
+                        style = Type.caption.semibold.copy(fontSize = 12.sp),
+                        color = electricGreen
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(dangerRed.copy(alpha = 0.2f))
+                        .border(1.dp, dangerRed.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                        .clickable { onReject() }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Arrêter la tâche",
+                        style = Type.caption.semibold.copy(fontSize = 12.sp),
+                        color = dangerRed
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QualityGatesVerificationCard(gates: List<CamcsQualityGate>) {
+    val dark = LocalDark.current
+    val electricGreen = if (dark) Color(0xFF00E676) else Color(0xFF059669)
+    val dangerRed = if (dark) Color(0xFFFF5252) else Color(0xFFDC2626)
+    val cyanAccent = if (dark) Color(0xFF00D2FF) else Color(0xFF0284C7)
+
+    val passedCount = gates.count { it.passed }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Palette.surface.copy(alpha = 0.6f))
+            .border(0.5.dp, Palette.glassBorder, RoundedCornerShape(16.dp))
+            .padding(12.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Symbol("shield.checkerboard", size = 18.dp, tint = if (passedCount == gates.size && gates.isNotEmpty()) electricGreen else cyanAccent)
+                    Text(
+                        text = "QUALITY GATES ($passedCount/${gates.size})",
+                        style = Type.caption.semibold.copy(fontSize = 11.sp, letterSpacing = 0.5.sp),
+                        color = Palette.secondary
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            if (passedCount == gates.size && gates.isNotEmpty()) electricGreen.copy(alpha = 0.15f)
+                            else if (gates.any { !it.passed && it.status == "FAILED" }) dangerRed.copy(alpha = 0.15f)
+                            else cyanAccent.copy(alpha = 0.15f)
+                        )
+                        .padding(horizontal = 7.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = if (passedCount == gates.size && gates.isNotEmpty()) "CONFORME"
+                               else if (gates.any { !it.passed && it.status == "FAILED" }) "ÉCHEC"
+                               else "EN COURS",
+                        style = Type.caption.semibold.copy(fontSize = 10.sp),
+                        color = if (passedCount == gates.size && gates.isNotEmpty()) electricGreen
+                                else if (gates.any { !it.passed && it.status == "FAILED" }) dangerRed
+                                else cyanAccent
+                    )
+                }
+            }
+
+            gates.forEach { gate ->
+                val gateColor = when {
+                    gate.passed -> electricGreen
+                    gate.status == "FAILED" -> dangerRed
+                    else -> cyanAccent
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Palette.surface.copy(alpha = 0.4f))
+                        .border(0.5.dp, gateColor.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+                        .padding(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(gateColor.copy(alpha = 0.2f))
+                                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = gate.type,
+                                        style = Type.caption.semibold.copy(fontSize = 8.5.sp),
+                                        color = gateColor
+                                    )
+                                }
+                                Text(
+                                    text = gate.name,
+                                    style = Type.caption.semibold.copy(fontSize = 11.5.sp),
+                                    color = Palette.text,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            if (!gate.details.isNullOrBlank()) {
+                                Text(
+                                    text = gate.details,
+                                    style = Type.caption.copy(fontSize = 10.sp),
+                                    color = Palette.secondary,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        if (gate.executionDurationMs > 0) {
+                            Text(
+                                text = "${gate.executionDurationMs}ms",
+                                style = Type.caption.copy(fontSize = 9.5.sp),
+                                color = Palette.secondary.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
