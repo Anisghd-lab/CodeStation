@@ -65,8 +65,8 @@ object CodeStationWidgetManager {
             val container = app?.container
 
             val catalog = container?.antigravityModelRepository?.catalogState?.value
-            val modelsCount = catalog?.models?.size ?: 13
-            val defaultModel = catalog?.models?.firstOrNull { it.isDefault }?.displayName ?: "gemini-4-argon"
+            val modelsCount = catalog?.models?.size ?: 6
+            val defaultModel = catalog?.models?.firstOrNull { it.isDefault }?.displayName ?: "gemini-3.8-flash-medium"
 
             // Usage percentages
             val sessionPct = 16.0

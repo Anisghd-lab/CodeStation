@@ -205,7 +205,7 @@ class RosterP1RemediationTest {
             avatarGlyph = "diamond",
             avatarColorHex = "#6366F1",
             provider = "ANTIGRAVITY",
-            model = "gemini-4-argon-high",
+            model = "gemini-3.8-flash-high",
             isFastMode = true,
             workspaceMode = "PERSONAL",
             workspacePath = "/root/custom",

@@ -257,7 +257,7 @@ class BotRepositoryImpl(
                 avatarGlyph = "diamond",
                 avatarColorHex = "#4285F4",
                 provider = ProviderType.ANTIGRAVITY,
-                model = "gemini-4-argon-medium",
+                model = "gemini-3.8-flash-medium",
                 isFastMode = true,
                 isLead = true,
                 isPinned = true,

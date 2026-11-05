@@ -82,7 +82,7 @@ class CliRegistry:
 
             models_map = {
                 "clixad": ["gpt-5-nano", "gpt-5-pro"],
-                "antigravity": ["gemini-4-argon-medium", "gemini-3.8-flash-medium", "claude-sonnet-4-6", "gpt-oss-120b-medium"],
+                "antigravity": ["gemini-3.8-flash-medium", "gemini-3.8-flash-high", "gemini-3.8-flash-low", "claude-sonnet-4-6", "claude-opus-4-6-thinking", "gpt-oss-120b-medium"],
                 "opencode": ["xkiro/qwen3-coder-plus", "opencode/glm-5.3-flash-free"],
                 "codebuddy": ["Hy3", "deepseek-v4.1-flash", "kimi-k3"],
                 "omnirush": ["gpt-6-astra", "claude-opus-5-5"],

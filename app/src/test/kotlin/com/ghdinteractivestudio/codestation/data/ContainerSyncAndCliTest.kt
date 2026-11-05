@@ -43,7 +43,7 @@ class ContainerSyncAndCliTest {
                 EnvironmentDto(
                     botId = "bot-antigravity",
                     engine = "antigravity",
-                    model = "gemini-4-argon-medium",
+                    model = "gemini-3.8-flash-medium",
                     status = "READY",
                     rootfs = "/root/CodeStation/environments/bot-antigravity/rootfs",
                     diskMb = 360

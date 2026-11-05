@@ -12,35 +12,207 @@ import subprocess
 import threading
 import os
 import time
+import re
 
 active_procs: dict[str, subprocess.Popen] = {}
 active_procs_lock = threading.Lock()
 session_conversations: dict[str, str] = {}
 session_conversations_lock = threading.Lock()
 
-current_selected_model = "gemini-4-argon-medium"
+SETTINGS_FILE_PATH = "/root/.gemini/antigravity-cli/settings.json"
+AUTH_TOKEN_FILE = "/root/.gemini/antigravity-cli/antigravity-oauth-token"
+LOG_FILE_PATH = "/tmp/codestation-agy-bridge.log"
 
+# The 6 REAL officially available models in Google Antigravity CLI
 DEFAULT_AGY_MODELS = [
-    {"value": "gemini-4-argon-medium", "name": "Gemini 4 Argon (Medium)"},
-    {"value": "gemini-4-argon-high", "name": "Gemini 4 Argon (High)"},
-    {"value": "gemini-4-argon-low", "name": "Gemini 4 Argon (Low)"},
-    {"value": "gemini-3.8-flash-high", "name": "Gemini 3.8 Flash (High)"},
     {"value": "gemini-3.8-flash-medium", "name": "Gemini 3.8 Flash (Medium)"},
+    {"value": "gemini-3.8-flash-high", "name": "Gemini 3.8 Flash (High)"},
     {"value": "gemini-3.8-flash-low", "name": "Gemini 3.8 Flash (Low)"},
-    {"value": "claude-opus-5-5-high", "name": "Claude Opus 5.5 (High)"},
-    {"value": "claude-opus-5-5-medium", "name": "Claude Opus 5.5 (Medium)"},
-    {"value": "claude-opus-5-5-low", "name": "Claude Opus 5.5 (Low)"},
-    {"value": "claude-sonnet-5-5-high", "name": "Claude Sonnet 5.5 (High)"},
-    {"value": "claude-sonnet-5-5-medium", "name": "Claude Sonnet 5.5 (Medium)"},
-    {"value": "claude-sonnet-5-5-low", "name": "Claude Sonnet 5.5 (Low)"},
-    {"value": "gpt-oss-120b-medium", "name": "GPT-OSS 120B (Medium)"}
+    {"value": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6 (Thinking)"},
+    {"value": "claude-opus-4-6-thinking", "name": "Claude Opus 4.6 (Thinking)"},
+    {"value": "gpt-oss-120b-medium", "name": "GPT-OSS 120B (Medium)"},
 ]
+
+CANONICAL_MODELS = {
+    "gemini-3.8-flash-medium": {"id": "gemini-3.8-flash-medium", "name": "Gemini 3.8 Flash (Medium)", "effort": "medium"},
+    "gemini-3.8-flash-high": {"id": "gemini-3.8-flash-high", "name": "Gemini 3.8 Flash (High)", "effort": "high"},
+    "gemini-3.8-flash-low": {"id": "gemini-3.8-flash-low", "name": "Gemini 3.8 Flash (Low)", "effort": "low"},
+    "claude-sonnet-4-6": {"id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6 (Thinking)", "effort": None},
+    "claude-opus-4-6-thinking": {"id": "claude-opus-4-6-thinking", "name": "Claude Opus 4.6 (Thinking)", "effort": None},
+    "gpt-oss-120b-medium": {"id": "gpt-oss-120b-medium", "name": "GPT-OSS 120B (Medium)", "effort": "medium"},
+}
+
+ALIASES = {
+    "gemini-3.8-flash": "gemini-3.8-flash-medium",
+    "gemini 3.8 flash": "gemini-3.8-flash-medium",
+    "gemini-3.8-flash-medium": "gemini-3.8-flash-medium",
+    "gemini 3.8 flash (medium)": "gemini-3.8-flash-medium",
+    "gemini-3.8-flash-high": "gemini-3.8-flash-high",
+    "gemini 3.8 flash (high)": "gemini-3.8-flash-high",
+    "gemini-3.8-flash-low": "gemini-3.8-flash-low",
+    "gemini 3.8 flash (low)": "gemini-3.8-flash-low",
+    "claude-sonnet": "claude-sonnet-4-6",
+    "claude sonnet": "claude-sonnet-4-6",
+    "claude-sonnet-4.6": "claude-sonnet-4-6",
+    "claude-sonnet-4-6": "claude-sonnet-4-6",
+    "claude sonnet 4.6 (thinking)": "claude-sonnet-4-6",
+    "claude-opus": "claude-opus-4-6-thinking",
+    "claude opus": "claude-opus-4-6-thinking",
+    "claude-opus-4-6": "claude-opus-4-6-thinking",
+    "claude-opus-4.6": "claude-opus-4-6-thinking",
+    "claude-opus-4-6-thinking": "claude-opus-4-6-thinking",
+    "claude opus 4.6 (thinking)": "claude-opus-4-6-thinking",
+    "gpt-oss": "gpt-oss-120b-medium",
+    "gpt-oss-120b": "gpt-oss-120b-medium",
+    "gpt oss 120b": "gpt-oss-120b-medium",
+    "gpt-oss-120b-medium": "gpt-oss-120b-medium",
+    "gpt-oss 120b (medium)": "gpt-oss-120b-medium",
+    # Legacy fallbacks
+    "gemini-4-argon-medium": "gemini-3.8-flash-medium",
+    "gemini-4-argon-high": "gemini-3.8-flash-high",
+    "gemini-4-argon-low": "gemini-3.8-flash-low",
+    "gemini-4-argon": "gemini-3.8-flash-medium",
+    "claude-opus-5-5-high": "claude-opus-4-6-thinking",
+    "claude-opus-5-5-medium": "claude-opus-4-6-thinking",
+    "claude-opus-5-5-low": "claude-opus-4-6-thinking",
+    "claude-sonnet-5-5-high": "claude-sonnet-4-6",
+    "claude-sonnet-5-5-medium": "claude-sonnet-4-6",
+    "claude-sonnet-5-5-low": "claude-sonnet-4-6",
+}
+
+DEFAULT_MODEL_ID = "gemini-3.8-flash-medium"
+
+def resolve_model(input_name, effort=None):
+    raw = (input_name or "").strip().lower()
+    clean = raw.replace("_", "-")
+    target_id = ALIASES.get(clean) or clean
+
+    if target_id == "gemini-3.8-flash" or clean.startswith("gemini-3.8-flash"):
+        eff = (effort or "").lower()
+        if eff in ("high", "xhigh", "max"):
+            target_id = "gemini-3.8-flash-high"
+        elif eff == "low":
+            target_id = "gemini-3.8-flash-low"
+        else:
+            target_id = target_id if target_id in CANONICAL_MODELS else "gemini-3.8-flash-medium"
+
+    if target_id not in CANONICAL_MODELS:
+        for cid, meta in CANONICAL_MODELS.items():
+            if raw == meta["name"].lower() or clean == meta["name"].lower().replace(" ", "-"):
+                target_id = cid
+                break
+
+    if target_id not in CANONICAL_MODELS:
+        log(f"Warning: Unknown model '{input_name}', defaulting to validated '{DEFAULT_MODEL_ID}'")
+        target_id = DEFAULT_MODEL_ID
+
+    return CANONICAL_MODELS[target_id]
+
+def load_persisted_model():
+    try:
+        if os.path.exists(SETTINGS_FILE_PATH):
+            with open(SETTINGS_FILE_PATH, "r", encoding="utf-8") as f:
+                d = json.load(f)
+                m = d.get("model")
+                if m:
+                    res = resolve_model(m)
+                    return res["id"]
+    except Exception:
+        pass
+    return DEFAULT_MODEL_ID
+
+def persist_selected_model(model_id):
+    try:
+        data = {}
+        if os.path.exists(SETTINGS_FILE_PATH):
+            with open(SETTINGS_FILE_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        meta = resolve_model(model_id)
+        data["model"] = meta["name"]
+        with open(SETTINGS_FILE_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        log(f"Persisted model '{meta['name']}' to {SETTINGS_FILE_PATH}")
+    except Exception as e:
+        log(f"Failed to persist model to settings.json: {e}")
+
+def execute_slash_command(prompt_text, current_model=None, target_effort=None):
+    """
+    Executes or inspects slash commands (/signin, /model, /model <name>).
+    Returns string response if it is a slash command, or None if it's a regular prompt.
+    """
+    global current_selected_model
+    ptrim = (prompt_text or "").strip()
+    plower = ptrim.lower()
+
+    if plower in ["/signin", "/login", "signin", "login"]:
+        user_email = ""
+        has_auth = False
+        if os.path.exists(AUTH_TOKEN_FILE) and os.path.getsize(AUTH_TOKEN_FILE) > 0:
+            has_auth = True
+            try:
+                with open(AUTH_TOKEN_FILE, "r", encoding="utf-8") as f:
+                    tok_data = json.load(f)
+                    user_email = tok_data.get("id_token_email", "")
+            except Exception:
+                pass
+        if has_auth:
+            msg = "✓ Session Google Antigravity active et authentifiée."
+            if user_email:
+                msg += f"\nCompte associé : {user_email}."
+            msg += "\nLa session OAuth est persistée dans ~/.gemini/antigravity-cli/antigravity-oauth-token et conservée après reconnexion."
+            return msg
+        else:
+            return "Session Google Antigravity non authentifiée. Veuillez vous connecter via `agy` dans le terminal."
+
+    if plower == "/model" or plower == "model":
+        model_to_query = current_model or current_selected_model or DEFAULT_MODEL_ID
+        meta = resolve_model(model_to_query, effort=target_effort)
+        target_model = meta["id"]
+        effort = target_effort or meta.get("effort")
+
+        cmd = ["agy", "-p", "/model", "--dangerously-skip-permissions", "--model", target_model]
+        if effort:
+            cmd.extend(["--effort", effort])
+        cmd.extend(["--output-format", "stream-json"])
+        env = os.environ.copy()
+        env["PATH"] = "/root/.gemini/antigravity-cli/bin:/root/.local/bin:/usr/local/bin:/usr/bin:/bin:" + env.get("PATH", "")
+        
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=15)
+            active_info = None
+            for l in res.stdout.splitlines():
+                if l.startswith("{") and "command_result" in l:
+                    try:
+                        cj = json.loads(l)
+                        active_info = cj.get("command", {}).get("data", {})
+                    except Exception:
+                        pass
+            if active_info:
+                act_label = active_info.get("label", target_model)
+                act_id = active_info.get("id", target_model)
+                act_eff = active_info.get("effort")
+                msg = f"Modèle Google Antigravity actif : {act_label} (`{act_id}`)"
+                if act_eff:
+                    msg += f"\nNiveau d'effort de réflexion : {act_eff}"
+                return msg
+        except Exception as e:
+            log(f"Error querying /model: {e}")
+        return f"Modèle Google Antigravity actif : {meta['name']} (`{target_model}`)"
+
+    if plower.startswith("/model "):
+        requested_model = ptrim[7:].strip()
+        new_meta = resolve_model(requested_model)
+        current_selected_model = new_meta["id"]
+        persist_selected_model(current_selected_model)
+        return f"✓ Modèle changé pour : {new_meta['name']} (`{current_selected_model}`)."
+
+    return None
+
+current_selected_model = load_persisted_model()
 
 _models_cache = DEFAULT_AGY_MODELS
 _models_cache_time = time.time()
 CACHE_TTL_SECONDS = 600
-
-LOG_FILE_PATH = "/tmp/codestation-agy-bridge.log"
 
 def log(msg):
     ts = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -58,20 +230,20 @@ def _background_refresh_models():
     try:
         env = os.environ.copy()
         env["PATH"] = "/root/.gemini/antigravity-cli/bin:/root/.local/bin:/usr/local/bin:/usr/bin:/bin:" + env.get("PATH", "")
-        out = subprocess.check_output(["agy", "models"], text=True, timeout=10, env=env)
+        out = subprocess.check_output(["agy", "models"], text=True, timeout=25, env=env)
         models = []
         for line in out.splitlines():
             line = line.strip()
-            if not line or "Fetching available models" in line or line.startswith("⠋") or line.startswith("⠙"):
+            if not line or "Fetching available models" in line:
                 continue
-            parts = line.split(None, 1)
-            if len(parts) == 2:
-                m_id = parts[0].strip()
-                m_name = parts[1].strip()
-                models.append({
-                    "value": m_id,
-                    "name": m_name
-                })
+            m = re.match(r"^([a-z0-9\.\-_]+)\s+([A-Za-z0-9\.\-\_\s\(\)]+)$", line)
+            if m:
+                m_id, m_name = m.group(1), m.group(2).strip()
+                if m_id in CANONICAL_MODELS:
+                    models.append({
+                        "value": m_id,
+                        "name": m_name
+                    })
         if models:
             _models_cache = models
             _models_cache_time = time.time()
@@ -101,30 +273,45 @@ def send_notification(method, params):
     sys.stdout.flush()
 
 def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
+    global current_selected_model
     proc = None
     try:
         env = os.environ.copy()
         env["PATH"] = "/root/.gemini/antigravity-cli/bin:/root/.local/bin:/usr/local/bin:/usr/bin:/bin:" + env.get("PATH", "")
-        
-        # Validate model against available models
-        avail_models = [m["value"] for m in fetch_agy_models()]
-        if not model_id or model_id not in avail_models:
-            model_id = "gemini-4-argon-medium"
-            log(f"Model {model_id} not in cache, using default: gemini-4-argon-medium")
 
-        # Check existing conversation ID for multi-turn continuity
-        with session_conversations_lock:
-            existing_conv_id = session_conversations.get(session_id)
+        resolved_meta = resolve_model(model_id or current_selected_model)
+        target_model = resolved_meta["id"]
+        target_effort = resolved_meta.get("effort")
 
+        # Handle Slash Commands (/signin, /model, /model <name>)
+        slash_res = execute_slash_command(prompt_text, current_model=target_model, target_effort=target_effort)
+        if slash_res is not None:
+            send_notification("session/update", {
+                "sessionId": session_id,
+                "update": {
+                    "sessionUpdate": "agent_message_chunk",
+                    "content": {"type": "text", "text": slash_res}
+                }
+            })
+            send_response(req_id, {"stopReason": "end_turn"})
+            return
+
+        # 4. Handle Quota query
         if prompt_text.strip().lower() in ["/quota", "/usage", "quota", "usage"]:
             cmd = ["agy", "-p", "/quota", "--dangerously-skip-permissions"]
             log(f"Executing quota query directly: {' '.join(cmd)}")
         else:
-            cmd = ["agy", "-p", prompt_text, "--dangerously-skip-permissions", "--model", model_id, "--output-format", "stream-json"]
+            cmd = ["agy", "-p", prompt_text, "--dangerously-skip-permissions", "--model", target_model]
+            if target_effort:
+                cmd.extend(["--effort", target_effort])
+            cmd.extend(["--output-format", "stream-json"])
+
+            with session_conversations_lock:
+                existing_conv_id = session_conversations.get(session_id)
             if existing_conv_id:
                 cmd.extend(["--conversation", existing_conv_id])
                 log(f"Continuing existing conversation {existing_conv_id} for session {session_id}")
-            log(f"Executing: {' '.join(cmd[:3])} ... --model {model_id} --output-format stream-json (cwd={cwd})")
+            log(f"Executing: {' '.join(cmd[:3])} ... --model {target_model} (cwd={cwd})")
 
         proc = subprocess.Popen(
             cmd,
@@ -139,13 +326,12 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
 
         with active_procs_lock:
             active_procs[session_id] = proc
-        
+
         output_chunks = []
         stderr_chunks = []
         last_stream_time = time.time()
         heartbeat_stop = threading.Event()
 
-        # Stream stderr chunks
         def read_stderr():
             if proc.stderr:
                 for sline in proc.stderr:
@@ -155,7 +341,6 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
         stderr_thread = threading.Thread(target=read_stderr, daemon=True)
         stderr_thread.start()
 
-        # Heartbeat to keep connection alive during lengthy thinking or tool execution
         def heartbeat_worker():
             while not heartbeat_stop.wait(6.0):
                 with active_procs_lock:
@@ -188,7 +373,6 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
 
             if parsed and isinstance(parsed, dict) and "event" in parsed:
                 event = parsed.get("event")
-                # Capture conversation_id for multi-turn continuity
                 conv_id = parsed.get("conversation_id")
                 if not conv_id and isinstance(parsed.get("result"), dict):
                     conv_id = parsed["result"].get("conversation_id")
@@ -243,7 +427,6 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
                             }
                         })
             else:
-                # Plain text line
                 output_chunks.append(raw_line)
                 send_notification("session/update", {
                     "sessionId": session_id,
@@ -252,7 +435,7 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
                         "content": {"type": "text", "text": raw_line}
                     }
                 })
-            
+
         heartbeat_stop.set()
         heartbeat_thread.join(timeout=1.0)
         try:
@@ -273,7 +456,7 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
             return
 
         stderr_thread.join(timeout=2.0)
-        
+
         exit_code = proc.returncode if proc else -1
         with active_procs_lock:
             active_procs.pop(session_id, None)
@@ -286,7 +469,7 @@ def run_prompt(req_id, session_id, prompt_text, cwd, model_id):
             log(f"agy execution failed: {err_msg}")
             send_response(req_id, error={"code": -32603, "message": err_msg})
             return
-            
+
         send_response(req_id, {
             "stopReason": "end_turn",
             "usage": {
@@ -329,7 +512,7 @@ def main():
                 },
                 "agentInfo": {
                     "name": "Google Antigravity",
-                    "version": "1.4.12"
+                    "version": "1.5.1"
                 }
             })
         elif method == "session/new":
@@ -351,7 +534,9 @@ def main():
             config_id = params.get("configId")
             value = params.get("value")
             if config_id == "model" and value:
-                current_selected_model = value
+                resolved = resolve_model(value)
+                current_selected_model = resolved["id"]
+                persist_selected_model(current_selected_model)
                 log(f"Model switched to: {current_selected_model}")
             send_response(req_id, {
                 "sessionId": session_id,
@@ -368,7 +553,9 @@ def main():
         elif method == "session/set_model":
             model_id = params.get("modelId")
             if model_id:
-                current_selected_model = model_id
+                resolved = resolve_model(model_id)
+                current_selected_model = resolved["id"]
+                persist_selected_model(current_selected_model)
                 log(f"Model set to: {current_selected_model}")
             send_response(req_id, {})
         elif method == "session/prompt":
@@ -385,7 +572,7 @@ def main():
                 elif isinstance(item, str):
                     prompt_text += item + " "
             prompt_text = prompt_text.strip()
-            
+
             t = threading.Thread(
                 target=run_prompt,
                 args=(req_id, session_id, prompt_text, session_cwd, current_selected_model),

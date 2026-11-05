@@ -714,7 +714,7 @@ private fun BotsWidgetPreview(sizeChoice: String) {
             CharacterAvatar("diamond", "blue", 32.dp, "working")
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("Google Antigravity", style = Type.caption.semibold, color = Palette.text)
-                Text("Au travail · gemini-4-argon-medium", style = Type.caption2, color = Palette.accent)
+                Text("Au travail · gemini-3.8-flash-medium", style = Type.caption2, color = Palette.accent)
             }
         }
 

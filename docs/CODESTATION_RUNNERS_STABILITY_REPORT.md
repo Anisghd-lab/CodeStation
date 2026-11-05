@@ -22,7 +22,7 @@ Dans le cadre du mandat de stabilisation des runners et de l'intégration indivi
 
 | CLI | Exécutable Réel | Harnais Host | Protocole | Modèle Assigné | Statut Final |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Google Antigravity** | `/root/.local/bin/agy` | `antigravity` | ACP Bridge (Python) | `gemini-4-argon-medium` | `FIXED_AND_VERIFIED` |
+| **Google Antigravity** | `/root/.local/bin/agy` | `antigravity` | ACP Bridge (Python) | `gemini-3.8-flash-medium` | `FIXED_AND_VERIFIED` |
 | **OpenCode** | `/usr/local/bin/opencode` | `opencode` | ACP natif stdio | `opencode/glm-5.3-flash-free` | `FIXED_AND_VERIFIED` |
 | **CodeBuddy Code** | `/usr/local/bin/codebuddy` | `codebuddy` | ACP natif stdio (`--acp`) | `Hy3` (v2.178.1) | `FIXED_AND_VERIFIED` |
 | **Clixad** | `/usr/local/bin/clixad` | `clixad` | ACP Bridge (CLI non-int.) | `gpt-5-nano` | `FIXED_AND_VERIFIED` |
@@ -71,8 +71,10 @@ Dans le cadre du mandat de stabilisation des runners et de l'intégration indivi
    - Capture de l'identifiant `conversation_id` extrait des événements `init` et `step_update` émis par `agy`.
    - Injection systématique de `--conversation <conversation_id>` sur les tours subséquents de la même session.
    - Validation expérimentale : rétention exacte d'un code secret passé au tour 1 (`BLUE_ORBIT_99`) et restitué parfaitement au tour 2.
-3. **Catalogue de modèles modernisé** :
-   - Mise à jour du catalogue par défaut avec `gemini-4-argon-medium` (modèle par défaut actif), `gemini-4-argon-high`, `gemini-4-argon-low`, ainsi que les variantes Claude et Flash.
+3. **Catalogue de modèles certifié & Routage AGY sans substitution silencieuse** :
+   - Remplacement intégral des modèles obsolètes/fictifs par les 6 modèles réels et officiellement vérifiés auprès de la CLI `agy` : `gemini-3.8-flash-medium` (par défaut), `gemini-3.8-flash-high`, `gemini-3.8-flash-low`, `claude-sonnet-4-6`, `claude-opus-4-6-thinking`, `gpt-oss-120b-medium`.
+   - Résolution stricte et explicite des alias, suppression des remplacements arbitraires et persistance du modèle sélectionné dans `~/.gemini/antigravity-cli/settings.json`.
+   - Prise en charge des commandes slash `/model` (interrogation du modèle réellement actif via JSON stream) et `/signin` (session OAuth préservée).
 4. **Prévention des blocages I/O & Heartbeat** :
    - Lecture séparée de `stderr` dans un thread dédié pour éviter la saturation du tampon de tube.
    - Émission régulière d'un heartbeat ACP (`agent_thought_chunk`) toutes les 6 secondes pour maintenir le canal actif durant les phases de réflexion profonde.

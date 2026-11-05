@@ -61,7 +61,7 @@ class SlashCommandHighlightingTest {
 
     @Test
     fun `test raw text preserved without modification`() {
-        val raw = "Exécute /model gemini-4-argon-medium puis /status. 🚀 Accents: é, à, ç, œ."
+        val raw = "Exécute /model gemini-3.8-flash-medium puis /status. 🚀 Accents: é, à, ç, œ."
         val richText = buildRichText(raw, isUser = false, defaultColor = defaultColor)
 
         assertEquals("Text content must remain completely identical", raw, richText.text)

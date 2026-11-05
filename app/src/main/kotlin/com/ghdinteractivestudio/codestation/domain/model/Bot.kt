@@ -11,7 +11,7 @@ enum class ProviderType(val displayName: String, val defaultModel: String, val b
     OMNIRUSH("OmniRush", "gpt-6-astra", "omnirush"),
     CLIXAD("Clixad", "gpt-5-nano", "clixad"),
     FREEBUFF("Freebuff", "freebuff/free-auto", "freebuff"),
-    ANTIGRAVITY("Google Antigravity", "gemini-4-argon-medium", "antigravity"),
+    ANTIGRAVITY("Google Antigravity", "gemini-3.8-flash-medium", "antigravity"),
     OPENCODE("OpenCode", "opencode/glm-5.3-flash-free", "opencode"),
     CODEBUDDY("CodeBuddy Code", "Hy3", "codebuddy"),
     CLAUDE_CODE("Claude Code", "claude-3-7-sonnet", "claude"),
@@ -65,18 +65,11 @@ enum class ProviderType(val displayName: String, val defaultModel: String, val b
                 ModelInfo("gemini-2.5-pro", "Gemini 2.5 Pro", isFree = false)
             )
             ANTIGRAVITY -> listOf(
-                ModelInfo("gemini-4-argon-medium", "Gemini 4 Argon (Medium)", isFree = false, isDefault = true, isVerified = true),
-                ModelInfo("gemini-4-argon-high", "Gemini 4 Argon (High)", isFree = false, isVerified = true),
-                ModelInfo("gemini-4-argon-low", "Gemini 4 Argon (Low)", isFree = false, isVerified = true),
+                ModelInfo("gemini-3.8-flash-medium", "Gemini 3.8 Flash (Medium)", isFree = false, isDefault = true, isVerified = true),
                 ModelInfo("gemini-3.8-flash-high", "Gemini 3.8 Flash (High)", isFree = false, isVerified = true),
-                ModelInfo("gemini-3.8-flash-medium", "Gemini 3.8 Flash (Medium)", isFree = false, isVerified = true),
                 ModelInfo("gemini-3.8-flash-low", "Gemini 3.8 Flash (Low)", isFree = false, isVerified = true),
-                ModelInfo("claude-opus-5-5-low", "Claude Opus 5.5 (Low)", isFree = false, isVerified = true),
-                ModelInfo("claude-opus-5-5-medium", "Claude Opus 5.5 (Medium)", isFree = false, isVerified = true),
-                ModelInfo("claude-opus-5-5-high", "Claude Opus 5.5 (High)", isFree = false, isVerified = true),
-                ModelInfo("claude-sonnet-5-5-low", "Claude Sonnet 5.5 (Low)", isFree = false, isVerified = true),
-                ModelInfo("claude-sonnet-5-5-medium", "Claude Sonnet 5.5 (Medium)", isFree = false, isVerified = true),
-                ModelInfo("claude-sonnet-5-5-high", "Claude Sonnet 5.5 (High)", isFree = false, isVerified = true),
+                ModelInfo("claude-sonnet-4-6", "Claude Sonnet 4.6 (Thinking)", isFree = false, isVerified = true),
+                ModelInfo("claude-opus-4-6-thinking", "Claude Opus 4.6 (Thinking)", isFree = false, isVerified = true),
                 ModelInfo("gpt-oss-120b-medium", "GPT-OSS 120B (Medium)", isFree = false, isVerified = true)
             )
             ACP_LOCAL -> listOf(

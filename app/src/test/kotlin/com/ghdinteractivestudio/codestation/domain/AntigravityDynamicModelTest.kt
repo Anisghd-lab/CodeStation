@@ -41,19 +41,22 @@ class AntigravityDynamicModelTest {
     @Test
     fun `test Antigravity baseline models match verified CLI models`() {
         val provider = ProviderType.ANTIGRAVITY
-        assertEquals("gemini-4-argon-medium", provider.defaultModel)
+        assertEquals("gemini-3.8-flash-medium", provider.defaultModel)
 
         val models = provider.getAvailableModels()
         assertTrue("Models list should not be empty", models.isNotEmpty())
+        assertEquals(6, models.size)
 
         val modelIds = models.map { it.id }
-        assertTrue(modelIds.contains("gemini-4-argon-medium"))
+        assertTrue(modelIds.contains("gemini-3.8-flash-medium"))
         assertTrue(modelIds.contains("gemini-3.8-flash-high"))
-        assertTrue(modelIds.contains("claude-opus-5-5-low"))
-        assertTrue(modelIds.contains("claude-sonnet-5-5-medium"))
+        assertTrue(modelIds.contains("gemini-3.8-flash-low"))
+        assertTrue(modelIds.contains("claude-sonnet-4-6"))
+        assertTrue(modelIds.contains("claude-opus-4-6-thinking"))
         assertTrue(modelIds.contains("gpt-oss-120b-medium"))
 
-        // Obsolete hardcoded models must not be present in Antigravity
+        // Obsolete or invalid models must not be present in Antigravity
+        assertFalse("gemini-4-argon-medium should not be in Antigravity", modelIds.contains("gemini-4-argon-medium"))
         assertFalse("gemini-2.5-pro should not be in Antigravity", modelIds.contains("gemini-2.5-pro"))
         assertFalse("gemini-2.0-flash should not be in Antigravity", modelIds.contains("gemini-2.0-flash"))
 
@@ -69,9 +72,10 @@ class AntigravityDynamicModelTest {
             initialModels = ProviderType.ANTIGRAVITY.getAvailableModels()
         )
 
-        assertEquals(13, fakeRepo.getModels().size)
-        assertTrue(fakeRepo.isModelVerified("gemini-4-argon-medium"))
+        assertEquals(6, fakeRepo.getModels().size)
+        assertTrue(fakeRepo.isModelVerified("gemini-3.8-flash-medium"))
         assertFalse(fakeRepo.isModelVerified("unverified-custom-model"))
+        assertFalse(fakeRepo.isModelVerified("gemini-4-argon-medium"))
 
         // Simulate refresh failure
         fakeRepo.shouldFail = true
@@ -80,7 +84,7 @@ class AntigravityDynamicModelTest {
 
         // Previous models must be retained, not wiped
         val retained = fakeRepo.getModels()
-        assertEquals(13, retained.size)
+        assertEquals(6, retained.size)
         assertNotNull(fakeRepo.catalogState.value.errorMessage)
         assertTrue(fakeRepo.catalogState.value.errorMessage!!.contains("Erreur"))
     }
@@ -102,18 +106,18 @@ class AntigravityDynamicModelTest {
         viewModel.onProviderChanged(ProviderType.ANTIGRAVITY)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals("gemini-4-argon-medium", viewModel.uiState.value.model)
+        assertEquals("gemini-3.8-flash-medium", viewModel.uiState.value.model)
         assertTrue(viewModel.isCurrentModelVerified())
 
         // Select specific verified model
-        viewModel.onModelChanged("claude-sonnet-5-5-high")
-        assertEquals("claude-sonnet-5-5-high", viewModel.uiState.value.model)
+        viewModel.onModelChanged("claude-sonnet-4-6")
+        assertEquals("claude-sonnet-4-6", viewModel.uiState.value.model)
         assertTrue(viewModel.isCurrentModelVerified())
 
         // Refresh should retain current selection
         viewModel.refreshAntigravityModels(force = true)
         testDispatcher.scheduler.advanceUntilIdle()
-        assertEquals("claude-sonnet-5-5-high", viewModel.uiState.value.model)
+        assertEquals("claude-sonnet-4-6", viewModel.uiState.value.model)
 
         // Set unverified model
         viewModel.onModelChanged("custom-fine-tuned-model")

@@ -326,7 +326,7 @@ exec {PROOT_BIN} \\
                 "binary": "agy",
                 "paths": ["/root/.local/bin/agy", "/usr/local/bin/agy", "/root/.gemini/antigravity-cli/bin/agy"],
                 "auth_paths": ["/root/.gemini/antigravity-cli", "/root/.gemini"],
-                "default_model": "gemini-4-argon-medium",
+                "default_model": "gemini-3.8-flash-medium",
                 "environment": "bot-antigravity",
                 "version_args": ["--version"]
             },

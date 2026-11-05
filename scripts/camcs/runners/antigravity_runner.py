@@ -13,8 +13,9 @@ from typing import Optional, Callable, Tuple
 from .base_runner import BaseCliRunner, CliExecutionResult
 
 class AntigravityRunner(BaseCliRunner):
-    def __init__(self):
+    def __init__(self, default_model: str = "gemini-3.8-flash-medium"):
         super().__init__("antigravity", "Google Antigravity", "agy")
+        self.default_model = default_model
         self.initialize()
 
     def initialize(self) -> bool:
@@ -49,7 +50,7 @@ class AntigravityRunner(BaseCliRunner):
         if not has_auth:
             return False, "BLOCKED", "Session Antigravity non authentifiée (manque ~/.gemini)"
 
-        return True, "IMPLEMENTED_AND_VERIFIED", f"Google Antigravity prêt ({self.version}) avec auto-permissions"
+        return True, "IMPLEMENTED_AND_VERIFIED", f"Google Antigravity prêt ({self.version}) avec modèle {self.default_model}"
 
     def execute_task(
         self,
@@ -59,7 +60,8 @@ class AntigravityRunner(BaseCliRunner):
         cwd: str,
         timeout: int = 150,
         output_callback: Optional[Callable[[str, str], None]] = None,
-        pid_callback: Optional[Callable[[int], None]] = None
+        pid_callback: Optional[Callable[[int], None]] = None,
+        model: Optional[str] = None
     ) -> CliExecutionResult:
         os.makedirs(cwd, exist_ok=True)
         snapshot_before = self.take_directory_snapshot(cwd)
@@ -67,8 +69,12 @@ class AntigravityRunner(BaseCliRunner):
         env = os.environ.copy()
         env["PATH"] = "/root/.gemini/antigravity-cli/bin:/root/.local/bin:/usr/local/bin:/usr/bin:/bin:" + env.get("PATH", "")
 
-        cmd = [self.path or "agy", "-p", prompt, "--dangerously-skip-permissions"]
-        cmd_str = f"agy -p \"{prompt[:80]}...\" --dangerously-skip-permissions"
+        active_model = model or self.default_model
+        cmd = [self.path or "agy"]
+        if active_model:
+            cmd.extend(["--model", active_model])
+        cmd.extend(["-p", prompt, "--dangerously-skip-permissions"])
+        cmd_str = f"agy {'--model ' + active_model + ' ' if active_model else ''}-p \"{prompt[:80]}...\" --dangerously-skip-permissions"
 
         t_start = time.time()
         stdout_chunks = []
@@ -145,7 +151,7 @@ class AntigravityRunner(BaseCliRunner):
             files_modified=modified,
             verified=is_verified,
             verdict=verdict,
-            metadata={"version": self.version, "runner": "AntigravityRunner"}
+            metadata={"version": self.version, "model": active_model, "runner": "AntigravityRunner"}
         )
 
     def cancel_task(self, task_id: str) -> bool:
