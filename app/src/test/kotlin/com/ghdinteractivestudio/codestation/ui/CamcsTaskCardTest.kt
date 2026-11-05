@@ -48,4 +48,11 @@ class CamcsTaskCardTest {
         assertNotNull(symbolRes("terminal"))
         assertNotNull(symbolRes("gearshape"))
     }
+
+    @Test
+    fun `test Glassmorphic New Task button symbols and structure are valid`() {
+        // Tâche 12 : Vérification de la disponibilité des symboles SF utilisés dans le bouton glassmorphic
+        assertNotNull("L'icône + doit être disponible pour le badge glassmorphic", symbolRes("plus"))
+        assertNotNull("Le chevron droit doit être disponible pour la flèche d'action", symbolRes("chevron.right"))
+    }
 }

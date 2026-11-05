@@ -235,45 +235,125 @@ fun CamcsNewTaskCard(
                 }
             }
 
-            // 3. MAIN ACTION BUTTON (+ Nouvelle tâche ›)
-            val buttonFill = if (dark) {
-                Color(0xFF0F172A)
+            // 3. MAIN ACTION BUTTON (+ Nouvelle tâche ›) - PREMIUM GLASSMORPHISM
+            val (buttonSource, buttonPressed) = rememberPress()
+
+            // Translucent frosted glass fill with chromatic depth and inner specular reflection
+            val buttonBgBrush = if (dark) {
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0x3567E8F9), // Luminous top specular cyan sheen
+                        Color(0x281E293B), // Translucent slate graphite depth
+                        Color(0x550F172A), // Frosted obsidian base
+                        Color(0x750A0F1D)  // Deep frosted anchoring base
+                    )
+                )
             } else {
-                Color(0xFF060B18)
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xE5FFFFFF), // Pure white liquid specular highlight
+                        Color(0x90F0F9FF), // Iridescent crystal sky wash
+                        Color(0x75E0F2FE), // Translucent frosted sapphire
+                        Color(0x95F8FAFC)  // Platinum crystal backing
+                    )
+                )
             }
 
-            val buttonRim = if (dark) {
+            // Fine, discrete specular glass border with top luster
+            val buttonRimBrush = if (dark) {
                 Brush.verticalGradient(
                     listOf(
-                        Color.White.copy(alpha = 0.25f),
-                        Color.White.copy(alpha = 0.05f)
+                        Color(0x80FFFFFF), // Specular crystal rim top
+                        Color(0x5038BDF8), // Electric cyan-blue refraction
+                        Color(0x2094A3B8), // Discrete slate outline
+                        Color(0x10FFFFFF)  // Subtle ambient bottom edge
                     )
                 )
             } else {
                 Brush.verticalGradient(
                     listOf(
-                        Color.White.copy(alpha = 0.35f),
-                        Color.Transparent
+                        Color(0xFAFFFFFF), // Crisp diamond highlight top
+                        Color(0x6038BDF8), // Subtle azure crystal refraction
+                        Color(0x250F172A), // Discrete defining outline
+                        Color(0x150F172A)  // Soft ambient bottom edge
                     )
                 )
             }
+
+            val buttonTextColor = if (dark) Color(0xFFFFFFFF) else Color(0xFF0F172A)
+            val buttonIconTint = if (dark) Color(0xFF38BDF8) else Palette.electricBlue
+            val buttonChevronTint = if (dark) Color(0xB3FFFFFF) else Color(0x990F172A)
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp)
+                    .pressScale(buttonPressed)
+                    .shadow(
+                        elevation = if (dark) 8.dp else 6.dp,
+                        shape = Capsule(),
+                        ambientColor = if (dark) Color.Black.copy(alpha = 0.55f) else Color(0x1A0F172A),
+                        spotColor = if (dark) Color(0x4038BDF8) else Color(0x250284C7)
+                    )
+                    .background(buttonBgBrush, Capsule())
+                    .border(1.dp, buttonRimBrush, Capsule())
                     .clip(Capsule())
-                    .background(buttonFill)
-                    .border(1.dp, buttonRim, Capsule())
-                    .clickable(role = Role.Button, onClick = onNewTaskClick)
-                    .padding(horizontal = 20.dp),
+                    .clickable(buttonSource, null, role = Role.Button, onClick = onNewTaskClick)
+                    .padding(horizontal = 18.dp),
                 contentAlignment = Alignment.Center
             ) {
+                // Diagonal liquid specular meniscus sheen overlay
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(Capsule())
+                ) {
+                    val meniscusBrush = if (dark) {
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.22f),
+                                Color.White.copy(alpha = 0.05f),
+                                Color.Transparent
+                            ),
+                            startY = 0f,
+                            endY = size.height * 0.55f
+                        )
+                    } else {
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.85f),
+                                Color.White.copy(alpha = 0.25f),
+                                Color.Transparent
+                            ),
+                            startY = 0f,
+                            endY = size.height * 0.50f
+                        )
+                    }
+                    drawRect(brush = meniscusBrush)
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Symbol("plus", size = 20.dp, tint = Color.White)
+                    // Left: Luminous frosted circular badge behind plus icon
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (dark) Color(0x2538BDF8) else Color(0x200284C7)
+                            )
+                            .border(
+                                0.8.dp,
+                                if (dark) Color(0x5038BDF8) else Color(0x350284C7),
+                                CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Symbol("plus", size = 16.dp, tint = buttonIconTint)
+                    }
 
                     Text(
                         text = "Nouvelle tâche",
@@ -282,12 +362,23 @@ fun CamcsNewTaskCard(
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = (-0.2).sp
                         ),
-                        color = Color.White,
+                        color = buttonTextColor,
                         modifier = Modifier.weight(1f),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
 
-                    Symbol("chevron.right", size = 15.dp, tint = Color.White)
+                    // Right: Chevron right inside subtle circular pill
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.04f)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Symbol("chevron.right", size = 13.dp, tint = buttonChevronTint)
+                    }
                 }
             }
 
