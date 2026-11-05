@@ -198,7 +198,7 @@ fun LinkButton(
 }
 
 @Composable
-fun CodyncSwitch(
+fun CodeStationSwitch(
     checked: Boolean,
     onChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -236,13 +236,14 @@ fun CodyncSwitch(
 }
 
 @Composable
-fun CodeStationSwitch(
+@Deprecated("Use CodeStationSwitch instead", ReplaceWith("CodeStationSwitch(checked, onChange, modifier, enabled, label)"))
+fun CodyncSwitch(
     checked: Boolean,
     onChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     label: @Composable RowScope.() -> Unit
-) = CodyncSwitch(checked, onChange, modifier, enabled, label)
+) = CodeStationSwitch(checked, onChange, modifier, enabled, label)
 
 @Composable
 fun Spinner(

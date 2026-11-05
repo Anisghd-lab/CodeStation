@@ -58,10 +58,10 @@ impl Actor {
         }
         let own_chat = self.active_group.is_none() && self.active_request.is_none() && self.active_routine.is_none();
         if remind_files && own_chat {
-            prompt.push_str("\n\n[Codync: send_file(path, name?) shares any regular file up to 100 MiB as a downloadable card. Use it instead of sending a local path.]");
+            prompt.push_str("\n\n[CodeStation: send_file(path, name?) shares any regular file up to 100 MiB as a downloadable card. Use it instead of sending a local path.]");
         }
         if remind_artifacts && own_chat {
-            prompt.push_str("\n\n[Codync: for a report, plan, tracker or dashboard the user will come back to, write one self-contained HTML file and publish_artifact(path, title) instead of a long message. To change it, edit a copy of its HTML (list_artifacts) and publish_artifact(path, artifact: its id).]");
+            prompt.push_str("\n\n[CodeStation: for a report, plan, tracker or dashboard the user will come back to, write one self-contained HTML file and publish_artifact(path, title) instead of a long message. To change it, edit a copy of its HTML (list_artifacts) and publish_artifact(path, artifact: its id).]");
         }
         Ok(prompt)
     }

@@ -40,7 +40,7 @@ import com.ghdinteractivestudio.codestation.ui.components.AvatarPalette
 import com.ghdinteractivestudio.codestation.ui.components.CardForm
 import com.ghdinteractivestudio.codestation.ui.components.CardSection
 import com.ghdinteractivestudio.codestation.ui.components.CharacterAvatar
-import com.ghdinteractivestudio.codestation.ui.components.CodyncSwitch
+import com.ghdinteractivestudio.codestation.ui.components.CodeStationSwitch
 import com.ghdinteractivestudio.codestation.ui.components.GlassAlertDialog
 import com.ghdinteractivestudio.codestation.ui.components.PageHeader
 import com.ghdinteractivestudio.codestation.ui.components.PrimaryButton
@@ -653,7 +653,7 @@ fun BotEditorScreen(
             CardSection(title = "Options d'exécution") {
                 // Fast Mode
                 row {
-                    CodyncSwitch(
+                    CodeStationSwitch(
                         checked = state.isFastMode,
                         onChange = { viewModel.onFastModeToggled(it) },
                         modifier = Modifier.fillMaxWidth()
@@ -667,7 +667,7 @@ fun BotEditorScreen(
 
                 // Épingler en haut
                 row {
-                    CodyncSwitch(
+                    CodeStationSwitch(
                         checked = state.isPinned,
                         onChange = { viewModel.onPinnedToggled(it) },
                         modifier = Modifier.fillMaxWidth()

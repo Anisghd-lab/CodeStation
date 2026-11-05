@@ -205,6 +205,85 @@ class MemoryCollector:
             pass
         return missions
 
+    def collect_codestation_interactions(self) -> List[Dict[str, Any]]:
+        interactions = []
+        db_path = "/root/.codestation/codestation.db"
+        if not os.path.exists(db_path):
+            db_path = "/root/.codestation/codync.db"
+        if not os.path.exists(db_path):
+            return interactions
+
+        last_seq = self.state.get("last_codestation_seq", 0)
+        try:
+            conn = sqlite3.connect(db_path)
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT seq, bot_id, kind, data, created_at
+                FROM entries
+                WHERE seq > ?
+                ORDER BY seq ASC
+            """, (last_seq,))
+            rows = cur.fetchall()
+            max_seen_seq = last_seq
+
+            for seq, bot_id, kind, data_str, created_at in rows:
+                if seq > max_seen_seq:
+                    max_seen_seq = seq
+                try:
+                    data = json.loads(data_str) if isinstance(data_str, str) else {}
+                except Exception:
+                    data = {"text": str(data_str)}
+
+                text = data.get("text") or ""
+                if not text or len(text.strip()) < 5:
+                    continue
+
+                # Détection des interactions d'équipe inter-agents
+                is_inter_agent = (
+                    "message_bot" in text
+                    or "replied to your message_bot request" in text
+                    or "Messaged " in text
+                    or "Message from " in text
+                    or "[CodeStation: " in text
+                    or "[Codync: " in text
+                )
+
+                # Détection des résolutions de bugs et diagnostics
+                is_bug_resolution = any(
+                    kw in text.lower()
+                    for kw in ["fix", "fixed", "résolu", "résolution", "erreur", "corrigé", "correction", "bug", "patch", "remediation"]
+                )
+
+                ts = created_at / 1000.0 if created_at > 1e11 else (created_at or time.time())
+
+                if is_inter_agent:
+                    interactions.append({
+                        "source": "codestation_team",
+                        "id": f"team-seq-{seq}",
+                        "bot_id": bot_id,
+                        "kind": kind,
+                        "text": text,
+                        "data": data,
+                        "timestamp": ts
+                    })
+                elif kind == "agent" and len(text.strip()) > 15:
+                    interactions.append({
+                        "source": "codestation_chat",
+                        "id": f"chat-seq-{seq}",
+                        "bot_id": bot_id,
+                        "kind": kind,
+                        "text": text,
+                        "is_bug_resolution": is_bug_resolution,
+                        "data": data,
+                        "timestamp": ts
+                    })
+
+            self.state["last_codestation_seq"] = max_seen_seq
+            conn.close()
+        except Exception:
+            pass
+        return interactions
+
 
 class MemoryAnalyzer:
     """Analyzes raw session traces to detect patterns, solutions and errors."""
@@ -271,6 +350,38 @@ class MemoryAnalyzer:
                 "solution_proposed": "Traitement contextuel des requêtes de développement.",
                 "tags": ["codebuddy", "acp", "coding"],
                 "type": "solution"
+            }
+        elif src == "codestation_team":
+            bot_id = raw_session.get("bot_id", "bot-agent")
+            text = raw_session.get("text", "")
+            return {
+                "author": bot_id,
+                "title": f"Collaboration inter-agents CodeStation ({bot_id})",
+                "problem": f"Échange ou délégation d'instructions entre agents CodeStation: {text[:160]}",
+                "context": "Collaboration autonome multi-agents dans CodeStation Runtime (port 19222/19223).",
+                "attempts": ["Émission d'une requête message_bot", "Routage du contexte inter-agents"],
+                "observed_results": [f"Transmission et traitement du message: {text[:100]}"],
+                "errors_encountered": [],
+                "solution_proposed": "Délégation asynchrone des sous-tâches entre agents spécialisés via le protocole d'équipe CodeStation.",
+                "tags": ["codestation", "inter-agents", "teamwork", "multi-agents", bot_id],
+                "type": "procedure"
+            }
+        elif src == "codestation_chat":
+            bot_id = raw_session.get("bot_id", "bot-agent")
+            text = raw_session.get("text", "")
+            is_bug = raw_session.get("is_bug_resolution", False)
+            title_prefix = "Résolution & Correction" if is_bug else "Interaction & Assistance"
+            return {
+                "author": bot_id,
+                "title": f"{title_prefix} CLI : {bot_id} ({text.splitlines()[0][:50]})",
+                "problem": f"Interaction utilisateur ou anomalie signalée traitée par {bot_id}.",
+                "context": "Session interactive CodeStation CLI / Android sous Ubuntu PRoot ARM64.",
+                "attempts": ["Analyse de la demande utilisateur", "Génération de la réponse adaptée", "Exécution des outils requis"],
+                "observed_results": [f"Réponse synthétisée et transmise: {text[:120]}"],
+                "errors_encountered": [],
+                "solution_proposed": sanitize_text(text[:300]),
+                "tags": ["codestation", "cli-interaction", "knowledge-transfer", bot_id] + (["bug-fix", "troubleshooting"] if is_bug else []),
+                "type": "solution" if is_bug else "best_practice"
             }
         return None
 
@@ -596,7 +707,14 @@ class ContinuousMemoryEngine:
                     return json.load(f)
             except Exception:
                 pass
-        return {"processed_opencode": [], "processed_agy": [], "processed_codebuddy": [], "processed_camcs": []}
+        return {
+            "processed_opencode": [],
+            "processed_agy": [],
+            "processed_codebuddy": [],
+            "processed_camcs": [],
+            "processed_codestation": [],
+            "last_codestation_seq": 0
+        }
 
     def _save_state(self):
         os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
@@ -613,6 +731,7 @@ class ContinuousMemoryEngine:
         raw_sessions.extend(self.collector.collect_agy_sessions())
         raw_sessions.extend(self.collector.collect_codebuddy_sessions())
         raw_sessions.extend(self.collector.collect_camcs_missions())
+        raw_sessions.extend(self.collector.collect_codestation_interactions())
 
         for raw in raw_sessions:
             analyzed = self.analyzer.analyze(raw)
@@ -631,6 +750,7 @@ class ContinuousMemoryEngine:
                 elif src == "google_agy": bucket = "processed_agy"
                 elif src == "codebuddy": bucket = "processed_codebuddy"
                 elif src == "camcs": bucket = "processed_camcs"
+                elif src in ("codestation_team", "codestation_chat"): bucket = "processed_codestation"
                 if bucket:
                     lst = self.state.setdefault(bucket, [])
                     if sid not in lst:

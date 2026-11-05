@@ -79,7 +79,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.ghdinteractivestudio.codestation.ui.components.CharacterAvatar
 import com.ghdinteractivestudio.codestation.ui.components.ChoicePicker
-import com.ghdinteractivestudio.codestation.ui.components.CodyncSwitch
+import com.ghdinteractivestudio.codestation.ui.components.CodeStationSwitch
 import com.ghdinteractivestudio.codestation.ui.components.GlassStyle
 import com.ghdinteractivestudio.codestation.ui.components.IconButton
 import com.ghdinteractivestudio.codestation.ui.components.LinkButton
@@ -842,7 +842,7 @@ private fun LiveUpdateGallery(chip: Boolean) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        CodyncSwitch(
+        CodeStationSwitch(
             checked = taskEnabled,
             onChange = { taskEnabled = it }
         ) {

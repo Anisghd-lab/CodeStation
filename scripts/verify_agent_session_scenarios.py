@@ -56,8 +56,10 @@ def verify_scenario_1():
     assert bot_info.get("id") == agent_id, f"L'agent retourné a un mauvais ID: {res}"
     print("   ✓ Agent créé avec succès via API Host.")
 
-    print("2. Vérification directe dans la base SQLite codync.db...")
-    db_path = "/root/.codestation/codync.db"
+    print("2. Vérification directe dans la base SQLite codestation.db...")
+    db_path = "/root/.codestation/codestation.db"
+    if not os.path.exists(db_path):
+        db_path = "/root/.codestation/codync.db"
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("SELECT id, config FROM bots WHERE id = ?", (agent_id,))
@@ -66,7 +68,7 @@ def verify_scenario_1():
     assert row is not None, f"Agent non trouvé dans {db_path} !"
     saved_cfg = json.loads(row[1])
     assert saved_cfg.get("name") == "QA Specialist Custom", f"Nom incorrect en DB: {saved_cfg}"
-    print(f"   ✓ Trouvé dans codync.db : id={row[0]}, name={saved_cfg.get('name')}")
+    print(f"   ✓ Trouvé dans {os.path.basename(db_path)} : id={row[0]}, name={saved_cfg.get('name')}")
 
     print("3. Simulation de modification de l'agent...")
     update_payload = {

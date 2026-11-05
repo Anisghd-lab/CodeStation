@@ -21,7 +21,10 @@ pub fn acp_server(name: &str, exe: &std::path::Path, args: &[&str], port: u16) -
     let args: Vec<&str> = ["mcp"].into_iter().chain(args.iter().copied()).chain(["--port", &port]).collect();
     json!({
         "name": name, "command": exe, "args": args,
-        "env": [{"name": "CODYNC_HOME", "value": crate::service::data_dir()}],
+        "env": [
+            {"name": "CODESTATION_HOME", "value": crate::service::data_dir()},
+            {"name": "CODYNC_HOME", "value": crate::service::data_dir()}
+        ],
     })
 }
 
@@ -63,11 +66,11 @@ pub async fn serve(bot: String, port: u16, server: Server) -> Result<()> {
     });
     let (name, instructions, available_tools) = match server {
         Server::Connectors => {
-            ("codync-connectors", crate::market::requests::INSTRUCTIONS, crate::market::requests::tools())
+            ("codestation-connectors", crate::market::requests::INSTRUCTIONS, crate::market::requests::tools())
         }
         // Listed by the host: they depend on this computer's driver.
-        Server::Computer => ("codync-computer", INSTRUCTIONS, Value::Null),
-        Server::Routines => ("codync-routines", crate::routines::INSTRUCTIONS, crate::routines::tools()),
+        Server::Computer => ("codestation-computer", INSTRUCTIONS, Value::Null),
+        Server::Routines => ("codestation-routines", crate::routines::INSTRUCTIONS, crate::routines::tools()),
         Server::Chat => {
             let mut tools = crate::chat::outbox::tools();
             if let Some(list) = tools.as_array_mut() {
@@ -77,13 +80,13 @@ pub async fn serve(bot: String, port: u16, server: Server) -> Result<()> {
                 list.push(crate::chat::reactions::tool());
                 list.push(crate::chat::skills::tool());
             }
-            ("codync-chat", crate::chat::outbox::INSTRUCTIONS, tools)
+            ("codestation-chat", crate::chat::outbox::INSTRUCTIONS, tools)
         }
-        Server::Team => ("codync-team", crate::chat::team::INSTRUCTIONS, crate::chat::team::tools()),
-        Server::Manage => ("codync-manage", crate::chat::manage::INSTRUCTIONS, crate::chat::manage::tools()),
-        Server::Memory => ("codync-memory", crate::chat::memory::INSTRUCTIONS, crate::chat::memory::tools()),
+        Server::Team => ("codestation-team", crate::chat::team::INSTRUCTIONS, crate::chat::team::tools()),
+        Server::Manage => ("codestation-manage", crate::chat::manage::INSTRUCTIONS, crate::chat::manage::tools()),
+        Server::Memory => ("codestation-memory", crate::chat::memory::INSTRUCTIONS, crate::chat::memory::tools()),
         Server::Composio => {
-            ("codync-composio", crate::market::composio::INSTRUCTIONS, crate::market::composio::tools())
+            ("codestation-composio", crate::market::composio::INSTRUCTIONS, crate::market::composio::tools())
         }
     };
     // Requests still running, by id: a cancelled one stops, and its host call with it (a team change's card expires).

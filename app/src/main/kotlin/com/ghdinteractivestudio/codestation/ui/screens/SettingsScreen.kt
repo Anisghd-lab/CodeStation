@@ -43,7 +43,7 @@ import com.ghdinteractivestudio.codestation.domain.model.ServerConnectionStatus
 import com.ghdinteractivestudio.codestation.util.OverlayPermissionHelper
 import com.ghdinteractivestudio.codestation.ui.components.CardForm
 import com.ghdinteractivestudio.codestation.ui.components.CardSection
-import com.ghdinteractivestudio.codestation.ui.components.CodyncSwitch
+import com.ghdinteractivestudio.codestation.ui.components.CodeStationSwitch
 import com.ghdinteractivestudio.codestation.ui.components.LinkButton
 import com.ghdinteractivestudio.codestation.ui.components.PageHeader
 import com.ghdinteractivestudio.codestation.ui.components.SecondaryButton
@@ -218,7 +218,7 @@ fun SettingsScreen(
 
                 // Discussion : Détails de la réflexion avec interrupteur accolé au texte
                 row {
-                    CodyncSwitch(
+                    CodeStationSwitch(
                         checked = state.showThinkingDetails,
                         onChange = { viewModel.setShowThinkingDetails(it) },
                         modifier = Modifier.fillMaxWidth()
@@ -266,7 +266,7 @@ fun SettingsScreen(
 
                 // Analyses d'utilisation
                 row {
-                    CodyncSwitch(
+                    CodeStationSwitch(
                         checked = shareAnalytics,
                         onChange = { shareAnalytics = it },
                         modifier = Modifier.fillMaxWidth()
@@ -284,7 +284,7 @@ fun SettingsScreen(
                 title = "Dynamic Island & Multitâche"
             ) {
                 row {
-                    CodyncSwitch(
+                    CodeStationSwitch(
                         checked = state.dynamicIslandOverlayEnabled && hasOverlayPermission,
                         onChange = { enableRequested ->
                             if (enableRequested) {

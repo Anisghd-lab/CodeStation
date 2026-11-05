@@ -238,8 +238,23 @@ enum McpServer {
 fn open_store() -> Result<(store::Store, String, String)> {
     let dir = service::data_dir();
     std::fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
-    let db = dir.join("codync.db");
-    let store = store::Store::open(&db).with_context(|| format!("opening {}", db.display()))?;
+    let db = dir.join("codestation.db");
+    let legacy_db = dir.join("codync.db");
+    if !db.exists() && legacy_db.exists() {
+        if let Err(e) = std::fs::rename(&legacy_db, &db) {
+            tracing::warn!("Failed to rename codync.db to codestation.db: {e}");
+        } else {
+            let _ = std::fs::rename(dir.join("codync.db-wal"), dir.join("codestation.db-wal"));
+            let _ = std::fs::rename(dir.join("codync.db-shm"), dir.join("codestation.db-shm"));
+            #[cfg(unix)]
+            let _ = std::os::unix::fs::symlink("codestation.db", &legacy_db);
+        }
+    } else if db.exists() && !legacy_db.exists() {
+        #[cfg(unix)]
+        let _ = std::os::unix::fs::symlink("codestation.db", &legacy_db);
+    }
+    let target_db = if db.exists() { db } else { legacy_db };
+    let store = store::Store::open(&target_db).with_context(|| format!("opening {}", target_db.display()))?;
     let host_id = if let Some(v) = store.kv_get("host_id") {
         v
     } else {

@@ -104,7 +104,14 @@ impl Hub {
 
     pub fn new(store: Store, host_id: String, identity: Identity, token: String, port: u16) -> Arc<Self> {
         let (events, _) = broadcast::channel(1024);
-        let mem_db = service::data_dir().join("codync.db");
+        let mem_db = {
+            let cs_db = service::data_dir().join("codestation.db");
+            if cs_db.exists() {
+                cs_db
+            } else {
+                service::data_dir().join("codync.db")
+            }
+        };
         let mem_repo = std::path::PathBuf::from("/root/CodeStation-Memory");
         let collective_memory = Arc::new(
             crate::collective_memory::MemoryEngine::new(&mem_db, &mem_repo).unwrap_or_else(|e| {
