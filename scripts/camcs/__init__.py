@@ -6,6 +6,8 @@ from .deliverable_manager import DeliverableManager
 from .quality_auditor import QualityAuditor
 from .collaboration_hub import CollaborationHub
 from .collective_memory_client import CollectiveMemoryClient
+from .quality_gates import QualityGateEngine, QualityGate, GateType, GateStatus
+from .auto_repair_loop import AutoRepairLoop, RepairAttempt
 
 __all__ = [
     "CliRegistry",
@@ -16,5 +18,11 @@ __all__ = [
     "DeliverableManager",
     "QualityAuditor",
     "CollaborationHub",
-    "CollectiveMemoryClient"
+    "CollectiveMemoryClient",
+    "QualityGateEngine",
+    "QualityGate",
+    "GateType",
+    "GateStatus",
+    "AutoRepairLoop",
+    "RepairAttempt"
 ]

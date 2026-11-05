@@ -46,6 +46,10 @@ class DagTask:
     started_at: Optional[float] = None
     completed_at: Optional[float] = None
     error_message: Optional[str] = None
+    iteration_count: int = 0
+    max_iterations: int = 3
+    last_error: Optional[str] = None
+    escalation_reason: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -73,7 +77,11 @@ class DagTask:
             "createdAt": self.created_at,
             "startedAt": self.started_at,
             "completedAt": self.completed_at,
-            "errorMessage": self.error_message
+            "errorMessage": self.error_message,
+            "iterationCount": self.iteration_count,
+            "maxIterations": self.max_iterations,
+            "lastError": self.last_error,
+            "escalationReason": self.escalation_reason
         }
 
 

@@ -51,6 +51,7 @@ from camcs.external_service_registry import ExternalServiceRegistry
 from camcs.external_action_executor import ExternalActionExecutor
 from camcs.objective_completion_gate import ObjectiveCompletionGate
 from camcs.quality_gates import QualityGateEngine, QualityGate, GateType, GateStatus
+from camcs.auto_repair_loop import AutoRepairLoop, RepairAttempt
 
 # Database for CAMCS persistence
 DB_PATH = os.path.expanduser("/root/.codestation/camcs.db")
@@ -122,6 +123,9 @@ def init_db(db_path: str = DB_PATH):
             created_at REAL,
             started_at REAL,
             completed_at REAL,
+            iteration_count INTEGER DEFAULT 0,
+            max_iterations INTEGER DEFAULT 3,
+            escalation_reason TEXT,
             FOREIGN KEY(mission_id) REFERENCES missions(id),
             FOREIGN KEY(agent_id) REFERENCES agents(id)
         )
@@ -290,7 +294,10 @@ def init_db(db_path: str = DB_PATH):
         ('error_message', 'TEXT'),
         ('started_at', 'REAL'),
         ('orchestration_phase', 'TEXT'),
-        ('governance_mode', 'TEXT')
+        ('governance_mode', 'TEXT'),
+        ('iteration_count', 'INTEGER DEFAULT 0'),
+        ('max_iterations', 'INTEGER DEFAULT 3'),
+        ('escalation_reason', 'TEXT')
     ]:
         try:
             cur.execute(f"ALTER TABLE tasks ADD COLUMN {col} {ctype}")
@@ -437,6 +444,7 @@ class CamcsOrchestrationEngine:
         self.external_executor = ExternalActionExecutor(db_path)
         self.completion_gate = ObjectiveCompletionGate(db_path)
         self.quality_gates = QualityGateEngine(db_path)
+        self.auto_repair_loop = AutoRepairLoop(default_max_iterations=3, db_path=db_path)
         self.active_missions: Dict[str, CamcsMission] = {}
         self.event_subscribers: List[queue.Queue] = []
         self._lock = threading.RLock()
@@ -491,7 +499,8 @@ class CamcsOrchestrationEngine:
                 cur.execute("""
                     SELECT id, agent_id, classification, title, description, prompt, dependencies_json,
                            status, progress, weight, is_mandatory, acceptance_criteria, expected_deliverable,
-                           assigned_file, exit_code, result_summary, error_message, created_at, started_at, completed_at
+                           assigned_file, exit_code, result_summary, error_message, created_at, started_at, completed_at,
+                           iteration_count, max_iterations, escalation_reason
                     FROM tasks WHERE mission_id = ?
                 """, (m_id,))
                 t_rows = cur.fetchall()
@@ -524,7 +533,10 @@ class CamcsOrchestrationEngine:
                         error_message=tr[16],
                         created_at=tr[17] or created_at,
                         started_at=tr[18],
-                        completed_at=tr[19]
+                        completed_at=tr[19],
+                        iteration_count=tr[20] if len(tr) > 20 and tr[20] is not None else 0,
+                        max_iterations=tr[21] if len(tr) > 21 and tr[21] is not None else 3,
+                        escalation_reason=tr[22] if len(tr) > 22 else None
                     )
                     mission_tasks.append(t)
                 m.tasks = mission_tasks
@@ -1060,14 +1072,16 @@ class CamcsOrchestrationEngine:
                 INSERT OR REPLACE INTO tasks
                 (id, mission_id, agent_id, classification, title, description, prompt, dependencies_json,
                  status, progress, weight, is_mandatory, acceptance_criteria, expected_deliverable, assigned_file,
-                 exit_code, result_summary, error_message, created_at, started_at, completed_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 exit_code, result_summary, error_message, created_at, started_at, completed_at,
+                 iteration_count, max_iterations, escalation_reason)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 task.id, task.mission_id, task.agent_id, task.classification, task.title,
                 task.description, task.prompt, json.dumps(task.dependencies), task.status,
                 task.progress, task.weight, 1 if task.is_mandatory else 0, task.acceptance_criteria,
                 task.expected_deliverable, task.assigned_file, task.exit_code, task.result_summary,
-                task.error_message, task.created_at, task.started_at, task.completed_at
+                task.error_message, task.created_at, task.started_at, task.completed_at,
+                getattr(task, "iteration_count", 0), getattr(task, "max_iterations", 3), getattr(task, "escalation_reason", None)
             ))
             conn.commit()
             conn.close()
@@ -1379,19 +1393,67 @@ class CamcsOrchestrationEngine:
                     completed_task_ids.add(task.id)
                     continue
 
-                res, engine_name = self.execute_with_failover(
-                    mission=mission,
-                    agent=agent,
-                    task=task,
-                    cwd=target_dir,
-                    timeout=90,
-                    output_callback=task_output_cb,
-                    pid_callback=task_pid_cb
-                )
-                agent.pid = None
+                task_succeeded = False
+                while not task_succeeded:
+                    if mission.status == MissionState.CANCELLED:
+                        return
 
-                if mission.status == MissionState.CANCELLED:
-                    return
+                    while mission.status in (MissionState.PAUSED, "PAUSED", MissionState.WAITING_FOR_APPROVAL, "WAITING_FOR_APPROVAL") or getattr(mission, "is_paused", False):
+                        time.sleep(0.5)
+                        if mission.status == MissionState.CANCELLED:
+                            return
+
+                    res, engine_name = self.execute_with_failover(
+                        mission=mission,
+                        agent=agent,
+                        task=task,
+                        cwd=target_dir,
+                        timeout=90,
+                        output_callback=task_output_cb,
+                        pid_callback=task_pid_cb
+                    )
+                    agent.pid = None
+
+                    if mission.status == MissionState.CANCELLED:
+                        return
+
+                    if res.exit_code != 0:
+                        can_retry, retry_or_escalation = self.auto_repair_loop.attempt_repair(
+                            task=task,
+                            error_msg=f"Processus échoué (code {res.exit_code}) : {res.stderr or res.stdout}",
+                            stdout=res.stdout,
+                            stderr=res.stderr,
+                            exit_code=res.exit_code
+                        )
+                        self._save_task(task)
+                        if can_retry:
+                            self.emit_event(
+                                mission.id, "task.auto_repair",
+                                f"Tentative d'auto-réparation {task.iteration_count}/{task.max_iterations} pour {task.title}",
+                                agent_id=agent.id, task_id=task.id,
+                                payload={"iteration": task.iteration_count, "maxIterations": task.max_iterations}
+                            )
+                            task.prompt = retry_or_escalation
+                            continue
+                        else:
+                            self.record_task_transition(mission.id, task.id, TaskState.NEEDS_APPROVAL, error_message=retry_or_escalation)
+                            self.record_mission_transition(mission.id, MissionState.WAITING_FOR_APPROVAL, f"Escalade humaine requise pour {task.title} : {retry_or_escalation}")
+                            self.emit_event(
+                                mission.id, "task.escalated",
+                                f"Seuil d'auto-réparation dépassé pour {task.title}. Escalade opérateur requise.",
+                                agent_id=agent.id, task_id=task.id,
+                                payload={"reason": retry_or_escalation}
+                            )
+                            while task.status in (TaskState.NEEDS_APPROVAL, "NEEDS_APPROVAL") and mission.status in (MissionState.WAITING_FOR_APPROVAL, "WAITING_FOR_APPROVAL"):
+                                time.sleep(0.5)
+                                if mission.status == MissionState.CANCELLED:
+                                    return
+                            if task.status in (TaskState.READY, TaskState.RUNNING):
+                                continue
+                            else:
+                                return
+
+                    task_succeeded = True
 
                 # Write or verify assigned deliverable file
                 if task.assigned_file:
@@ -1779,6 +1841,40 @@ class CamcsOrchestrationEngine:
                 return ok
         return False
 
+    def approve_task(self, mission_id: str, task_id: str, override_prompt: Optional[str] = None, extra_attempts: int = 1) -> bool:
+        with self._lock:
+            m = self.active_missions.get(mission_id)
+            if not m:
+                return False
+            task = next((t for t in m.tasks if t.id == task_id), None)
+            if not task:
+                return False
+            ok = self.auto_repair_loop.resolve_escalation(task, approved=True, extra_attempts=extra_attempts, override_prompt=override_prompt)
+            if ok:
+                self._save_task(task)
+                self.record_task_transition(mission_id, task.id, TaskState.READY, result_summary="Escalade approuvée par l'opérateur")
+                if m.status in (MissionState.WAITING_FOR_APPROVAL, "WAITING_FOR_APPROVAL", MissionState.PAUSED, "PAUSED"):
+                    m.status = MissionState.RUNNING
+                    self._save_mission_state(m)
+                    self.emit_event(mission_id, "mission.resumed", f"Mission reprise suite à l'approbation de « {task.title} ».")
+                return True
+        return False
+
+    def reject_task(self, mission_id: str, task_id: str, reason: Optional[str] = None) -> bool:
+        with self._lock:
+            m = self.active_missions.get(mission_id)
+            if not m:
+                return False
+            task = next((t for t in m.tasks if t.id == task_id), None)
+            if not task:
+                return False
+            ok = self.auto_repair_loop.resolve_escalation(task, approved=False)
+            task.error_message = reason or task.escalation_reason
+            self._save_task(task)
+            self.record_task_transition(mission_id, task.id, TaskState.FAILED, error_message=task.error_message)
+            self.emit_event(mission_id, "task.rejected", f"Tâche « {task.title} » rejetée par l'opérateur.", task_id=task.id)
+            return True
+
     def delete_mission(self, mission_id: str) -> bool:
         """Deletes a single mission by id, cleans up database and mission folder."""
         if not mission_id:
@@ -2008,6 +2104,9 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
             if sub_res == "gates":
                 gates = ENGINE.quality_gates.get_gates_for_task(task_id)
                 self._send_json(200, {"ok": True, "taskId": task_id, "gates": [g.to_dict() for g in gates]})
+            elif sub_res == "repairs":
+                repairs = ENGINE.auto_repair_loop.get_task_repair_history(task_id)
+                self._send_json(200, {"ok": True, "taskId": task_id, "repairs": repairs})
             else:
                 self._send_json(404, {"error": "Sous-ressource de tâche non trouvée"})
         elif self.path.startswith("/api/camcs/file"):
@@ -2138,6 +2237,19 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
             agent_id = data.get("agentId")
             ok = ENGINE.stop_task(mission_id, task_id=task_id, agent_id=agent_id)
             self._send_json(200, {"ok": ok, "status": "CANCELLED", "taskId": task_id, "agentId": agent_id})
+        elif self.path == "/api/camcs/tasks/approve":
+            mission_id = data.get("missionId", "")
+            task_id = data.get("taskId", "")
+            override_prompt = data.get("overridePrompt", None)
+            extra_attempts = int(data.get("extraAttempts", 1))
+            ok = ENGINE.approve_task(mission_id, task_id, override_prompt=override_prompt, extra_attempts=extra_attempts)
+            self._send_json(200, {"ok": ok, "missionId": mission_id, "taskId": task_id, "action": "approved"})
+        elif self.path == "/api/camcs/tasks/reject":
+            mission_id = data.get("missionId", "")
+            task_id = data.get("taskId", "")
+            reason = data.get("reason", None)
+            ok = ENGINE.reject_task(mission_id, task_id, reason=reason)
+            self._send_json(200, {"ok": ok, "missionId": mission_id, "taskId": task_id, "action": "rejected"})
         elif self.path in ["/api/camcs/missions/delete", "/api/camcs/mission/delete"]:
             mission_id = data.get("missionId", "")
             ok = ENGINE.delete_mission(mission_id)
