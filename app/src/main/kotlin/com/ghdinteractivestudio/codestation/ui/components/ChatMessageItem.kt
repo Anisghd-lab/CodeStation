@@ -1,5 +1,6 @@
 package com.ghdinteractivestudio.codestation.ui.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,16 +18,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -39,6 +45,8 @@ import coil.request.ImageRequest
 import com.ghdinteractivestudio.codestation.domain.model.ChatMessage
 import com.ghdinteractivestudio.codestation.domain.model.FileAttachment
 import com.ghdinteractivestudio.codestation.domain.model.MessageAuthorType
+import com.ghdinteractivestudio.codestation.ui.theme.LocalDark
+import com.ghdinteractivestudio.codestation.ui.theme.Motion
 import com.ghdinteractivestudio.codestation.ui.theme.Palette
 import com.ghdinteractivestudio.codestation.ui.theme.RoundedRectangle
 import com.ghdinteractivestudio.codestation.ui.theme.Type
@@ -59,6 +67,9 @@ fun ChatMessageItem(
 ) {
     val isUser = message.author.type == MessageAuthorType.USER
     val alignment = if (isUser) Alignment.End else Alignment.Start
+    val dark = LocalDark.current
+    val isLongUserMessage = isUser && (message.text.length > 240 || message.text.count { it == '\n' } >= 5)
+    var isExpanded by remember(message.id) { mutableStateOf(false) }
 
     val bubbleShape = if (isUser) {
         RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 6.dp)
@@ -166,11 +177,81 @@ fun ChatMessageItem(
                     val isRedundantArtifactString = message.text.startsWith("Artifact: ") && message.attachments.any { it.isArtifact }
 
                     if (message.text.isNotBlank() && !isRedundantFileString && !isRedundantArtifactString) {
-                        MarkdownMessageView(
-                            text = message.text,
-                            isUser = isUser,
-                            textColor = Palette.text
-                        )
+                        if (isLongUserMessage) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .wrapContentHeight()
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .animateContentSize(Motion.layout())
+                                        .then(
+                                            if (!isExpanded) {
+                                                Modifier
+                                                    .heightIn(max = 135.dp)
+                                                    .clipToBounds()
+                                            } else {
+                                                Modifier
+                                            }
+                                        )
+                                ) {
+                                    MarkdownMessageView(
+                                        text = message.text,
+                                        isUser = isUser,
+                                        textColor = Palette.text
+                                    )
+
+                                    if (!isExpanded) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(44.dp)
+                                                .align(Alignment.BottomCenter)
+                                                .background(
+                                                    Brush.verticalGradient(
+                                                        colors = listOf(
+                                                            Color.Transparent,
+                                                            if (dark) Color(0xF01E2533) else Color(0xF0CBD5E1)
+                                                        )
+                                                    )
+                                                )
+                                                .clickable { isExpanded = true }
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier
+                                        .align(Alignment.End)
+                                        .padding(top = 4.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Palette.text.copy(alpha = 0.08f))
+                                        .clickable { isExpanded = !isExpanded }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = if (isExpanded) "Afficher moins" else "Afficher la suite",
+                                        style = Type.caption2.semibold,
+                                        color = Palette.electricBlue
+                                    )
+                                    Symbol(
+                                        name = if (isExpanded) "chevron.up" else "chevron.down",
+                                        size = 11.dp,
+                                        tint = Palette.electricBlue
+                                    )
+                                }
+                            }
+                        } else {
+                            MarkdownMessageView(
+                                text = message.text,
+                                isUser = isUser,
+                                textColor = Palette.text
+                            )
+                        }
                     }
 
                     // Attachments Preview (Images réelles, Artefacts, Documents)
