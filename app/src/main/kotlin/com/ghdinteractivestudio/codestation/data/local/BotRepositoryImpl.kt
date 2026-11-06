@@ -347,7 +347,7 @@ class BotRepositoryImpl(
                 avatarGlyph = "hexagon",
                 avatarColorHex = "#6366F1",
                 provider = ProviderType.OPENROUTER,
-                model = "liquid/lfm-2.5-2.6b:free",
+                model = "nvidia/nemotron-3.5-lightning:free",
                 isFastMode = true,
                 isLead = false,
                 isPinned = true,

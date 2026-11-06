@@ -144,46 +144,58 @@ class OpenRouterAdapter(BaseProviderAdapter):
         self,
         model: str,
         messages: List[Dict[str, str]],
-        max_tokens: int = 1000,
+        max_tokens: int = 1500,
         temperature: float = 0.2
     ) -> Tuple[bool, str, float]:
         # Enforce free model invariant
         if ":free" not in model and not any(m.model_id == model and m.is_free for m in self.get_available_free_models()):
             return False, f"ERREUR_SECURITE: Le modèle '{model}' n'est pas certifié 100% gratuit.", 0.0
 
+        candidate_models = [model]
+        for fb in ["nvidia/nemotron-3.5-lightning:free", "recursive/flint-v1.0:free", "liquid/lfm-2.5-2.6b:free"]:
+            if fb not in candidate_models:
+                candidate_models.append(fb)
+
         t0 = time.time()
         self.total_requests += 1
-        req_data = json.dumps({
-            "model": model,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "temperature": temperature
-        }).encode("utf-8")
+        last_err = ""
 
-        req = urllib.request.Request(
-            f"{self.base_url}/chat/completions",
-            data=req_data,
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://codestation.app",
-                "X-Title": "CodeStation CAMCS"
-            }
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                elapsed = (time.time() - t0) * 1000
-                self.latencies.append(elapsed)
-                res = json.loads(resp.read().decode("utf-8"))
-                choice = res.get("choices", [{}])[0].get("message", {}).get("content", "")
-                self.is_healthy = True
-                return True, choice.strip() if choice else "Réponse vide de l'API", elapsed
-        except Exception as e:
-            self.failed_requests += 1
-            self.is_healthy = False
-            self.last_error = str(e)
-            elapsed = (time.time() - t0) * 1000
-            return False, f"Erreur OpenRouter ({type(e).__name__}): {e}", elapsed
+        for m in candidate_models:
+            req_data = json.dumps({
+                "model": m,
+                "messages": messages,
+                "max_tokens": max_tokens,
+                "temperature": temperature
+            }).encode("utf-8")
+
+            req = urllib.request.Request(
+                f"{self.base_url}/chat/completions",
+                data=req_data,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://github.com/ghdinteractivestudio/codestation",
+                    "X-Title": "CodeStation CAMCS"
+                }
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    elapsed = (time.time() - t0) * 1000
+                    self.latencies.append(elapsed)
+                    res = json.loads(resp.read().decode("utf-8"))
+                    msg = res.get("choices", [{}])[0].get("message", {})
+                    choice = msg.get("content") or msg.get("reasoning") or ""
+                    self.is_healthy = True
+                    return True, choice.strip() if choice else "Réponse vide de l'API", elapsed
+            except Exception as e:
+                last_err = str(e)
+                continue
+
+        self.failed_requests += 1
+        self.is_healthy = False
+        self.last_error = last_err
+        elapsed = (time.time() - t0) * 1000
+        return False, f"Erreur OpenRouter: {last_err}", elapsed
 
 
 class XKiroAdapter(BaseProviderAdapter):

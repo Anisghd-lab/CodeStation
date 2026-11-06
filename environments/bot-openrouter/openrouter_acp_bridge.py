@@ -38,7 +38,7 @@ def run_prompt(req_id, session_id, prompt_text, model):
         ]
         
         ok, reply, latency = adapter.chat_completion(
-            model=model or "liquid/lfm-2.5-2.6b:free",
+            model=model or "nvidia/nemotron-3.5-lightning:free",
             messages=messages,
             max_tokens=2048,
             temperature=0.2
@@ -84,7 +84,7 @@ def run_prompt(req_id, session_id, prompt_text, model):
 
 def main():
     session_id = "openrouter-session-1"
-    selected_model = "liquid/lfm-2.5-2.6b:free"
+    selected_model = "nvidia/nemotron-3.5-lightning:free"
 
     for raw_line in sys.stdin:
         line = raw_line.strip()
@@ -119,11 +119,11 @@ def main():
                         "id": "model",
                         "category": "model",
                         "type": "select",
-                        "currentValue": "liquid/lfm-2.5-2.6b:free",
+                        "currentValue": "nvidia/nemotron-3.5-lightning:free",
                         "options": [
-                            {"value": "liquid/lfm-2.5-2.6b:free", "name": "LFM 2.5 2.6B (Free)"},
                             {"value": "nvidia/nemotron-3.5-lightning:free", "name": "Nemotron 3.5 Lightning (Free)"},
-                            {"value": "recursive/flint-v1.0:free", "name": "Flint v1.0 (Free)"}
+                            {"value": "recursive/flint-v1.0:free", "name": "Flint v1.0 (Free)"},
+                            {"value": "liquid/lfm-2.5-2.6b:free", "name": "LFM 2.5 2.6B (Free)"}
                         ]
                     }
                 ]

@@ -326,6 +326,46 @@ impl Hub {
             let _ = self.store.save_bot(&cfg);
         }
 
+        // 7. OpenRouter
+        if !existing_ids.contains("bot-openrouter") {
+            let cfg: BotConfig = serde_json::from_value(serde_json::json!({
+                "id": "bot-openrouter",
+                "kind": "agent",
+                "name": "OpenRouter",
+                "description": "Agent d'ingénierie logicielle propulsé par OpenRouter",
+                "avatarColor": "#6366F1",
+                "avatarShape": "hexagon",
+                "backend": "openrouter",
+                "cwd": "/root/CodeStation",
+                "permission": "auto",
+                "model": "liquid/lfm-2.5-2.6b:free",
+                "fastMode": true,
+                "pinned": true,
+                "position": 7,
+            }))?;
+            let _ = self.store.save_bot(&cfg);
+        }
+
+        // 8. xKIRO
+        if !existing_ids.contains("bot-xkiro") {
+            let cfg: BotConfig = serde_json::from_value(serde_json::json!({
+                "id": "bot-xkiro",
+                "kind": "agent",
+                "name": "xKIRO Qwen Coder",
+                "description": "Agent de codage avancé xKIRO",
+                "avatarColor": "#06B6D4",
+                "avatarShape": "diamond",
+                "backend": "xkiro",
+                "cwd": "/root/CodeStation",
+                "permission": "auto",
+                "model": "qwen/qwen3-coder-plus:free",
+                "fastMode": true,
+                "pinned": true,
+                "position": 8,
+            }))?;
+            let _ = self.store.save_bot(&cfg);
+        }
+
         Ok(())
     }
 
