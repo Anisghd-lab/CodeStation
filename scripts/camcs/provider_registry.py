@@ -62,6 +62,14 @@ class OpenRouterAdapter(BaseProviderAdapter):
     def __init__(self):
         super().__init__("openrouter", "OpenRouter", "https://openrouter.ai/api/v1")
         self.api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+        if not self.api_key:
+            fpath = os.path.expanduser("~/.secrets/openrouter-key")
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        self.api_key = f.read().strip()
+                except Exception:
+                    pass
         self._cached_models: List[ModelCapability] = []
         self._cache_time = 0.0
 
