@@ -1,0 +1,8 @@
+{
+  "status": "READY",
+  "updated_at": 1793956160000,
+  "bot_id": "bot-xkiro",
+  "engine": "xkiro",
+  "model": "qwen/qwen3-coder-plus:free",
+  "run_script": "/root/CodeStation/environments/bot-xkiro/xkiro_acp_bridge.py"
+}

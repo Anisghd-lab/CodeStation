@@ -279,7 +279,11 @@ fun BotEditorScreen(
                             ProviderType.FREEBUFF,
                             ProviderType.OMNIRUSH
                         )
-                        val otherProviders = ProviderType.entries.filter { it !in officialClis }
+                        val apiProviders = listOf(
+                            ProviderType.OPENROUTER,
+                            ProviderType.XKIRO
+                        )
+                        val otherProviders = ProviderType.entries.filter { it !in officialClis && it !in apiProviders }
 
                         // Section 1: Registre Officiel des 6 CLI
                         officialClis.forEach { provider ->
@@ -362,6 +366,89 @@ fun BotEditorScreen(
                             }
                         }
 
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = "Fournisseurs IA & APIs Cloud (Connectés)",
+                            style = Type.caption.semibold,
+                            color = Palette.accent
+                        )
+
+                        // Section 2: Fournisseurs IA Connectés (OpenRouter & xKIRO)
+                        apiProviders.forEach { provider ->
+                            val isSelected = state.provider == provider
+                            val (badgeText, badgeColor) = when (provider) {
+                                ProviderType.OPENROUTER -> "Connecté (Clé active · Modèles Free)" to Palette.emeraldAccent
+                                ProviderType.XKIRO -> "Connecté (Clé active · Qwen3 Coder Plus 1M)" to Palette.emeraldAccent
+                                else -> "Connecté" to Palette.emeraldAccent
+                            }
+
+                            val itemShape = RoundedRectangle(10.dp)
+                            val radioShape = Capsule()
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(if (isSelected) Palette.bubbleUser.copy(alpha = 0.5f) else Color.Transparent, itemShape)
+                                    .border(
+                                        width = if (isSelected) 1.dp else 0.5.dp,
+                                        color = if (isSelected) Palette.emeraldAccent.copy(alpha = 0.7f) else Palette.glassBorder,
+                                        shape = itemShape
+                                    )
+                                    .clip(itemShape)
+                                    .clickable { viewModel.onProviderChanged(provider) }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .border(
+                                            width = if (isSelected) 2.dp else 1.5.dp,
+                                            color = if (isSelected) Palette.emeraldAccent else Palette.tertiary,
+                                            shape = radioShape
+                                        )
+                                        .clip(radioShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSelected) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(Capsule())
+                                                .background(Palette.emeraldAccent)
+                                        )
+                                    }
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = provider.displayName,
+                                            style = Type.body.semibold,
+                                            color = if (isSelected) Palette.text else Palette.secondary
+                                        )
+                                        Text(
+                                            text = badgeText,
+                                            style = Type.system(9f).semibold,
+                                            color = badgeColor
+                                        )
+                                    }
+                                    Text(
+                                        text = "Défaut : ${provider.defaultModel}",
+                                        style = Type.caption,
+                                        color = Palette.tertiary
+                                    )
+                                }
+
+                                if (isSelected) {
+                                    Symbol("checkmark", size = 15.dp, tint = Palette.emeraldAccent)
+                                }
+                            }
+                        }
+
                         Spacer(Modifier.height(4.dp))
                         Text(
                             text = "Autres CLI détectées",
@@ -369,7 +456,7 @@ fun BotEditorScreen(
                             color = Palette.secondary
                         )
 
-                        // Section 2: Autres CLI
+                        // Section 3: Autres CLI
                         otherProviders.forEach { provider ->
                             val isSelected = state.provider == provider
                             val badgeText = when (provider) {

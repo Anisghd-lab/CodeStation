@@ -339,6 +339,36 @@ class BotRepositoryImpl(
                 status = BotStatus.IDLE,
                 lastMessage = "Prêt. Freebuff CLI (0.2.35) opérationnel.",
                 instructions = "Tu es un assistant d'ingénierie logicielle autonome Freebuff."
+            ),
+            Bot(
+                id = "bot-openrouter",
+                name = "OpenRouter",
+                description = "Agent d'ingénierie logicielle propulsé par OpenRouter (Liquid LFM / Nemotron)",
+                avatarGlyph = "hexagon",
+                avatarColorHex = "#6366F1",
+                provider = ProviderType.OPENROUTER,
+                model = "liquid/lfm-2.5-2.6b:free",
+                isFastMode = true,
+                isLead = false,
+                isPinned = true,
+                status = BotStatus.IDLE,
+                lastMessage = "Prêt. API OpenRouter connectée et opérationnelle (clé active).",
+                instructions = "Tu es un agent d'ingénierie logicielle expert propulsé par OpenRouter."
+            ),
+            Bot(
+                id = "bot-xkiro",
+                name = "xKIRO Qwen Coder",
+                description = "Agent de codage avancé xKIRO (Qwen3 Coder Plus avec fenêtre de 1M tokens)",
+                avatarGlyph = "diamond",
+                avatarColorHex = "#06B6D4",
+                provider = ProviderType.XKIRO,
+                model = "qwen/qwen3-coder-plus:free",
+                isFastMode = true,
+                isLead = false,
+                isPinned = true,
+                status = BotStatus.IDLE,
+                lastMessage = "Prêt. API xKIRO connectée (Qwen3 Coder Plus 1M tokens opérationnel).",
+                instructions = "Tu es un agent d'architecture et de codage haute performance propulsé par xKIRO."
             )
         )
     }

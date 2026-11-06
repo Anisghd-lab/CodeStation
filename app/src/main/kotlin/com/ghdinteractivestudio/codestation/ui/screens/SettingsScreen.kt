@@ -172,6 +172,44 @@ fun SettingsScreen(
                 }
             }
 
+            // Section 1.7: Fournisseurs IA & APIs Cloud Connectés
+            CardSection(
+                title = "Fournisseurs IA & APIs d'Inférence",
+                footer = "Clés API configurées localement dans ~/.secrets avec chiffrement et accès aux modèles gratuits certifiés."
+            ) {
+                // OpenRouter
+                row {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Symbol("cloud.fill", size = 20.dp, tint = Palette.accent)
+                        Column(Modifier.weight(1f)) {
+                            Text("OpenRouter API", style = Type.body.semibold, color = Palette.text)
+                            Text("Connecté · Clé active · 15 modèles gratuits disponibles", style = Type.footnote, color = Palette.emeraldAccent)
+                        }
+                        Symbol("checkmark.circle.fill", size = 18.dp, tint = Palette.emeraldAccent)
+                    }
+                }
+
+                // xKIRO
+                row {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Symbol("bolt.horizontal.fill", size = 20.dp, tint = Palette.emeraldAccent)
+                        Column(Modifier.weight(1f)) {
+                            Text("xKIRO / Okiro API", style = Type.body.semibold, color = Palette.text)
+                            Text("Connecté · Clé active · Qwen3 Coder Plus (1M ctx)", style = Type.footnote, color = Palette.emeraldAccent)
+                        }
+                        Symbol("checkmark.circle.fill", size = 18.dp, tint = Palette.emeraldAccent)
+                    }
+                }
+            }
+
             // Section 2: Préférences & Discussion (Regroupées pour éliminer le vide artificiel)
             CardSection(
                 title = "Préférences générales"

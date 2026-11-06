@@ -1,0 +1,8 @@
+{
+  "status": "READY",
+  "updated_at": 1793956140000,
+  "bot_id": "bot-openrouter",
+  "engine": "openrouter",
+  "model": "liquid/lfm-2.5-2.6b:free",
+  "run_script": "/root/CodeStation/environments/bot-openrouter/openrouter_acp_bridge.py"
+}

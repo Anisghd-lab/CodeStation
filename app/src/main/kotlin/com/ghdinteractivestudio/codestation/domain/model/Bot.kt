@@ -14,6 +14,8 @@ enum class ProviderType(val displayName: String, val defaultModel: String, val b
     ANTIGRAVITY("Google Antigravity", "gemini-3.8-flash-medium", "antigravity"),
     OPENCODE("OpenCode", "opencode/glm-5.3-flash-free", "opencode"),
     CODEBUDDY("CodeBuddy Code", "Hy3", "codebuddy"),
+    OPENROUTER("OpenRouter", "liquid/lfm-2.5-2.6b:free", "openrouter"),
+    XKIRO("xKIRO / Okiro", "qwen/qwen3-coder-plus:free", "xkiro"),
     CLAUDE_CODE("Claude Code", "claude-3-7-sonnet", "claude"),
     OPENAI_CODEX("OpenAI Codex", "gpt-4o", "codex"),
     GEMINI_CLI("Google Gemini CLI", "gemini-2.0-flash", "gemini"),
@@ -40,6 +42,20 @@ enum class ProviderType(val displayName: String, val defaultModel: String, val b
                 ModelInfo("gpt-6.1-sol", "GPT-6.1 Sol", isFree = false, isVerified = true),
                 ModelInfo("gemini-3.8-flash", "Gemini 3.8 Flash", isFree = false, isVerified = true),
                 ModelInfo("glm-5.3-flash", "GLM-5.3 Flash", isFree = true, isVerified = true)
+            )
+            OPENROUTER -> listOf(
+                ModelInfo("liquid/lfm-2.5-2.6b:free", "LFM 2.5 2.6B (Free)", isFree = true, isDefault = true, isVerified = true),
+                ModelInfo("nvidia/nemotron-3.5-lightning:free", "Nemotron 3.5 Lightning (Free)", isFree = true, isVerified = true),
+                ModelInfo("recursive/flint-v1.0:free", "Flint v1.0 (Free)", isFree = true, isVerified = true),
+                ModelInfo("dots-studio/dots-3-note-preview:free", "Dots 3 Note Preview (Free)", isFree = true, isVerified = true),
+                ModelInfo("xingchen-agi/xing4.0-29b-a4b:free", "Xing 4.0 29B (Free)", isFree = true, isVerified = true)
+            )
+            XKIRO -> listOf(
+                ModelInfo("qwen/qwen3-coder-plus:free", "Qwen3 Coder Plus (Free 1M ctx)", isFree = true, isDefault = true, isVerified = true),
+                ModelInfo("qwen/qwen3.6-27b:free", "Qwen3.6 27B (Free)", isFree = true, isVerified = true),
+                ModelInfo("qwen/qwen3.5-plus:free", "Qwen3.5 Plus (Free 1M ctx)", isFree = true, isVerified = true),
+                ModelInfo("qwen/qwen3.6-max-preview:free", "Qwen3.6 Max Preview (Free)", isFree = true, isVerified = true),
+                ModelInfo("qwen/qwen3.5-flash:free", "Qwen3.5 Flash (Free)", isFree = true, isVerified = true)
             )
             OPENCODE -> listOf(
                 ModelInfo("opencode/glm-5.3-flash-free", "GLM-5.3-Flash Free", isFree = true, isDefault = true),
