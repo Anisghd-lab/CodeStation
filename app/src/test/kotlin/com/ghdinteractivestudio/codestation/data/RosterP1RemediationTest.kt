@@ -158,11 +158,11 @@ class RosterP1RemediationTest {
         // Collecter le premier flux émis
         val bots = botRepository.getBotsStream().first()
 
-        // Vérification P1-02 : le seed automatique doit injecter exactement 6 bots
-        assertEquals(6, bots.size)
-        assertEquals(6, insertedBots.size)
+        // Vérification : le seed automatique doit injecter 8 bots (6 CLI réelles + 2 providers IA connectés)
+        assertEquals(8, bots.size)
+        assertEquals(8, insertedBots.size)
 
-        // Vérifier la présence des 6 CLI réelles configurées
+        // Vérifier la présence des CLI et providers configurés
         val botIds = bots.map { it.id }.toSet()
         assertTrue(botIds.contains("bot-antigravity"))
         assertTrue(botIds.contains("bot-opencode-glm"))
@@ -170,6 +170,8 @@ class RosterP1RemediationTest {
         assertTrue(botIds.contains("bot-omnirush"))
         assertTrue(botIds.contains("bot-clixad"))
         assertTrue(botIds.contains("bot-freebuff"))
+        assertTrue(botIds.contains("bot-openrouter"))
+        assertTrue(botIds.contains("bot-xkiro"))
     }
 
     @Test
@@ -239,9 +241,9 @@ class RosterP1RemediationTest {
         assertTrue(result.isSuccess)
 
         val bots = result.getOrThrow()
-        // Vérification P1-02 : refreshBots ne retourne plus emptyList()
+        // Vérification : refreshBots retourne la liste complète des 8 bots
         assertFalse("refreshBots ne doit JAMAIS retourner une liste vide", bots.isEmpty())
-        assertEquals(6, bots.size)
+        assertEquals(8, bots.size)
 
         // Le bot préexistant modifié n'a pas été écrasé
         val antigravity = bots.first { it.id == "bot-antigravity" }
