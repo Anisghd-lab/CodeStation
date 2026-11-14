@@ -175,7 +175,7 @@ pub const HARNESSES: &[Harness] = &[
             windows: "powershell -NoProfile -ExecutionPolicy Bypass -Command \"irm https://code.kimi.com/kimi-code/install.ps1 | iex\"",
         }),
         login: Some("{bin} login"),
-        signed_in: None,
+        signed_in: Some(SignInCheck { args: "doctor", ok: exit_ok }),
     },
     Harness {
         id: "droid",
@@ -420,7 +420,7 @@ pub const HARNESSES: &[Harness] = &[
     Harness {
         id: "openrouter",
         name: "OpenRouter",
-        bins: &["python3"],
+        bins: &["openrouter"],
         local: Some("python3 /root/CodeStation/environments/bot-openrouter/openrouter_acp_bridge.py"),
         registry: Some("openrouter-acp"),
         setup: "OpenRouter API configured in ~/.secrets/openrouter-key.",
@@ -431,7 +431,7 @@ pub const HARNESSES: &[Harness] = &[
     Harness {
         id: "xkiro",
         name: "xKIRO",
-        bins: &["python3"],
+        bins: &["xkiro"],
         local: Some("python3 /root/CodeStation/environments/bot-xkiro/xkiro_acp_bridge.py"),
         registry: Some("xkiro-acp"),
         setup: "xKIRO API configured in ~/.secrets/xkiro-key.",

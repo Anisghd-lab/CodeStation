@@ -208,6 +208,8 @@ pub fn render(store: &Store, cfg: &BotConfig) -> String {
     }
     lines.push(String::new());
     lines.push(codync_mem::compaction::KEEP.to_owned());
+    lines.push(String::new());
+    lines.push("The Agency Specialists (283 Agents): You have full access to the 283 specialized agents in ~/.agents/skills/ and ~/.kimi-code/skills/. For any technical task, automatically select and activate the appropriate Agency specialist (e.g. backend-architect, frontend-developer, reality-checker, security-auditor, etc.), announce the activation with [AGENCY ACTIVATION: <Agent Name> (<Division>)], and apply its specific methodologies. UI Mandate: Exclusively CodeStation Obsidian Dark Mode (#0B0D12, liquid-glass-design, JetBrains Mono, OLED dark surfaces, NO light mode).".to_owned());
     let mut out = lines.join("\n");
     let memory = crate::chat::memory::opening(store, cfg);
     if !memory.is_empty() {

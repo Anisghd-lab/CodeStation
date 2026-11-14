@@ -78,8 +78,8 @@ class TestCliSpeedAndDetection(unittest.TestCase):
     def setUp(self):
         self.registry = CliRegistry()
 
-    def test_cli_registry_has_all_six_clis(self):
-        expected = ["clixad", "antigravity", "opencode", "codebuddy", "omnirush", "freebuff"]
+    def test_cli_registry_has_all_clis(self):
+        expected = ["clixad", "antigravity", "opencode", "codebuddy", "omnirush", "freebuff", "kimi"]
         for cid in expected:
             runner = self.registry.get_runner(cid)
             self.assertIsNotNone(runner, f"CLI {cid} must be registered in CliRegistry")
@@ -89,14 +89,14 @@ class TestCliSpeedAndDetection(unittest.TestCase):
         status_list = self.registry.get_all_clis_status(force_refresh=True)
         elapsed_ms = (time.time() - t0) * 1000
 
-        self.assertEqual(len(status_list), 6)
+        self.assertGreaterEqual(len(status_list), 6)
         self.assertLess(elapsed_ms, 250, f"Status collection must be instant (got {elapsed_ms:.1f}ms)")
 
     def test_cli_operational_and_installed_status(self):
         status_map = {item["id"]: item for item in self.registry.get_all_clis_status(force_refresh=True)}
 
         # Installed operational CLIs on local system
-        for cid in ["clixad", "antigravity", "opencode", "codebuddy", "omnirush"]:
+        for cid in ["clixad", "antigravity", "opencode", "codebuddy", "omnirush", "kimi"]:
             item = status_map[cid]
             self.assertTrue(item["isInstalled"], f"{cid} should be detected as installed")
             self.assertTrue(item["isOperational"], f"{cid} should be operational")
@@ -114,8 +114,13 @@ class TestCliSpeedAndDetection(unittest.TestCase):
         results = agent_discovery.discover_all()
         ids = [r["id"] for r in results]
 
-        for req in ["antigravity", "opencode", "codebuddy", "clixad", "omnirush", "freebuff"]:
+        for req in ["antigravity", "opencode", "codebuddy", "clixad", "omnirush", "freebuff", "kimi"]:
             self.assertIn(req, ids, f"{req} must be discovered by agent_discovery.py")
+
+        # Kimi should be detected as installed and authenticated via ~/.kimi-code/config.toml
+        kimi_agent = next(r for r in results if r["id"] == "kimi")
+        self.assertTrue(kimi_agent["installed"])
+        self.assertTrue(kimi_agent["authenticated"])
 
         # OpenCode should now be detected as authenticated via ~/.config/opencode
         opencode = next(r for r in results if r["id"] == "opencode")

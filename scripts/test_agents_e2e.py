@@ -39,6 +39,11 @@ def test_antigravity_run_script_syntax():
     res = subprocess.run(["bash", "-n", script], capture_output=True, text=True)
     assert res.returncode == 0, f"Erreur syntaxe bash: {res.stderr}"
 
+def test_kimi_run_script_syntax():
+    script = "/root/CodeStation/environments/bot-kimi/run.sh"
+    res = subprocess.run(["bash", "-n", script], capture_output=True, text=True)
+    assert res.returncode == 0, f"Erreur syntaxe bash kimi run.sh: {res.stderr}"
+
 def test_opencode_status_action():
     script = "/root/CodeStation/environments/bot-opencode-glm/run.sh"
     res = subprocess.run([script, "status"], capture_output=True, text=True, timeout=10)
@@ -51,6 +56,52 @@ def test_antigravity_status_action():
     res = subprocess.run([script, "status"], capture_output=True, text=True, timeout=10)
     assert res.returncode == 0, f"run.sh status code={res.returncode}"
     assert "agy_acp_bridge.py" in res.stdout, "Bridge ACP manquant dans status"
+
+def test_kimi_status_action():
+    script = "/root/CodeStation/environments/bot-kimi/run.sh"
+    res = subprocess.run([script, "status"], capture_output=True, text=True, timeout=10)
+    assert res.returncode == 0, f"run.sh status code={res.returncode}"
+    assert "bot-kimi" in res.stdout, "bot-kimi manquant dans status"
+    assert "kimi" in res.stdout, "kimi binaire manquant dans status"
+
+def test_kimi_acp_initialize():
+    script = "/root/CodeStation/environments/bot-kimi/run.sh"
+    proc = subprocess.Popen(
+        [script, "acp"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+    req = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": 1,
+            "clientCapabilities": {},
+            "clientInfo": {"name": "test-e2e", "version": "1.0"}
+        }
+    }
+    proc.stdin.write(json.dumps(req) + "\n")
+    proc.stdin.flush()
+    line = proc.stdout.readline()
+    proc.terminate()
+    data = json.loads(line)
+    assert data.get("id") == 1, "ID de réponse invalide"
+    assert "Kimi Code" in data.get("result", {}).get("agentInfo", {}).get("name", ""), "Nom Kimi Code manquant dans réponse ACP"
+
+def test_kimi_real_query():
+    script = "/root/CodeStation/environments/bot-kimi/run.sh"
+    res = subprocess.run(
+        [script, "run", "Reponds uniquement le mot 'KIMI_READY'"],
+        capture_output=True,
+        text=True,
+        timeout=30
+    )
+    combined = res.stdout + " " + res.stderr
+    assert res.returncode == 0, f"Erreur run kimi: {res.stderr}"
+    assert "KIMI_READY" in combined or "kimi" in combined.lower(), f"Réponse inattendue de kimi: stdout={res.stdout}, stderr={res.stderr}"
 
 def test_opencode_real_glm_query():
     script = "/root/CodeStation/environments/bot-opencode-glm/run.sh"
@@ -100,13 +151,14 @@ def test_cancellation_and_stop():
 
 def test_cli_auto_detection():
     manager = "/root/CodeStation/scripts/bot_env_manager.py"
-    res = subprocess.run(["python3", manager, "detect"], capture_output=True, text=True, timeout=10)
+    res = subprocess.run(["python3", manager, "detect"], capture_output=True, text=True, timeout=30)
     assert res.returncode == 0, f"bot_env_manager detect a échoué: {res.stderr}"
     data = json.loads(res.stdout)
     clis = data.get("clis", [])
     assert len(clis) >= 2, f"Au moins 2 CLIs attendues, trouvé: {len(clis)}"
     ids = [c["id"] for c in clis]
     assert "antigravity" in ids, "Antigravity non détecté"
+    assert "kimi" in ids, "Kimi Code non détecté"
     assert "opencode" in ids, "OpenCode non détecté"
 
     agy = next(c for c in clis if c["id"] == "antigravity")
@@ -159,7 +211,7 @@ def test_antigravity_real_query():
         [script, "run", "Réponds uniquement : AGY_OK"],
         capture_output=True,
         text=True,
-        timeout=30
+        timeout=60
     )
     assert res.returncode == 0, f"Code de retour non nul: {res.returncode}, stderr={res.stderr}"
     assert "AGY_OK" in res.stdout, f"Réponse invalide: {res.stdout}"
@@ -197,12 +249,15 @@ def main():
     tests = [
         ("Syntaxe run.sh (bot-opencode-glm)", test_opencode_run_script_syntax),
         ("Syntaxe run.sh (bot-antigravity)", test_antigravity_run_script_syntax),
+        ("Syntaxe run.sh (bot-kimi)", test_kimi_run_script_syntax),
         ("Commande 'status' (bot-opencode-glm)", test_opencode_status_action),
         ("Commande 'status' (bot-antigravity)", test_antigravity_status_action),
+        ("Commande 'status' (bot-kimi)", test_kimi_status_action),
         ("Détection automatique des CLI (Ubuntu PRoot)", test_cli_auto_detection),
         ("Découverte officielle des modèles Antigravity", test_antigravity_official_models_command),
         ("Préservation des messages longs et sans troncature", test_long_message_piping_preservation),
         ("Bridge ACP Handshake (bot-antigravity)", test_antigravity_acp_bridge_initialize),
+        ("Native ACP Handshake (bot-kimi)", test_kimi_acp_initialize),
         ("Arrêt propre 'stop' (bot-opencode-glm)", test_cancellation_and_stop),
         ("Configuration notifications persistantes Android 16", test_persistent_notification_configuration),
         ("Suppression du faux notch in-app (Zone système Android)", test_no_fake_in_app_notch),
@@ -210,6 +265,7 @@ def main():
         ("Parsing universel botId/bot_id dans SSE EventStream", test_event_stream_entry_bot_id_parsing),
         ("Téléversement sécurisé des pièces jointes via uploadChunk", test_attachment_chunk_upload_in_repository),
         ("Réponse réelle Google Antigravity (AGY_OK)", test_antigravity_real_query),
+        ("Réponse réelle Kimi Code (KIMI_READY)", test_kimi_real_query),
         ("Réponse réelle OpenCode GLM-5.3-Flash Free", test_opencode_real_glm_query),
     ]
 

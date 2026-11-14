@@ -653,14 +653,14 @@ run_health_checks() {
     fi
 
     # 5. CLI Tools
-    echo -n "• Vérification Outils CLI PRoot (omnirush, clixad, agy, opencode, codebuddy, freebuff)... "
+    echo -n "• Vérification Outils CLI PRoot (omnirush, clixad, agy, opencode, codebuddy, freebuff, kimi)... "
     local cli_found=0
-    for cmd in omnirush clixad agy opencode codebuddy freebuff; do
+    for cmd in omnirush clixad agy opencode codebuddy freebuff kimi; do
         if command -v "$cmd" >/dev/null 2>&1; then
             cli_found=$((cli_found + 1))
         fi
     done
-    echo -e "\033[0;32m$cli_found/6 CLI opérationnels détectés\033[0m"
+    echo -e "\033[0;32m$cli_found/7 CLI opérationnels détectés\033[0m"
 
     if [ "$all_ok" -eq 1 ]; then
         echo -e "\n\033[0;32m[✓] TOUS LES SERVICES CODESTATION SONT PARFAITEMENT SAINS ET FONCTIONNELS !\033[0m"
@@ -721,7 +721,7 @@ usage() {
     echo "  pair                                : Générer le lien d'appairage direct avec l'app Android"
     echo "  token                               : Afficher le jeton d'authentification (~/.codestation/token)"
     echo "  info                                : Afficher les identifiants et informations réseau de l'hôte"
-    echo "  cli-status                          : État détaillé des 6 CLI installées (omnirush, clixad, agy, opencode, codebuddy, freebuff)"
+    echo "  cli-status                          : État détaillé des 7 CLI installées (omnirush, clixad, agy, opencode, codebuddy, freebuff, kimi)"
     echo "  check-agents                        : Alias vers cli-status"
     exit 1
 }

@@ -78,7 +78,7 @@ case "$ACTION" in
             echo "[ERREUR] Binaire agy introuvable." >&2
             exit 1
         fi
-        MODEL_ARGS=()
+        MODEL_ARGS=("--model" "gemini-3.8-flash-medium")
         if [ "$1" = "--model" ] || [ "$1" = "-m" ]; then
             MODEL_ARGS=("--model" "$2")
             shift 2 2>/dev/null || true

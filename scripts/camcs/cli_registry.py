@@ -13,7 +13,8 @@ from .runners import (
     OpenCodeRunner,
     CodeBuddyRunner,
     OmniRushRunner,
-    FreebuffRunner
+    FreebuffRunner,
+    KimiRunner
 )
 
 class CliRegistry:
@@ -24,7 +25,8 @@ class CliRegistry:
             "opencode": OpenCodeRunner(),
             "codebuddy": CodeBuddyRunner(),
             "omnirush": OmniRushRunner(),
-            "freebuff": FreebuffRunner()
+            "freebuff": FreebuffRunner(),
+            "kimi": KimiRunner()
         }
         self._health_cache: Dict[str, Tuple[bool, str, str, float]] = {}
         self._cache_ttl = 30.0  # seconds
@@ -43,6 +45,8 @@ class CliRegistry:
             return self._runners.get("omnirush")
         elif normalized in ("freebuff",):
             return self._runners.get("freebuff")
+        elif normalized in ("kimi", "kimi-code", "kimi-cli"):
+            return self._runners.get("kimi")
         return self._runners.get(normalized, None)
 
     def check_cli_health(self, cli_id: str, force_refresh: bool = False) -> Tuple[bool, str, str]:
@@ -62,7 +66,7 @@ class CliRegistry:
 
     def get_all_clis_status(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
         results = []
-        official_order = ["clixad", "antigravity", "opencode", "codebuddy", "omnirush", "freebuff"]
+        official_order = ["clixad", "antigravity", "opencode", "codebuddy", "omnirush", "freebuff", "kimi"]
 
         for cid in official_order:
             t_check = time.time()
@@ -86,7 +90,8 @@ class CliRegistry:
                 "opencode": ["xkiro/qwen3-coder-plus", "opencode/glm-5.3-flash-free"],
                 "codebuddy": ["Hy3", "deepseek-v4.1-flash", "kimi-k3"],
                 "omnirush": ["gpt-6-astra", "claude-opus-5-5"],
-                "freebuff": ["freebuff/free-auto"]
+                "freebuff": ["freebuff/free-auto"],
+                "kimi": ["openrouter/flint-v1", "nvidia/nemotron-3-ultra", "kimi-latest"]
             }
 
             capabilities_map = {
@@ -95,7 +100,8 @@ class CliRegistry:
                 "opencode": ["coding", "acp_stdio", "autonomous_edits", "multi_model"],
                 "codebuddy": ["full_project_edits", "headless_print", "fast_coding", "unit_tests"],
                 "omnirush": ["high_complexity_coding", "one_shot_prompts", "doctor_audit"],
-                "freebuff": ["tui_interactive_coding", "tree_sitter_ast"]
+                "freebuff": ["tui_interactive_coding", "tree_sitter_ast"],
+                "kimi": ["agent_client_protocol", "prompt_mode", "autonomous_coding", "research", "documentation"]
             }
 
             results.append({
@@ -138,12 +144,13 @@ class CliRegistry:
 
         # Routing priorities based on task type
         task_routing_priority = {
-            "architecture": ["antigravity", "codebuddy", "clixad", "opencode"],
-            "coding": ["codebuddy", "opencode", "antigravity", "clixad"],
-            "backend": ["codebuddy", "antigravity", "clixad", "opencode"],
-            "qa": ["clixad", "codebuddy", "antigravity", "opencode"],
-            "verification": ["antigravity", "codebuddy", "clixad", "opencode"],
-            "documentation": ["clixad", "antigravity", "codebuddy", "opencode"]
+            "architecture": ["antigravity", "kimi", "codebuddy", "clixad", "opencode"],
+            "coding": ["codebuddy", "kimi", "opencode", "antigravity", "clixad"],
+            "backend": ["codebuddy", "antigravity", "kimi", "clixad", "opencode"],
+            "qa": ["clixad", "codebuddy", "antigravity", "kimi", "opencode"],
+            "verification": ["antigravity", "kimi", "codebuddy", "clixad", "opencode"],
+            "documentation": ["clixad", "kimi", "antigravity", "codebuddy", "opencode"],
+            "research": ["kimi", "clixad", "antigravity", "opencode"]
         }
 
         priorities = task_routing_priority.get(task_type.lower(), ["codebuddy", "antigravity", "clixad", "opencode"])

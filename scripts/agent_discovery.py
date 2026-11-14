@@ -77,6 +77,14 @@ CANDIDATES = [
         "custom_paths": ["/usr/bin/freebuff", "/usr/local/bin/freebuff", "/root/.config/manicode/freebuff"],
         "integration": "Interactive TUI (Curses) / Tree-sitter AST",
         "doc_hint": "Install Freebuff and run freebuff login."
+    },
+    {
+        "id": "kimi",
+        "name": "Kimi Code",
+        "bins": ["kimi"],
+        "custom_paths": ["/root/.kimi-code/bin/kimi", "/usr/local/bin/kimi", "/root/.local/bin/kimi"],
+        "integration": "Agent Client Protocol (acp) stdio / Prompt (-p)",
+        "doc_hint": "Install Kimi Code and run kimi login."
     }
 ]
 
@@ -157,6 +165,15 @@ def check_agent(candidate):
                 authenticated = False
                 available = False
                 unavailability_reason = "Identifiants Freebuff manquants (~/.config/manicode/credentials.json)"
+        elif candidate["id"] == "kimi":
+            kimi_cfg = os.path.expanduser("~/.kimi-code/config.toml")
+            if os.path.isfile(kimi_cfg) and os.path.getsize(kimi_cfg) > 10:
+                authenticated = True
+                available = True
+            else:
+                authenticated = False
+                available = False
+                unavailability_reason = "Configuration Kimi manquante (~/.kimi-code/config.toml)"
         elif candidate["id"] == "codex":
             codex_auth = os.path.expanduser("~/.codex/auth.json")
             if os.path.exists(codex_auth) and os.path.getsize(codex_auth) > 5:

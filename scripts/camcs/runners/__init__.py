@@ -5,6 +5,7 @@ from .opencode_runner import OpenCodeRunner
 from .codebuddy_runner import CodeBuddyRunner
 from .omnirush_runner import OmniRushRunner
 from .freebuff_runner import FreebuffRunner
+from .kimi_runner import KimiRunner
 
 __all__ = [
     "BaseCliRunner",
@@ -15,5 +16,6 @@ __all__ = [
     "OpenCodeRunner",
     "CodeBuddyRunner",
     "OmniRushRunner",
-    "FreebuffRunner"
+    "FreebuffRunner",
+    "KimiRunner"
 ]

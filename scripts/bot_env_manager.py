@@ -214,6 +214,33 @@ exec {PROOT_BIN} \\
             if not model:
                 model = "Hy3"
 
+        elif engine in ["kimi", "kimi-code"]:
+            src_kimi = Path("/root/.kimi-code/bin/kimi")
+            if not src_kimi.exists():
+                src_kimi = Path("/usr/local/bin/kimi")
+            dst_kimi = rootfs / "usr" / "local" / "bin" / "kimi"
+            if src_kimi.exists():
+                shutil.copy2(src_kimi, dst_kimi)
+                os.chmod(dst_kimi, 0o755)
+
+            # Copy credentials & config (~/.kimi-code)
+            src_cfg = Path("/root/.kimi-code")
+            if src_cfg.exists():
+                dst_cfg = rootfs / "root" / ".kimi-code"
+                dst_cfg.mkdir(parents=True, exist_ok=True)
+                for f in src_cfg.glob("*.toml*"):
+                    try:
+                        shutil.copy2(f, dst_cfg / f.name)
+                    except Exception:
+                        pass
+
+            env_file = rootfs / "root" / ".bashrc"
+            with open(env_file, "w", encoding="utf-8") as f:
+                f.write("export PATH=/usr/local/bin:/usr/bin:/bin:$PATH\n")
+
+            if not model:
+                model = "openrouter/flint-v1"
+
         # 4. Create run.sh wrapper for PRoot
         run_script = env_dir / "run.sh"
         with open(run_script, "w", encoding="utf-8") as f:
@@ -358,6 +385,16 @@ exec {PROOT_BIN} \\
                 "auth_paths": ["/root/.freebuff/project-id", "/root/.freebuff"],
                 "default_model": "freebuff/free-auto",
                 "environment": "bot-freebuff",
+                "version_args": ["--version"]
+            },
+            {
+                "id": "kimi",
+                "name": "Kimi Code",
+                "binary": "kimi",
+                "paths": ["/root/.kimi-code/bin/kimi", "/usr/local/bin/kimi", "/root/.local/bin/kimi"],
+                "auth_paths": ["/root/.kimi-code/config.toml", "/root/.kimi-code"],
+                "default_model": "openrouter/flint-v1",
+                "environment": "bot-kimi",
                 "version_args": ["--version"]
             }
         ]
