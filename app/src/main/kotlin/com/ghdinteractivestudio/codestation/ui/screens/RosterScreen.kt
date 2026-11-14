@@ -270,6 +270,7 @@ fun RosterScreen(
                     selection = selectedTab,
                     tabs = listOf(
                         TabItem("bots", "Bots", "bubble.left.and.bubble.right.fill", iconSize = 24.dp),
+                        TabItem("agency", "Agents 283", "person.3.fill", iconSize = 22.dp),
                         TabItem("state", "État", "rectangle.stack.fill", iconSize = 22.dp)
                     ),
                     select = { selectedTab = it }
@@ -282,6 +283,10 @@ fun RosterScreen(
                 onUsageLimitsClick = { },
                 bottomInset = 96.dp,
                 isHostConnected = isConnected
+            )
+        } else if (selectedTab == "agency") {
+            AgencyAgentsScreen(
+                bottomInset = 96.dp
             )
         } else {
             val allBots = buildList {

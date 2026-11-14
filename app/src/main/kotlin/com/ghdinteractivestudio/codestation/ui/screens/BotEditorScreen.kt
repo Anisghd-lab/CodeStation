@@ -275,6 +275,7 @@ fun BotEditorScreen(
                             ProviderType.ANTIGRAVITY,
                             ProviderType.OPENCODE,
                             ProviderType.CODEBUDDY,
+                            ProviderType.KIMI,
                             ProviderType.CLIXAD,
                             ProviderType.FREEBUFF,
                             ProviderType.OMNIRUSH
@@ -285,13 +286,14 @@ fun BotEditorScreen(
                         )
                         val otherProviders = ProviderType.entries.filter { it !in officialClis && it !in apiProviders }
 
-                        // Section 1: Registre Officiel des 6 CLI
+                        // Section 1: Registre Officiel des 7 CLI
                         officialClis.forEach { provider ->
                             val isSelected = state.provider == provider
                             val (badgeText, badgeColor) = when (provider) {
                                 ProviderType.ANTIGRAVITY -> "Opérationnel (Gemini 4 Argon / Claude 5.5)" to Palette.emeraldAccent
                                 ProviderType.OPENCODE -> "Opérationnel (GLM-5.3-Flash Free)" to Palette.emeraldAccent
                                 ProviderType.CODEBUDDY -> "Opérationnel (Hy3 Free)" to Palette.emeraldAccent
+                                ProviderType.KIMI -> "Opérationnel (Kimi Code 2.6.1 · Flint)" to Palette.emeraldAccent
                                 ProviderType.CLIXAD -> "Opérationnel (GPT-5 Nano)" to Palette.emeraldAccent
                                 ProviderType.FREEBUFF -> "Opérationnel (Free Auto - TUI)" to Palette.accent
                                 ProviderType.OMNIRUSH -> "Configuré (GPT-6 Astra - Standby Cloud)" to Palette.warning

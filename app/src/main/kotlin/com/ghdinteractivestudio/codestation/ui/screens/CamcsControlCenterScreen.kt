@@ -856,7 +856,8 @@ fun CamcsControlCenterScreen(
                 Pair("Orchestration & Dispatching", 0),
                 Pair("Journal Live (${liveEvents.size})", 1),
                 Pair("Providers, CLIs & Services (${providers.size + clis.size + externalServices.size})", 2),
-                Pair("Résultats & Livrables (${deliverables.size})", 3)
+                Pair("Résultats & Livrables (${deliverables.size})", 3),
+                Pair("Agency Agents (283)", 4)
             )
 
             tabs.forEach { (label, idx) ->
@@ -1015,6 +1016,12 @@ fun CamcsControlCenterScreen(
                         gitDiffText = gitDiffText,
                         gitStatus = gitStatus,
                         onInspectDeliverable = { selectedDeliverableForView = it }
+                    )
+                }
+                4 -> {
+                    // TAB 5: The Agency 283 Specialists
+                    AgencyAgentsScreen(
+                        bottomInset = 24.dp
                     )
                 }
             }

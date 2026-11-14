@@ -14,6 +14,7 @@ enum class ProviderType(val displayName: String, val defaultModel: String, val b
     ANTIGRAVITY("Google Antigravity", "gemini-3.8-flash-medium", "antigravity"),
     OPENCODE("OpenCode", "opencode/glm-5.3-flash-free", "opencode"),
     CODEBUDDY("CodeBuddy Code", "Hy3", "codebuddy"),
+    KIMI("Kimi Code", "openrouter/flint-v1", "kimi"),
     OPENROUTER("OpenRouter", "liquid/lfm-2.5-2.6b:free", "openrouter"),
     XKIRO("xKIRO / Okiro", "qwen/qwen3-coder-plus:free", "xkiro"),
     CLAUDE_CODE("Claude Code", "claude-3-7-sonnet", "claude"),
@@ -42,6 +43,11 @@ enum class ProviderType(val displayName: String, val defaultModel: String, val b
                 ModelInfo("gpt-6.1-sol", "GPT-6.1 Sol", isFree = false, isVerified = true),
                 ModelInfo("gemini-3.8-flash", "Gemini 3.8 Flash", isFree = false, isVerified = true),
                 ModelInfo("glm-5.3-flash", "GLM-5.3 Flash", isFree = true, isVerified = true)
+            )
+            KIMI -> listOf(
+                ModelInfo("openrouter/flint-v1", "Flint v1.0 (Free)", isFree = true, isDefault = true, isVerified = true),
+                ModelInfo("nvidia/nemotron-3-ultra", "Nemotron 3 Ultra (Free)", isFree = true, isVerified = true),
+                ModelInfo("kimi-latest", "Kimi Latest", isFree = false, isVerified = true)
             )
             OPENROUTER -> listOf(
                 ModelInfo("liquid/lfm-2.5-2.6b:free", "LFM 2.5 2.6B (Free)", isFree = true, isDefault = true, isVerified = true),

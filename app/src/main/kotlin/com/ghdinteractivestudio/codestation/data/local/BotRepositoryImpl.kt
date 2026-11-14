@@ -296,6 +296,21 @@ class BotRepositoryImpl(
                 instructions = "Tu es un agent de codage CodeBuddy Code expert."
             ),
             Bot(
+                id = "bot-kimi",
+                name = "Kimi Code",
+                description = "Agent Kimi Code propulsé par la CLI kimi officielle (v2.6.1)",
+                avatarGlyph = "hexagon",
+                avatarColorHex = "#00D2FF",
+                provider = ProviderType.KIMI,
+                model = "openrouter/flint-v1",
+                isFastMode = true,
+                isLead = false,
+                isPinned = true,
+                status = BotStatus.IDLE,
+                lastMessage = "Prêt. Kimi Code CLI (v2.6.1) opérationnel.",
+                instructions = "Tu es un agent de développement Kimi Code expert doté des 283 compétences Agency Agents."
+            ),
+            Bot(
                 id = "bot-omnirush",
                 name = "OmniRush",
                 description = "Agent OmniRush propulsé par GPT-6 Astra",
