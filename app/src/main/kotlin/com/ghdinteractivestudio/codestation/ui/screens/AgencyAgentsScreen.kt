@@ -344,8 +344,8 @@ fun AgencyAgentsScreen(
             },
             confirmButton = {
                 PrimaryButton(
-                    text = "Copier la directive",
-                    onClick = {
+                    title = "Copier la directive",
+                    action = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         val clip = ClipData.newPlainText("Agency Activation", promptText)
                         clipboard.setPrimaryClip(clip)
@@ -356,8 +356,8 @@ fun AgencyAgentsScreen(
             },
             dismissButton = {
                 SecondaryButton(
-                    text = "Fermer",
-                    onClick = { selectedAgentForDetail = null }
+                    title = "Fermer",
+                    action = { selectedAgentForDetail = null }
                 )
             }
         )
