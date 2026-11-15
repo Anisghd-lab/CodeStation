@@ -747,42 +747,20 @@ fun ChatScreen(
                 }
             }
 
-            // Live reasoning thinking orb indicator with large monospace elapsed timer
+            // Live reasoning thinking orb indicator
             if (state.isBotWorking) {
                 item("thinking") {
-                    val minutes = state.generationElapsedSeconds / 60
-                    val seconds = state.generationElapsedSeconds % 60
-                    val timeFormatted = String.format(java.util.Locale.US, "%02d:%02d", minutes, seconds)
-
-                    Box(
-                        modifier = Modifier
-                            .padding(start = 16.dp, top = 8.dp, bottom = 4.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(Palette.bubbleAgent)
-                            .border(1.dp, Palette.border, RoundedCornerShape(18.dp))
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                    Row(
+                        Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            ThinkingOrb(size = 20.dp, color = Palette.accent)
-                            Column {
-                                Text(
-                                    text = timeFormatted,
-                                    style = Type.title2.bold.copy(
-                                        fontFamily = Type.monospaced,
-                                        fontFeatureSettings = "tnum"
-                                    ),
-                                    color = Palette.text
-                                )
-                                Text(
-                                    text = "Réflexion en cours…",
-                                    style = Type.caption,
-                                    color = Palette.secondary
-                                )
-                            }
-                        }
+                        ThinkingOrb(size = 18.dp, color = Palette.secondary)
+                        Text(
+                            text = "Réflexion en cours…",
+                            style = Type.caption,
+                            color = Palette.secondary
+                        )
                     }
                 }
             }

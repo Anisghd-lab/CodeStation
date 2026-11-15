@@ -112,8 +112,6 @@ class ChatViewModel(
     private var lastSentAttachments: List<PendingAttachment> = emptyList()
     private var lastSentMessageId: String? = null
     private var turnTimeoutJob: Job? = null
-    private var timerJob: Job? = null
-    private var turnStartNano: Long = 0L
     private var isSending = false
     private var turnStartTimeMs = 0L
     private var activeTurnStartTimeMs = 0L
@@ -135,21 +133,11 @@ class ChatViewModel(
     private val outgoingQueue = ConcurrentLinkedQueue<QueuedMessage>()
 
     private fun startTimer() {
-        timerJob?.cancel()
-        turnStartNano = System.nanoTime()
-        _generationElapsedSeconds.value = 0
-        timerJob = viewModelScope.launch {
-            while (true) {
-                delay(500L)
-                val elapsedSec = ((System.nanoTime() - turnStartNano) / 1_000_000_000L).toInt()
-                _generationElapsedSeconds.value = elapsedSec
-            }
-        }
+        // Chronometer removed as requested by user; keeping lifecycle hook
     }
 
     private fun stopTimer() {
-        timerJob?.cancel()
-        timerJob = null
+        // Chronometer removed as requested by user; keeping lifecycle hook
     }
 
     private fun updateNotification(phase: TaskNotificationPhase, summary: String) {
