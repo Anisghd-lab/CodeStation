@@ -371,6 +371,21 @@ class BotRepositoryImpl(
                 instructions = "Tu es un agent d'ingénierie logicielle expert propulsé par OpenRouter."
             ),
             Bot(
+                id = "bot-vercel",
+                name = "Vercel AI Gateway",
+                description = "Agent Vercel AI Gateway propulsé par des modèles 100% gratuits (Nemotron 3.5 Lightning / Beam)",
+                avatarGlyph = "triangle",
+                avatarColorHex = "#00D2FF",
+                provider = ProviderType.VERCEL_AI_GATEWAY,
+                model = "nvidia/nemotron-3.5-lightning-free",
+                isFastMode = true,
+                isLead = false,
+                isPinned = true,
+                status = BotStatus.IDLE,
+                lastMessage = "Prêt. Vercel AI Gateway connectée avec modèles gratuits (1M context).",
+                instructions = "Tu es un agent d'ingénierie logicielle propulsé par Vercel AI Gateway et ses modèles gratuits."
+            ),
+            Bot(
                 id = "bot-xkiro",
                 name = "xKIRO Qwen Coder",
                 description = "Agent de codage avancé xKIRO (Qwen3 Coder Plus avec fenêtre de 1M tokens)",

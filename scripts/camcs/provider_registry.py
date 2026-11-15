@@ -352,15 +352,88 @@ class OpenCodeInferenceAdapter(BaseProviderAdapter):
             return False, f"Erreur OpenCode Inference ({type(e).__name__}): {e}", elapsed
 
 
+class VercelAIGatewayAdapter(BaseProviderAdapter):
+    """Vercel AI Gateway Provider — Strictly 100% Free models."""
+    def __init__(self):
+        super().__init__("vercel", "Vercel AI Gateway", "https://ai-gateway.vercel.sh/v1")
+        self.api_key = self._load_key()
+        self._cached_models: List[ModelCapability] = []
+        self._cache_time = 0.0
+
+    def _load_key(self) -> str:
+        key_path = os.path.expanduser("~/.secrets/vercel-ai-gateway-key")
+        if os.path.exists(key_path):
+            try:
+                with open(key_path) as fp:
+                    return fp.read().strip()
+            except Exception:
+                pass
+        return os.environ.get("AI_GATEWAY_API_KEY", "").strip()
+
+    def is_configured(self) -> bool:
+        return bool(self.api_key)
+
+    def get_available_free_models(self) -> List[ModelCapability]:
+        return [
+            ModelCapability("nvidia/nemotron-3.5-lightning-free", "Nemotron 3.5 Lightning Free (1M)", "vercel", True, 1000000, True, True, True, ["coding", "reasoning"]),
+            ModelCapability("reflection/beam-free", "Beam 1.0 Free (1M)", "vercel", True, 1048576, True, True, True, ["reasoning", "coding"]),
+            ModelCapability("humansand/ampersand-v0.1", "Ampersand v0.1 Free (1M)", "vercel", True, 1000000, False, True, True, ["documentation", "research"]),
+            ModelCapability("stealth/glyph-cluster", "Glyph Cluster Free", "vercel", True, 256000, False, True, True, ["lightweight", "research"]),
+            ModelCapability("parallel/parallel-decisions-fast", "Decisions Fast Free", "vercel", True, 32000, False, True, True, ["validation", "evaluation"])
+        ]
+
+    def chat_completion(
+        self,
+        model: str,
+        messages: List[Dict[str, str]],
+        max_tokens: int = 1000,
+        temperature: float = 0.2
+    ) -> Tuple[bool, str, float]:
+        t0 = time.time()
+        self.total_requests += 1
+        req_data = json.dumps({
+            "model": model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            f"{self.base_url}/chat/completions",
+            data=req_data,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "CodeStation/1.0"
+            }
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                elapsed = (time.time() - t0) * 1000
+                self.latencies.append(elapsed)
+                res = json.loads(resp.read().decode("utf-8"))
+                choice = res.get("choices", [{}])[0].get("message", {}).get("content", "")
+                self.is_healthy = True
+                return True, choice.strip(), elapsed
+        except Exception as e:
+            self.failed_requests += 1
+            self.is_healthy = False
+            self.last_error = str(e)
+            elapsed = (time.time() - t0) * 1000
+            return False, f"Erreur Vercel AI Gateway ({type(e).__name__}): {e}", elapsed
+
+
 class ProviderRegistry:
     """Central registry of API providers and Model Capabilities (100% Free)."""
     def __init__(self):
         self.openrouter = OpenRouterAdapter()
         self.xkiro = XKiroAdapter()
         self.opencode_inf = OpenCodeInferenceAdapter()
+        self.vercel = VercelAIGatewayAdapter()
         self._providers: Dict[str, BaseProviderAdapter] = {
             "openrouter": self.openrouter,
             "xkiro": self.xkiro,
+            "vercel": self.vercel,
             "opencode-inference": self.opencode_inf
         }
 
@@ -453,6 +526,10 @@ class ProviderFallbackManager:
         """
         # Build candidate list of free models across configured providers
         candidates: List[Tuple[BaseProviderAdapter, str]] = []
+
+        if self.registry.vercel.is_configured():
+            for m in self.registry.vercel.get_available_free_models():
+                candidates.append((self.registry.vercel, m.model_id))
 
         if self.registry.openrouter.is_configured():
             for m in self.registry.openrouter.get_available_free_models():

@@ -14,9 +14,10 @@ enum class ProviderType(val displayName: String, val defaultModel: String, val b
     ANTIGRAVITY("Google Antigravity", "gemini-3.8-flash-medium", "antigravity"),
     OPENCODE("OpenCode", "opencode/glm-5.3-flash-free", "opencode"),
     CODEBUDDY("CodeBuddy Code", "Hy3", "codebuddy"),
-    KIMI("Kimi Code", "openrouter/flint-v1", "kimi"),
-    OPENROUTER("OpenRouter", "liquid/lfm-2.5-2.6b:free", "openrouter"),
-    XKIRO("xKIRO / Okiro", "qwen/qwen3-coder-plus:free", "xkiro"),
+    KIMI("Kimi Code", "openrouter/nemotron-3-5-lightning", "kimi"),
+    OPENROUTER("OpenRouter", "nvidia/nemotron-3.5-lightning:free", "openrouter"),
+    XKIRO("xKIRO / Okiro", "mistralai/ministral-14b", "xkiro"),
+    VERCEL_AI_GATEWAY("Vercel AI Gateway", "nvidia/nemotron-3.5-lightning-free", "vercel"),
     CLAUDE_CODE("Claude Code", "claude-3-7-sonnet", "claude"),
     OPENAI_CODEX("OpenAI Codex", "gpt-4o", "codex"),
     GEMINI_CLI("Google Gemini CLI", "gemini-2.0-flash", "gemini"),
@@ -25,74 +26,92 @@ enum class ProviderType(val displayName: String, val defaultModel: String, val b
 
     fun getAvailableModels(): List<ModelInfo> {
         return when (this) {
+            VERCEL_AI_GATEWAY -> listOf(
+                ModelInfo("nvidia/nemotron-3.5-lightning-free", "Nemotron 3.5 Lightning Free (1M)", isFree = true, isDefault = true, isVerified = true),
+                ModelInfo("reflection/beam-free", "Beam 1.0 Free (1M)", isFree = true, isVerified = true),
+                ModelInfo("humansand/ampersand-v0.1", "Ampersand v0.1 Free (1M)", isFree = true, isVerified = true),
+                ModelInfo("stealth/glyph-cluster", "Glyph Cluster Free (256k)", isFree = true, isVerified = true),
+                ModelInfo("parallel/parallel-decisions-fast", "Decisions Fast Free (32k)", isFree = true, isVerified = true)
+            )
             FREEBUFF -> listOf(
-                ModelInfo("freebuff/free-auto", "Freebuff Auto (Free)", isFree = true, isDefault = true, isVerified = true)
+                ModelInfo("freebuff/free-auto", "Freebuff Auto (100% Free)", isFree = true, isDefault = true, isVerified = true)
             )
             OMNIRUSH -> listOf(
-                ModelInfo("gpt-6-astra", "GPT-6 Astra", isFree = false, isDefault = true, isVerified = true),
-                ModelInfo("gpt-6-turbo", "GPT-6 Turbo", isFree = false, isVerified = true)
+                ModelInfo("gpt-6-astra", "GPT-6 Astra (Free Tier Included)", isFree = true, isDefault = true, isVerified = true),
+                ModelInfo("gpt-6-sol", "GPT-6 Sol", isFree = true, isVerified = true)
             )
             CLIXAD -> listOf(
-                ModelInfo("gpt-5-nano", "GPT-5 Nano", isFree = false, isDefault = true, isVerified = true),
-                ModelInfo("gpt-5-flash", "GPT-5 Flash", isFree = false, isVerified = true)
+                ModelInfo("gpt-5-nano", "GPT-5 Nano (Ad-Funded Free)", isFree = true, isDefault = true, isVerified = true)
             )
             CODEBUDDY -> listOf(
-                ModelInfo("Hy3", "Hy3", isFree = true, isDefault = true, isVerified = true),
-                ModelInfo("hy4-preview", "Hy4 Preview", isFree = false, isVerified = true),
-                ModelInfo("deepseek-v4.1-flash", "DeepSeek V4.1 Flash", isFree = true, isVerified = true),
-                ModelInfo("gpt-6.1-sol", "GPT-6.1 Sol", isFree = false, isVerified = true),
-                ModelInfo("gemini-3.8-flash", "Gemini 3.8 Flash", isFree = false, isVerified = true),
-                ModelInfo("glm-5.3-flash", "GLM-5.3 Flash", isFree = true, isVerified = true)
+                ModelInfo("Hy3", "Hy3 (Free)", isFree = true, isDefault = true, isVerified = true),
+                ModelInfo("deepseek-v4.1-flash", "DeepSeek V4.1 Flash (Free)", isFree = true, isVerified = true),
+                ModelInfo("glm-5.3-flash", "GLM-5.3 Flash (Free)", isFree = true, isVerified = true)
             )
             KIMI -> listOf(
-                ModelInfo("openrouter/flint-v1", "Flint v1.0 (Free)", isFree = true, isDefault = true, isVerified = true),
-                ModelInfo("nvidia/nemotron-3-ultra", "Nemotron 3 Ultra (Free)", isFree = true, isVerified = true),
-                ModelInfo("kimi-latest", "Kimi Latest", isFree = false, isVerified = true)
+                ModelInfo("openrouter/nemotron-3-5-lightning", "Nemotron 3.5 Lightning (Free)", isFree = true, isDefault = true, isVerified = true),
+                ModelInfo("openrouter/flint-v1", "Flint v1.0 (Free)", isFree = true, isVerified = true),
+                ModelInfo("openrouter/nemotron-3-ultra", "Nemotron 3 Ultra (Free)", isFree = true, isVerified = true),
+                ModelInfo("openrouter/north-mini-code", "Cohere North Mini Code (Free)", isFree = true, isVerified = true),
+                ModelInfo("vercel/nemotron-3-5-lightning-free", "Vercel Nemotron Free", isFree = true, isVerified = true),
+                ModelInfo("xkiro/ministral-14b", "xKIRO Ministral Free", isFree = true, isVerified = true),
+                ModelInfo("kimi-code/kimi-for-coding", "K2.8 Preview (Free Included)", isFree = true, isVerified = true),
+                ModelInfo("kimi-code/k3", "K3 (Free Tier)", isFree = true, isVerified = true)
             )
             OPENROUTER -> listOf(
-                ModelInfo("liquid/lfm-2.5-2.6b:free", "LFM 2.5 2.6B (Free)", isFree = true, isDefault = true, isVerified = true),
-                ModelInfo("nvidia/nemotron-3.5-lightning:free", "Nemotron 3.5 Lightning (Free)", isFree = true, isVerified = true),
-                ModelInfo("recursive/flint-v1.0:free", "Flint v1.0 (Free)", isFree = true, isVerified = true),
+                ModelInfo("nvidia/nemotron-3.5-lightning:free", "Nemotron 3.5 Lightning (Free 1M)", isFree = true, isDefault = true, isVerified = true),
+                ModelInfo("nvidia/nemotron-3-ultra-550b-a55b:free", "Nemotron 3 Ultra 550B (Free 1M)", isFree = true, isVerified = true),
+                ModelInfo("nvidia/nemotron-3.5-super-vl:free", "Nemotron 3.5 Super VL (Free 1M)", isFree = true, isVerified = true),
+                ModelInfo("cohere/north-mini-code:free", "Cohere North Mini Code (Free)", isFree = true, isVerified = true),
                 ModelInfo("dots-studio/dots-3-note-preview:free", "Dots 3 Note Preview (Free)", isFree = true, isVerified = true),
-                ModelInfo("xingchen-agi/xing4.0-29b-a4b:free", "Xing 4.0 29B (Free)", isFree = true, isVerified = true)
+                ModelInfo("baidu/ernie-5.5-flash-preview:free", "ERNIE 5.5 Flash (Free 1M)", isFree = true, isVerified = true),
+                ModelInfo("google/gemma-4-26b-a4b-it:free", "Gemma 4 26B (Free)", isFree = true, isVerified = true),
+                ModelInfo("google/gemma-4-31b-it:free", "Gemma 4 31B (Free)", isFree = true, isVerified = true),
+                ModelInfo("liquid/lfm-3-1.7b:free", "LFM 3 1.7B (Free)", isFree = true, isVerified = true),
+                ModelInfo("recursive/flint-v1.0:free", "Flint v1.0 (Free)", isFree = true, isVerified = true),
+                ModelInfo("thinkingmachines/inkling-2-small:free", "Inkling 2 Small (Free)", isFree = true, isVerified = true),
+                ModelInfo("particle-ai/particle-1:free", "Particle 1 (Free)", isFree = true, isVerified = true),
+                ModelInfo("openrouter/free", "OpenRouter Auto Free Router", isFree = true, isVerified = true)
             )
             XKIRO -> listOf(
-                ModelInfo("qwen/qwen3-coder-plus:free", "Qwen3 Coder Plus (Free 1M ctx)", isFree = true, isDefault = true, isVerified = true),
-                ModelInfo("qwen/qwen3.6-27b:free", "Qwen3.6 27B (Free)", isFree = true, isVerified = true),
-                ModelInfo("qwen/qwen3.5-plus:free", "Qwen3.5 Plus (Free 1M ctx)", isFree = true, isVerified = true),
-                ModelInfo("qwen/qwen3.6-max-preview:free", "Qwen3.6 Max Preview (Free)", isFree = true, isVerified = true),
-                ModelInfo("qwen/qwen3.5-flash:free", "Qwen3.5 Flash (Free)", isFree = true, isVerified = true)
+                ModelInfo("mistralai/ministral-14b", "Ministral 3 14B Free (256k)", isFree = true, isDefault = true, isVerified = true),
+                ModelInfo("mistralai/codestral-2508", "Codestral Free (256k)", isFree = true, isVerified = true),
+                ModelInfo("mistralai/devstral-medium", "Devstral 2 Free (256k)", isFree = true, isVerified = true),
+                ModelInfo("mistralai/mistral-large-2512", "Mistral Large 3 Free (256k)", isFree = true, isVerified = true),
+                ModelInfo("cohere/north-mini-code", "North Mini Code Free (256k)", isFree = true, isVerified = true),
+                ModelInfo("cohere/command-r-plus-08-2024", "Command R+ Free (128k)", isFree = true, isVerified = true),
+                ModelInfo("cohere/command-a", "Command A Free (288k)", isFree = true, isVerified = true),
+                ModelInfo("cohere/command-a-plus", "Command A+ Free (436k)", isFree = true, isVerified = true),
+                ModelInfo("sensenova/sensenova-6.8-flash-lite", "SenseNova 6.8 Flash-Lite Free", isFree = true, isVerified = true),
+                ModelInfo("stealth/big-pickle", "Big Pickle Free (200k)", isFree = true, isVerified = true)
             )
             OPENCODE -> listOf(
                 ModelInfo("opencode/glm-5.3-flash-free", "GLM-5.3-Flash Free", isFree = true, isDefault = true),
                 ModelInfo("opencode/deepseek-v4.1-flash-free", "DeepSeek V4.1 Flash Free", isFree = true),
                 ModelInfo("opencode/beam-free", "Beam Free", isFree = true),
+                ModelInfo("openrouter-free/nvidia/nemotron-3.5-lightning:free", "Nemotron 3.5 Lightning Free (1M)", isFree = true),
+                ModelInfo("vercel-free/nvidia/nemotron-3.5-lightning-free", "Vercel Nemotron Free (1M)", isFree = true),
                 ModelInfo("opencode/flint-40b-free", "Flint 40B Free", isFree = true),
                 ModelInfo("opencode/mimo-v2.6-flash-free", "MiMo V2.6 Flash Free", isFree = true),
                 ModelInfo("opencode/nemotron-3-ultra-free", "Nemotron 3 Ultra Free", isFree = true),
-                ModelInfo("deepseek/deepseek-v4-pro", "DeepSeek V4 Pro", isFree = false)
+                ModelInfo("ollama/qwen2.5-coder:3b", "Qwen 2.5 Coder 3B (Local Free)", isFree = true)
             )
             CLAUDE_CODE -> listOf(
-                ModelInfo("claude-3-7-sonnet", "Claude 3.7 Sonnet", isFree = false, isDefault = true),
-                ModelInfo("claude-3-5-sonnet", "Claude 3.5 Sonnet", isFree = false),
-                ModelInfo("claude-3-5-haiku", "Claude 3.5 Haiku", isFree = false)
+                ModelInfo("claude-3-7-sonnet", "Claude 3.7 Sonnet", isFree = false, isDefault = true)
             )
             OPENAI_CODEX -> listOf(
-                ModelInfo("gpt-4o", "GPT-4o", isFree = false, isDefault = true),
-                ModelInfo("gpt-4o-mini", "GPT-4o Mini", isFree = false),
-                ModelInfo("o3-mini", "o3-mini", isFree = false)
+                ModelInfo("gpt-4o-mini", "GPT-4o Mini", isFree = false, isDefault = true)
             )
             GEMINI_CLI -> listOf(
-                ModelInfo("gemini-2.0-flash", "Gemini 2.0 Flash", isFree = false, isDefault = true),
-                ModelInfo("gemini-2.5-pro", "Gemini 2.5 Pro", isFree = false)
+                ModelInfo("gemini-2.0-flash", "Gemini 2.0 Flash", isFree = true, isDefault = true)
             )
             ANTIGRAVITY -> listOf(
-                ModelInfo("gemini-3.8-flash-medium", "Gemini 3.8 Flash (Medium)", isFree = false, isDefault = true, isVerified = true),
-                ModelInfo("gemini-3.8-flash-high", "Gemini 3.8 Flash (High)", isFree = false, isVerified = true),
-                ModelInfo("gemini-3.8-flash-low", "Gemini 3.8 Flash (Low)", isFree = false, isVerified = true),
-                ModelInfo("claude-sonnet-4-6", "Claude Sonnet 4.6 (Thinking)", isFree = false, isVerified = true),
-                ModelInfo("claude-opus-4-6-thinking", "Claude Opus 4.6 (Thinking)", isFree = false, isVerified = true),
-                ModelInfo("gpt-oss-120b-medium", "GPT-OSS 120B (Medium)", isFree = false, isVerified = true)
+                ModelInfo("gemini-3.8-flash-medium", "Gemini 3.8 Flash (Medium)", isFree = true, isDefault = true, isVerified = true),
+                ModelInfo("gemini-3.8-flash-high", "Gemini 3.8 Flash (High)", isFree = true, isVerified = true),
+                ModelInfo("gemini-3.8-flash-low", "Gemini 3.8 Flash (Low)", isFree = true, isVerified = true),
+                ModelInfo("claude-sonnet-4-6", "Claude Sonnet 4.6 (Thinking)", isFree = true, isVerified = true),
+                ModelInfo("claude-opus-4-6-thinking", "Claude Opus 4.6 (Thinking)", isFree = true, isVerified = true),
+                ModelInfo("gpt-oss-120b-medium", "GPT-OSS 120B (Medium)", isFree = true, isVerified = true)
             )
             ACP_LOCAL -> listOf(
                 ModelInfo("local-qwen-2.5", "Qwen 2.5 (Local)", isFree = true, isDefault = true)
@@ -130,7 +149,7 @@ data class Bot(
     val description: String = "",
     val avatarGlyph: String = "circle",
     val avatarColorHex: String = "#00D2FF",
-    val provider: ProviderType = ProviderType.CLAUDE_CODE,
+    val provider: ProviderType = ProviderType.OPENCODE,
     val model: String = provider.defaultModel,
     val isFastMode: Boolean = true,
     val workspaceMode: WorkspaceMode = WorkspaceMode.PERSONAL,
@@ -144,7 +163,7 @@ data class Bot(
     val lastActivityAt: Long = System.currentTimeMillis(),
     val unreadCount: Int = 0,
     val pendingApprovalsCount: Int = 0,
-    val memberBotIds: List<String> = emptyList() // Pour les salons multi-bots
+    val memberBotIds: List<String> = emptyList()
 ) {
     val isGroup: Boolean get() = memberBotIds.isNotEmpty()
 }
