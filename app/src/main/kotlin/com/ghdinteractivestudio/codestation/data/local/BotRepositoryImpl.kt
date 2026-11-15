@@ -399,6 +399,21 @@ class BotRepositoryImpl(
                 status = BotStatus.IDLE,
                 lastMessage = "Prêt. API xKIRO connectée (Qwen3 Coder Plus 1M tokens opérationnel).",
                 instructions = "Tu es un agent d'architecture et de codage haute performance propulsé par xKIRO."
+            ),
+            Bot(
+                id = "bot-bytez",
+                name = "Bytez Serverless AI",
+                description = "Agent Bytez Serverless propulsé par des modèles open-source gratuits (<7B)",
+                avatarGlyph = "hexagon",
+                avatarColorHex = "#A855F7",
+                provider = ProviderType.BYTEZ,
+                model = "Qwen/Qwen2.5-7B-Instruct",
+                isFastMode = true,
+                isLead = false,
+                isPinned = true,
+                status = BotStatus.IDLE,
+                lastMessage = "Prêt. Bytez API connectée avec tier open-source gratuit (<7B).",
+                instructions = "Tu es un agent d'ingénierie et de raisonnement propulsé par Bytez Serverless."
             )
         )
     }

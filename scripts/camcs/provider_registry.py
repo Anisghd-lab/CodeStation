@@ -423,6 +423,93 @@ class VercelAIGatewayAdapter(BaseProviderAdapter):
             return False, f"Erreur Vercel AI Gateway ({type(e).__name__}): {e}", elapsed
 
 
+class BytezAdapter(BaseProviderAdapter):
+    """Bytez Serverless AI Provider — Strictly Free Tier (<7B Open Source Models)."""
+    def __init__(self):
+        super().__init__("bytez", "Bytez Serverless AI", "https://api.bytez.com/models/v2")
+        self.api_key = self._load_key()
+
+    def _load_key(self) -> str:
+        key_path = os.path.expanduser("~/.secrets/bytez-api-key")
+        if os.path.exists(key_path):
+            try:
+                with open(key_path) as fp:
+                    return fp.read().strip()
+            except Exception:
+                pass
+        return os.environ.get("BYTEZ_API_KEY", "").strip()
+
+    def is_configured(self) -> bool:
+        return bool(self.api_key)
+
+    def get_available_free_models(self) -> List[ModelCapability]:
+        return [
+            ModelCapability("Qwen/Qwen2.5-7B-Instruct", "Qwen 2.5 7B Instruct (Free)", "bytez", True, 32768, True, True, False, ["coding", "reasoning"]),
+            ModelCapability("microsoft/Phi-3-mini-4k-instruct", "Phi-3 Mini 4K (Free)", "bytez", True, 4096, True, True, False, ["reasoning", "coding"]),
+            ModelCapability("google/gemma-2-2b-it", "Gemma 2 2B IT (Free)", "bytez", True, 8192, False, True, False, ["documentation", "research"]),
+            ModelCapability("mistralai/Mistral-7B-Instruct-v0.3", "Mistral 7B Instruct v0.3 (Free)", "bytez", True, 32768, True, True, False, ["coding", "general"]),
+            ModelCapability("meta-llama/Llama-3.2-3B-Instruct", "Llama 3.2 3B Instruct (Free)", "bytez", True, 131072, True, True, False, ["chat", "coding"]),
+            ModelCapability("meta-llama/Llama-3.2-1B-Instruct", "Llama 3.2 1B Instruct (Free)", "bytez", True, 131072, False, True, False, ["fast", "general"]),
+        ]
+
+    def chat_completion(
+        self,
+        model: str,
+        messages: List[Dict[str, str]],
+        max_tokens: int = 1000,
+        temperature: float = 0.2
+    ) -> Tuple[bool, str, float]:
+        self.total_requests += 1
+        t0 = time.time()
+        if not self.is_configured():
+            return False, "Bytez API key non configurée", 0.0
+
+        prompt_parts = []
+        for m in messages:
+            role = m.get("role", "user")
+            content = m.get("content", "")
+            prompt_parts.append(f"<|im_start|>{role}\n{content}<|im_end|>")
+        prompt_parts.append("<|im_start|>assistant\n")
+        prompt = "\n".join(prompt_parts)
+
+        payload = {
+            "input": prompt,
+            "params": {
+                "max_new_tokens": max_tokens,
+                "temperature": temperature,
+                "do_sample": temperature > 0
+            }
+        }
+        req_data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            f"{self.base_url}/{model}",
+            data=req_data,
+            headers={
+                "Authorization": f"Key {self.api_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "CodeStation/1.0"
+            }
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                elapsed = (time.time() - t0) * 1000
+                self.latencies.append(elapsed)
+                res = json.loads(resp.read().decode("utf-8"))
+                output = res.get("output", "")
+                if isinstance(output, list) and output:
+                    output = str(output[0])
+                elif not isinstance(output, str):
+                    output = str(output)
+                self.is_healthy = True
+                return True, output.strip(), elapsed
+        except Exception as e:
+            self.failed_requests += 1
+            self.is_healthy = False
+            self.last_error = str(e)
+            elapsed = (time.time() - t0) * 1000
+            return False, f"Erreur Bytez ({type(e).__name__}): {e}", elapsed
+
+
 class ProviderRegistry:
     """Central registry of API providers and Model Capabilities (100% Free)."""
     def __init__(self):
@@ -430,11 +517,13 @@ class ProviderRegistry:
         self.xkiro = XKiroAdapter()
         self.opencode_inf = OpenCodeInferenceAdapter()
         self.vercel = VercelAIGatewayAdapter()
+        self.bytez = BytezAdapter()
         self._providers: Dict[str, BaseProviderAdapter] = {
             "openrouter": self.openrouter,
             "xkiro": self.xkiro,
             "vercel": self.vercel,
-            "opencode-inference": self.opencode_inf
+            "opencode-inference": self.opencode_inf,
+            "bytez": self.bytez
         }
 
     def get_adapter(self, provider_id: str) -> Optional[BaseProviderAdapter]:
@@ -542,6 +631,10 @@ class ProviderFallbackManager:
         if self.registry.opencode_inf.is_configured():
             for m in self.registry.opencode_inf.get_available_free_models():
                 candidates.append((self.registry.opencode_inf, m.model_id))
+
+        if self.registry.bytez.is_configured():
+            for m in self.registry.bytez.get_available_free_models():
+                candidates.append((self.registry.bytez, m.model_id))
 
         if not candidates:
             return False, "Aucun fournisseur API avec modèles gratuits configuré", "none", "none", 0.0

@@ -283,7 +283,8 @@ fun BotEditorScreen(
                         val apiProviders = listOf(
                             ProviderType.OPENROUTER,
                             ProviderType.XKIRO,
-                            ProviderType.VERCEL_AI_GATEWAY
+                            ProviderType.VERCEL_AI_GATEWAY,
+                            ProviderType.BYTEZ
                         )
                         val otherProviders = ProviderType.entries.filter { it !in officialClis && it !in apiProviders }
 
@@ -383,6 +384,7 @@ fun BotEditorScreen(
                                 ProviderType.OPENROUTER -> "Connecté (Clé active · Modèles Free)" to Palette.emeraldAccent
                                 ProviderType.XKIRO -> "Connecté (Clé active · Qwen3 Coder Plus 1M)" to Palette.emeraldAccent
                                 ProviderType.VERCEL_AI_GATEWAY -> "Connecté (Clé active · Modèles Free 1M)" to Palette.emeraldAccent
+                                ProviderType.BYTEZ -> "Connecté (Clé active · Modèles Free <7B)" to Palette.emeraldAccent
                                 else -> "Connecté" to Palette.emeraldAccent
                             }
 

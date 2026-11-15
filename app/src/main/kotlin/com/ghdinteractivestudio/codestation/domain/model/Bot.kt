@@ -18,6 +18,7 @@ enum class ProviderType(val displayName: String, val defaultModel: String, val b
     OPENROUTER("OpenRouter", "nvidia/nemotron-3.5-lightning:free", "openrouter"),
     XKIRO("xKIRO / Okiro", "mistralai/ministral-14b", "xkiro"),
     VERCEL_AI_GATEWAY("Vercel AI Gateway", "nvidia/nemotron-3.5-lightning-free", "vercel"),
+    BYTEZ("Bytez Serverless AI", "Qwen/Qwen2.5-7B-Instruct", "bytez"),
     CLAUDE_CODE("Claude Code", "claude-3-7-sonnet", "claude"),
     OPENAI_CODEX("OpenAI Codex", "gpt-4o", "codex"),
     GEMINI_CLI("Google Gemini CLI", "gemini-2.0-flash", "gemini"),
@@ -32,6 +33,14 @@ enum class ProviderType(val displayName: String, val defaultModel: String, val b
                 ModelInfo("humansand/ampersand-v0.1", "Ampersand v0.1 Free (1M)", isFree = true, isVerified = true),
                 ModelInfo("stealth/glyph-cluster", "Glyph Cluster Free (256k)", isFree = true, isVerified = true),
                 ModelInfo("parallel/parallel-decisions-fast", "Decisions Fast Free (32k)", isFree = true, isVerified = true)
+            )
+            BYTEZ -> listOf(
+                ModelInfo("Qwen/Qwen2.5-7B-Instruct", "Qwen 2.5 7B Instruct (Free)", isFree = true, isDefault = true, isVerified = true),
+                ModelInfo("microsoft/Phi-3-mini-4k-instruct", "Phi-3 Mini 4K (Free)", isFree = true, isVerified = true),
+                ModelInfo("google/gemma-2-2b-it", "Gemma 2 2B IT (Free)", isFree = true, isVerified = true),
+                ModelInfo("mistralai/Mistral-7B-Instruct-v0.3", "Mistral 7B Instruct v0.3 (Free)", isFree = true, isVerified = true),
+                ModelInfo("meta-llama/Llama-3.2-3B-Instruct", "Llama 3.2 3B Instruct (Free)", isFree = true, isVerified = true),
+                ModelInfo("meta-llama/Llama-3.2-1B-Instruct", "Llama 3.2 1B Instruct (Free)", isFree = true, isVerified = true)
             )
             FREEBUFF -> listOf(
                 ModelInfo("freebuff/free-auto", "Freebuff Auto (100% Free)", isFree = true, isDefault = true, isVerified = true)
