@@ -64,6 +64,7 @@ class QualityGate:
             "gateType": self.gate_type,
             "name": self.name,
             "status": self.status,
+            "passed": (self.status in ("PASSED", getattr(GateStatus.PASSED, "value", "PASSED"))),
             "evaluator": self.evaluator,
             "details": self.details,
             "outputSummary": self.output_summary,

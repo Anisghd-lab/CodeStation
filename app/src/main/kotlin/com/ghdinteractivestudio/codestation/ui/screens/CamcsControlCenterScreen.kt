@@ -4370,7 +4370,7 @@ private fun QualityGatesVerificationCard(gates: List<CamcsQualityGate>) {
     val dangerRed = if (dark) Color(0xFFFF5252) else Color(0xFFDC2626)
     val cyanAccent = if (dark) Color(0xFF00D2FF) else Color(0xFF0284C7)
 
-    val passedCount = gates.count { it.passed }
+    val passedCount = gates.count { it.passed || it.status == "PASSED" }
 
     Box(
         modifier = Modifier
@@ -4421,8 +4421,9 @@ private fun QualityGatesVerificationCard(gates: List<CamcsQualityGate>) {
             }
 
             gates.forEach { gate ->
+                val isGatePassed = gate.passed || gate.status == "PASSED"
                 val gateColor = when {
-                    gate.passed -> electricGreen
+                    isGatePassed -> electricGreen
                     gate.status == "FAILED" -> dangerRed
                     else -> cyanAccent
                 }

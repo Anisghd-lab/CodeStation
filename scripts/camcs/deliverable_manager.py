@@ -206,6 +206,29 @@ class DeliverableManager:
         conn.close()
         return {"status": "VERIFIED", "sha256": current_sha}
 
+    def update_deliverable_sha(
+        self,
+        deliv_id: str,
+        new_sha: str,
+        new_size: int,
+        validation_status: str = "VERIFIED",
+        details: str = "SHA synchronisé avec le livrable physique finalisé"
+    ) -> bool:
+        """Synchronizes deliverable SHA-256 and size with finalized file on disk."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE deliverables
+                SET sha256 = ?, size_bytes = ?, validation_status = ?, validation_details = ?, updated_at = ?, lifecycle_state = 'FINALIZED'
+                WHERE id = ?
+            """, (new_sha, new_size, validation_status, details, time.time(), deliv_id))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception:
+            return False
+
     def register_proof(
         self,
         mission_id: str,

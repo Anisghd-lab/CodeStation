@@ -61,14 +61,8 @@ class MainActivity : ComponentActivity() {
         handleIncomingIntent(intent, container)
 
         setContent {
-            val themeMode by container.preferencesRepository.themeModeStream.collectAsState(initial = "SYSTEM")
-            val isDark = when (themeMode.uppercase()) {
-                "DARK" -> true
-                "LIGHT" -> false
-                else -> isSystemInDarkTheme()
-            }
-
-            CodeStationTheme(darkTheme = isDark) {
+            // Mandat strict CodeStation : Dark Mode Obsidian exclusif permanent (aucun mode clair)
+            CodeStationTheme(darkTheme = true) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val navController = rememberNavController()
                     currentNavController = navController

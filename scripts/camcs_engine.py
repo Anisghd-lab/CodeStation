@@ -1585,6 +1585,18 @@ class CamcsOrchestrationEngine:
             cwd=tests_dir
         )
         all_delivs = self.deliverable_mgr.get_mission_deliverables(mission.id)
+        # S'assurer que les empreintes physiques des livrables finalisés sur le disque sont synchronisées
+        for d in all_delivs:
+            fpath = d.get("filePath") or d.get("file_path", "")
+            if fpath and os.path.isfile(fpath):
+                disk_sha = compute_file_sha256(fpath)
+                disk_size = os.path.getsize(fpath)
+                if disk_sha and disk_sha != d.get("sha256"):
+                    self.deliverable_mgr.update_deliverable_sha(d["id"], disk_sha, disk_size)
+                    d["sha256"] = disk_sha
+                    d["sizeBytes"] = disk_size
+                    d["size_bytes"] = disk_size
+
         all_ok, verif_count, _ = self.quality_auditor.audit_deliverables(mission.id, all_delivs)
         # Register deliverable quality gate
         if all_delivs:
