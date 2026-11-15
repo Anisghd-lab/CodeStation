@@ -161,12 +161,12 @@ class ChatRepositoryImpl(
         text: String,
         replyTo: QuotedReply?,
         attachments: List<com.ghdinteractivestudio.codestation.domain.model.FileAttachment>,
-        conversationId: String?
+        conversationId: String?,
+        clientRequestId: String?,
+        isQueued: Boolean
     ): Result<ChatMessage> {
         return runCatching {
             val now = System.currentTimeMillis()
-            val recentMsg = messageDao.findRecentUserMessage(botId, text)
-            val isRetry = recentMsg != null && (now - recentMsg.timestamp < 120_000L)
 
             val effectiveConvId = if (!conversationId.isNullOrBlank()) {
                 conversationId
@@ -187,16 +187,27 @@ class ChatRepositoryImpl(
                 }
             }
 
-            val userMsg = if (isRetry && recentMsg != null) {
-                recentMsg.toDomain()
+            // Détection de réessai technique basée strictement sur l'identifiant de requête (clientRequestId)
+            // et JAMAIS sur le contenu du texte. Tout nouvel envoi volontaire dispose d'un ID unique et reste visible.
+            val msgId = clientRequestId ?: UUID.randomUUID().toString()
+            val existingMsg = messageDao.getMessageById(msgId)
+
+            val userMsg = if (existingMsg != null) {
+                if (!isQueued && !existingMsg.isFinal) {
+                    val updated = existingMsg.copy(isFinal = true)
+                    messageDao.insertMessage(updated)
+                    updated.toDomain()
+                } else {
+                    existingMsg.toDomain()
+                }
             } else {
                 val newMsg = ChatMessage(
-                    id = UUID.randomUUID().toString(),
+                    id = msgId,
                     botId = botId,
                     author = MessageAuthor(MessageAuthorType.USER, "user", "Moi"),
                     text = text,
                     timestamp = now,
-                    isFinal = true,
+                    isFinal = !isQueued,
                     replyTo = replyTo,
                     attachments = attachments,
                     conversationId = effectiveConvId
@@ -208,6 +219,11 @@ class ChatRepositoryImpl(
             val previewText = text.ifBlank { if (attachments.isNotEmpty()) "[Pièce jointe: ${attachments.first().name}]" else "" }
             botDao.updateLastMessage(botId, previewText, userMsg.timestamp)
             conversationDao?.updateLastMessage(effectiveConvId, previewText, userMsg.timestamp)
+
+            // Si le message est marqué en file d'attente locale, la persistance est achevée. L'envoi réseau aura lieu dès la fin du tour actif.
+            if (isQueued) {
+                return@runCatching userMsg
+            }
 
             // Envoi réseau vers apiService si connecté
             if (apiServiceProvider != null && serverRepository != null) {

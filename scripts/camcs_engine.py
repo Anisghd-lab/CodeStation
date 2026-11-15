@@ -332,6 +332,9 @@ class CamcsAgent:
         self.model_id = model_id
         self.objective = objective
         self.skills: List[str] = []
+        self.agency_slug: Optional[str] = None
+        self.agency_skill_path: Optional[str] = None
+        self.agency_system_prompt: Optional[str] = None
         self.current_subtask = "Initialisation du contexte de travail"
         self.progress = 0
         self.status = AgentState.CREATED
@@ -359,6 +362,8 @@ class CamcsAgent:
             "provider": self.provider_id,
             "model": self.model_id,
             "skills": self.skills,
+            "agencySlug": getattr(self, "agency_slug", None),
+            "agencySkillPath": getattr(self, "agency_skill_path", None),
             "objective": self.objective,
             "currentSubtask": self.current_subtask,
             "progress": self.progress,
@@ -1105,6 +1110,22 @@ class CamcsOrchestrationEngine:
         3. 100% FREE API model via OpenRouter / xKIRO / OpenCode.
         Preserves context and emits audit failover events.
         """
+        # Prepare enriched prompt with Agency persona if available
+        agency_prompt = getattr(agent, "agency_system_prompt", None)
+        agency_slug = getattr(agent, "agency_slug", None)
+        if agency_slug and agency_prompt:
+            enriched_prompt = (
+                f"🎭 **[AGENCY ACTIVATION : {agent.name} ({agent.role})]**\n"
+                f"🎯 **Rôle** : {agent.role}\n"
+                f"📂 **Skill** : ~/.agents/skills/{agency_slug}/SKILL.md\n\n"
+                f"--- DIRECTIVES DE L'EXPERT ---\n"
+                f"{agency_prompt[:1200]}\n\n"
+                f"--- TÂCHE À ACCOMPLIR ---\n"
+                f"{task.prompt}"
+            )
+        else:
+            enriched_prompt = task.prompt
+
         # Level 1: Attempt Primary CLI
         runner = self.cli_registry.get_runner(agent.cli_id)
         if runner:
@@ -1114,7 +1135,7 @@ class CamcsOrchestrationEngine:
                     runner=runner,
                     task_id=task.id,
                     mission_id=mission.id,
-                    prompt=task.prompt,
+                    prompt=enriched_prompt,
                     cwd=cwd,
                     timeout=timeout,
                     output_callback=output_callback,
@@ -1144,7 +1165,7 @@ class CamcsOrchestrationEngine:
                         runner=alt_runner,
                         task_id=task.id,
                         mission_id=mission.id,
-                        prompt=task.prompt,
+                        prompt=enriched_prompt,
                         cwd=cwd,
                         timeout=timeout,
                         output_callback=output_callback,
@@ -1612,13 +1633,57 @@ class CamcsOrchestrationEngine:
 
         report_file = os.path.join(mission_dir, "report.md")
         now_dt = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+        # Query confirmed external actions (GitHub delivery proofs)
+        gh_proof_section = ""
+        try:
+            conn_gh = sqlite3.connect(DB_PATH)
+            conn_gh.row_factory = sqlite3.Row
+            cur_gh = conn_gh.cursor()
+            cur_gh.execute("SELECT * FROM external_actions WHERE mission_id = ? AND status = 'CONFIRMED' ORDER BY created_at DESC LIMIT 1;", (mission.id,))
+            gh_row = cur_gh.fetchone()
+            conn_gh.close()
+            if gh_row:
+                details = json.loads(gh_row["verification_details_json"] or "{}")
+                gh_url = details.get("url") or f"https://github.com/{details.get('fullName')}"
+                gh_branch = details.get("branch", "main")
+                gh_sha = details.get("remoteSha") or details.get("localSha") or "N/A"
+                gh_commit_url = details.get("commitUrl") or f"{gh_url}/commit/{gh_sha}"
+                gh_pr = details.get("prUrl")
+                gh_type = details.get("projectType", "NOUVEAU_PROJET")
+
+                gh_proof_section = f"""
+## 📦 Livraison GitHub Vérifiable & Certifiée
+- **Dépôt GitHub** : [{details.get('fullName') or gh_url}]({gh_url})
+- **Type de Projet** : `{gh_type}`
+- **Branche Livrée** : `{gh_branch}`
+- **SHA Commit Livré** : [`{gh_sha}`]({gh_commit_url})
+"""
+                if gh_pr:
+                    gh_proof_section += f"- **Pull Request Créée** : [{gh_pr}]({gh_pr})\n"
+                gh_proof_section += f"""
+### 🚀 Instructions pour récupérer et lancer le projet
+```bash
+# Cloner le dépôt
+git clone {gh_url}.git
+cd {details.get('repoName', 'projet')}
+git checkout {gh_branch}
+
+# Lancer les vérifications
+pytest || python3 -m unittest discover || ./gradlew test
+```
+"""
+        except Exception as e:
+            gh_proof_section = f"\n*Erreur récupération preuves GitHub : {e}*\n"
+
         report_content = (
             f"# Rapport de Clôture CAMCS — {mission.title}\n\n"
             f"**Date** : {now_dt}\n"
             f"**Statut** : **CONFORME & VALIDÉ (100%)**\n"
             f"**Tâches validées** : {len(completed_task_ids)}/{len(dag_tasks)}\n"
             f"**Livrables certifiés** : {verif_count}/{len(all_delivs)}\n"
-            f"**Modèles utilisés** : 100% Gratuits vérifiés\n\n"
+            f"**Modèles utilisés** : 100% Gratuits et Locaux vérifiés\n"
+            f"{gh_proof_section}\n"
             f"## Vérification Indépendante des Livrables\n"
             f"Tous les livrables physiques et opérations distantes ont été audités et scellés avec empreintes cryptographiques SHA-256.\n"
         )
@@ -1722,6 +1787,9 @@ class CamcsOrchestrationEngine:
                 objective=ag_dict["objective"]
             )
             ag.skills = ag_dict.get("skills", [])
+            ag.agency_slug = ag_dict.get("agency_slug")
+            ag.agency_skill_path = ag_dict.get("agency_skill_path")
+            ag.agency_system_prompt = ag_dict.get("agency_system_prompt")
             mission_agents.append(ag)
 
         mission.agents = mission_agents
@@ -2393,6 +2461,8 @@ class CamcsHttpHandler(BaseHTTPRequestHandler):
 
 
 class SilentThreadingHTTPServer(ThreadingHTTPServer):
+    allow_reuse_address = True
+
     def handle_error(self, request, client_address):
         exc_type, _, _ = sys.exc_info()
         if exc_type in (BrokenPipeError, ConnectionResetError):

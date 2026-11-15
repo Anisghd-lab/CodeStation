@@ -175,18 +175,26 @@ class ObjectiveCompletionGate:
         actions = [dict(r) for r in action_rows]
 
         # Check if the objective requested a GitHub repository or remote publication
-        repo_keywords = ["repo", "dépôt", "depot", "repository", "github", "git"]
-        requires_github_repo = any(kw in obj_lower for kw in repo_keywords)
+        repo_keywords = ["repo", "dépôt", "depot", "repository", "github", "git", "code", "développe", "projet"]
+        has_code_deliverables = any(
+            d.get("file_path", "").endswith((".py", ".kt", ".java", ".ts", ".js", ".go", ".rs", ".json", ".md"))
+            for d in deliverables
+        )
+        requires_github_repo = has_code_deliverables or any(kw in obj_lower for kw in repo_keywords)
 
         if requires_github_repo:
             if not actions:
-                msg = "L'objectif exige un dépôt GitHub mais aucune action externe n'a été planifiée ni exécutée."
+                msg = "L'objectif exige une livraison GitHub vérifiable mais aucune action externe n'a été planifiée ni exécutée."
                 diagnostics["checks"]["external_github_action"] = {"passed": False, "reason": "NO_ACTION_REGISTERED"}
                 diagnostics["blocking_reasons"].append(msg)
             else:
-                github_actions = [a for a in actions if a.get("action_type") == "GITHUB_CREATE_REPO" or a.get("target_service") == "github"]
+                github_actions = [
+                    a for a in actions
+                    if a.get("action_type") in ("GITHUB_CREATE_REPO", "GIT_BRANCH_AND_PR", "GIT_PUSH")
+                    or a.get("target_service") == "github"
+                ]
                 if not github_actions:
-                    msg = "Aucune action externe de création de dépôt GitHub n'a été enregistrée."
+                    msg = "Aucune action externe de livraison GitHub (nouveau dépôt ou branche dédiée) n'a été enregistrée."
                     diagnostics["checks"]["external_github_action"] = {"passed": False, "reason": "MISSING_GITHUB_ACTION"}
                     diagnostics["blocking_reasons"].append(msg)
                 else:
@@ -195,7 +203,7 @@ class ObjectiveCompletionGate:
                         if a.get("status") not in (ExternalActionStatus.CONFIRMED.value, "CONFIRMED")
                     ]
                     if unconfirmed_gh:
-                        msg = f"Actions externes GitHub non confirmées : {unconfirmed_gh}"
+                        msg = f"Actions de livraison GitHub non confirmées (statut!=CONFIRMED) : {unconfirmed_gh}"
                         diagnostics["checks"]["external_github_action"] = {"passed": False, "unconfirmed": unconfirmed_gh}
                         diagnostics["blocking_reasons"].append(msg)
                     else:
@@ -213,32 +221,40 @@ class ObjectiveCompletionGate:
                                 if "/" not in full_repo:
                                     owner = repo_meta.get("owner") or "Anisghd-lab"
                                     full_repo = f"{owner}/{full_repo}"
-                                cmd_sha = ["gh", "api", f"repos/{full_repo}/commits/main", "--jq", ".sha"]
+                                details_json = act.get("verification_details_json") or "{}"
                                 try:
-                                    res_sha = subprocess.run(cmd_sha, capture_output=True, text=True, timeout=8)
+                                    details = json.loads(details_json) if isinstance(details_json, str) else details_json
+                                except Exception:
+                                    details = {}
+
+                                target_branch = details.get("branch") or "main"
+                                cmd_sha = ["gh", "api", f"repos/{full_repo}/commits/{target_branch}", "--jq", ".sha"]
+                                try:
+                                    res_sha = subprocess.run(cmd_sha, capture_output=True, text=True, timeout=10)
                                     if res_sha.returncode != 0 or not res_sha.stdout.strip():
-                                        msg = f"Dépôt GitHub '{full_repo}' existant mais branche 'main' sans commit ou inaccessible."
+                                        msg = f"Dépôt GitHub '{full_repo}' existant mais branche '{target_branch}' sans commit ou inaccessible."
                                         diagnostics["checks"]["github_commits"] = {"passed": False, "error": res_sha.stderr.strip()}
                                         diagnostics["blocking_reasons"].append(msg)
                                     else:
                                         remote_sha = res_sha.stdout.strip()
-                                        diagnostics["checks"]["github_commits"] = {"passed": True, "sha": remote_sha}
+                                        diagnostics["checks"]["github_commits"] = {"passed": True, "sha": remote_sha, "branch": target_branch}
                                 except Exception as e:
                                     msg = f"Erreur lors du contrôle de commit GitHub : {str(e)}"
                                     diagnostics["blocking_reasons"].append(msg)
 
-                                # Verify remote README
-                                cmd_readme = ["gh", "api", f"repos/{full_repo}/readme", "--jq", ".name"]
-                                try:
-                                    res_readme = subprocess.run(cmd_readme, capture_output=True, text=True, timeout=8)
-                                    if res_readme.returncode != 0:
-                                        msg = f"README.md introuvable sur le dépôt distant '{full_repo}'."
-                                        diagnostics["checks"]["github_readme"] = {"passed": False, "error": res_readme.stderr.strip()}
-                                        diagnostics["blocking_reasons"].append(msg)
-                                    else:
-                                        diagnostics["checks"]["github_readme"] = {"passed": True}
-                                except Exception as e:
-                                    diagnostics["blocking_reasons"].append(f"Erreur vérification README : {str(e)}")
+                                # Verify remote README for new repos
+                                if act.get("action_type") == "GITHUB_CREATE_REPO":
+                                    cmd_readme = ["gh", "api", f"repos/{full_repo}/readme", "--jq", ".name"]
+                                    try:
+                                        res_readme = subprocess.run(cmd_readme, capture_output=True, text=True, timeout=8)
+                                        if res_readme.returncode != 0:
+                                            msg = f"README.md introuvable sur le dépôt distant '{full_repo}'."
+                                            diagnostics["checks"]["github_readme"] = {"passed": False, "error": res_readme.stderr.strip()}
+                                            diagnostics["blocking_reasons"].append(msg)
+                                        else:
+                                            diagnostics["checks"]["github_readme"] = {"passed": True}
+                                    except Exception as e:
+                                        diagnostics["blocking_reasons"].append(f"Erreur vérification README : {str(e)}")
 
         # 7. Check Automated Tests
         test_tasks = [t for t in tasks if t.get("classification") in ("TESTING", "VALIDATION") or "test" in t.get("title", "").lower()]

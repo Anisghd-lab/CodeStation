@@ -69,7 +69,8 @@ import com.ghdinteractivestudio.codestation.ui.theme.semibold
 fun AgencyAgentsScreen(
     onNavigateBack: (() -> Unit)? = null,
     bottomInset: androidx.compose.ui.unit.Dp = 96.dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    includeStatusBarPadding: Boolean = onNavigateBack != null
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -94,11 +95,19 @@ fun AgencyAgentsScreen(
         }
     }
 
-    Column(
-        modifier = modifier
+    val baseModifier = if (includeStatusBarPadding) {
+        modifier
             .fillMaxSize()
             .background(Palette.background)
             .statusBarsPadding()
+    } else {
+        modifier
+            .fillMaxSize()
+            .background(Palette.background)
+    }
+
+    Column(
+        modifier = baseModifier
     ) {
         // En-tête
         Row(

@@ -100,7 +100,7 @@ class ExternalActionExecutor:
         self.update_action_status(action, ExternalActionStatus.IN_PROGRESS)
 
         try:
-            if action_type in ("GITHUB_CREATE_REPO", "GITHUB_PUBLISH_CODE", "GITHUB_REPO_AND_PUBLISH"):
+            if action_type in ("GITHUB_CREATE_REPO", "GITHUB_PUBLISH_CODE", "GITHUB_REPO_AND_PUBLISH", "GIT_BRANCH_AND_PR", "GIT_PUSH"):
                 return self._execute_github_repo_flow(action, context)
             elif action_type == "GITHUB_CREATE_ISSUE":
                 return self._execute_github_create_issue(action, context)
@@ -155,21 +155,21 @@ class ExternalActionExecutor:
     # GITHUB WORKFLOWS
     # =========================================================================
     def _execute_github_repo_flow(self, action: ExternalAction, context: Dict[str, Any]) -> Tuple[bool, Dict[str, Any], str]:
-        repo_name = action.parameters.get("repo_name", action.target_resource.split("/")[-1])
         workspace_dir = context.get("workspace_dir") or action.parameters.get("workspace_dir", f"/root/.codestation/workspaces/{action.mission_id}")
-        description = action.parameters.get("description", "CodeStation CAMCS Autonomous Project")
-        is_private = action.parameters.get("is_private", False)
-        expected_files = action.parameters.get("expected_files", ["README.md"])
+        title = context.get("title") or action.parameters.get("title", f"CAMCS Project ({action.mission_id[:8]})")
+        objective = context.get("objective") or action.parameters.get("objective", "Autonomous development delivered by CAMCS.")
+        config = dict(action.parameters)
+        if "is_private" not in config:
+            config["is_private"] = action.parameters.get("is_private", True)
 
-        # Delegate execution directly to GitHubWorkflowExecutor using the already-connected local CLI session
-        ok, details, err = self.github_workflow.execute_github_repo_creation_and_publish(
+        # Delegate execution directly to the master developer delivery workflow
+        ok, details, err = self.github_workflow.execute_developer_delivery(
             mission_id=action.mission_id,
             task_id=action.task_id,
-            repo_name=repo_name,
             workspace_dir=workspace_dir,
-            description=description,
-            is_private=is_private,
-            expected_files=expected_files,
+            title=title,
+            objective=objective,
+            config=config,
             existing_action=action
         )
 
@@ -178,7 +178,7 @@ class ExternalActionExecutor:
             action.verified_at = time.time()
             action.verification_details = details
             self.verifier.save_action(action)
-            self.log_event(action.mission_id, action.task_id, "EXTERNAL_ACTION_CONFIRMED", f"Dépôt GitHub {details.get('fullName')} vérifié avec succès", details)
+            self.log_event(action.mission_id, action.task_id, "EXTERNAL_ACTION_CONFIRMED", f"Livraison GitHub {details.get('fullName')} vérifiée avec succès", details)
             return True, details, ""
         else:
             action.status = ExternalActionStatus.FAILED

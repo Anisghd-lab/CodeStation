@@ -201,7 +201,10 @@ class DynamicIslandOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
                 val hasPermission = OverlayPermissionHelper.canDrawOverlays(this@DynamicIslandOverlayService)
                 val hasWorkingBot = bots.any { it.status == BotStatus.WORKING || it.status == BotStatus.BUSY }
                 val hasApproval = approvals.isNotEmpty()
-                val hasActiveCamcs = camcsMission != null && camcsMission.status !in listOf("CANCELLED", "FAILED")
+                val hasActiveCamcs = camcsMission != null && camcsMission.status in listOf(
+                    "WORKING", "RUNNING", "STREAMING", "PLANNING", "DISPATCHING",
+                    "STARTING", "QUEUED", "WAITING_FOR_AGENT", "WAITING_FOR_APPROVAL", "VALIDATING"
+                )
                 val currentlyActive = hasWorkingBot || hasApproval || hasActiveCamcs
 
                 val shouldShow = isEnabled && hasPermission && (currentlyActive || wasActive)
@@ -515,6 +518,8 @@ private fun OverlayIslandContent(
 
     LaunchedEffect(activeBots, camcsMission?.id, camcsMission?.status) {
         val currentIds = activeBots.map { it.id }.toSet()
+        val isTerminalCamcs = camcsMission != null && camcsMission?.status in listOf("COMPLETED", "CANCELLED", "FAILED", "TERMINATED", "DONE")
+
         if (activeBots.isNotEmpty() || isCamcsActive) {
             if (previousWorkingBotIds.isEmpty() && startedAt == 0L) {
                 val oldestBot = activeBots.map { it.lastActivityAt }.filter { it > 0 }.minOrNull()
@@ -522,12 +527,14 @@ private fun OverlayIslandContent(
                 startedAt = listOfNotNull(oldestBot, camcsStart).minOrNull() ?: System.currentTimeMillis()
             }
             showCompletedBanner = false
-        } else if (previousWorkingBotIds.isNotEmpty() || isCamcsCompleted) {
+        } else if (previousWorkingBotIds.isNotEmpty() || isCamcsCompleted || isTerminalCamcs) {
             val completedBot = bots.firstOrNull { it.id in previousWorkingBotIds }
             lastCompletedBotName = completedBot?.name ?: camcsMission?.title ?: "Tâche CAMCS"
+            startedAt = 0L // Stop counter immediately
             showCompletedBanner = true
             delay(4000)
             showCompletedBanner = false
+        } else {
             startedAt = 0L
         }
         previousWorkingBotIds = currentIds

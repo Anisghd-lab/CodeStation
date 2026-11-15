@@ -192,6 +192,12 @@ class CamcsRepositoryImpl(
                         lastCompletedMission = completed
                         retainCompletedUntilMs = System.currentTimeMillis() + 4200L
                         _activeMissionStream.value = completed
+                        scope.launch {
+                            delay(4300L)
+                            if (_activeMissionStream.value?.id == mid && _activeMissionStream.value?.status == "COMPLETED") {
+                                _activeMissionStream.value = null
+                            }
+                        }
                     }
                 }
                 "mission.cancelled" -> {

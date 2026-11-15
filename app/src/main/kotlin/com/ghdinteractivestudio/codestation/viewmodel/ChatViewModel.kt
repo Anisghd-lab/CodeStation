@@ -34,6 +34,21 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
+import java.util.concurrent.ConcurrentLinkedQueue
+
+enum class TurnState {
+    IDLE,
+    STARTING,
+    RUNNING
+}
+
+enum class TurnTerminationReason {
+    COMPLETED,
+    CANCELLED,
+    ERROR,
+    EXPIRED
+}
 
 data class ChatUiState(
     val bot: Bot? = null,
@@ -53,7 +68,9 @@ data class ChatUiState(
     val serverToken: String = "",
     val activeConversationId: String? = null,
     val activeConversationTitle: String = "Discussion",
-    val conversations: List<Conversation> = emptyList()
+    val conversations: List<Conversation> = emptyList(),
+    val generationElapsedSeconds: Int = 0,
+    val queuedMessagesCount: Int = 0
 )
 
 class ChatViewModel(
@@ -88,55 +105,178 @@ class ChatViewModel(
     private val _isTranscribing = MutableStateFlow(false)
     private val _serverUrl = MutableStateFlow("http://127.0.0.1:19222")
     private val _serverToken = MutableStateFlow("")
+    private val _generationElapsedSeconds = MutableStateFlow(0)
+    private val _queuedMessagesCount = MutableStateFlow(0)
 
     private var lastSentText: String? = null
     private var lastSentAttachments: List<PendingAttachment> = emptyList()
     private var lastSentMessageId: String? = null
     private var turnTimeoutJob: Job? = null
+    private var timerJob: Job? = null
+    private var turnStartNano: Long = 0L
     private var isSending = false
     private var turnStartTimeMs = 0L
+    private var activeTurnStartTimeMs = 0L
+    private var activeTurnId: String? = null
+    private var activeTurnConversationId: String? = null
+    private var activeTurnState: TurnState = TurnState.IDLE
+    private var turnExplicitlyFinished: Boolean = false
     private var lastBotMsgId: String? = null
     private var lastBotMsgLength: Int = 0
 
-    private fun resetTurnTimeout(timeoutMs: Long, isStreaming: Boolean = false) {
+    private data class QueuedMessage(
+        val clientRequestId: String,
+        val text: String,
+        val attachments: List<PendingAttachment>,
+        val reply: QuotedReply?,
+        val conversationId: String?
+    )
+
+    private val outgoingQueue = ConcurrentLinkedQueue<QueuedMessage>()
+
+    private fun startTimer() {
+        timerJob?.cancel()
+        turnStartNano = System.nanoTime()
+        _generationElapsedSeconds.value = 0
+        timerJob = viewModelScope.launch {
+            while (true) {
+                delay(500L)
+                val elapsedSec = ((System.nanoTime() - turnStartNano) / 1_000_000_000L).toInt()
+                _generationElapsedSeconds.value = elapsedSec
+            }
+        }
+    }
+
+    private fun stopTimer() {
+        timerJob?.cancel()
+        timerJob = null
+    }
+
+    private fun updateNotification(phase: TaskNotificationPhase, summary: String) {
+        context?.let { ctx ->
+            viewModelScope.launch {
+                val bot = botRepository.getBotById(botId)
+                val displayName = CodeStationNotificationManager.formatAgentDisplayName(botId, bot?.name)
+                val engine = bot?.provider?.backendId ?: "opencode"
+                CodeStationNotificationManager.updateTaskNotification(
+                    context = ctx,
+                    botId = botId,
+                    botName = displayName,
+                    agentBackend = engine,
+                    phase = phase,
+                    summary = summary
+                )
+            }
+        }
+    }
+
+    private fun finishTurn(
+        reason: TurnTerminationReason,
+        errorDetails: String? = null,
+        expectedTurnId: String? = null
+    ) {
+        if (expectedTurnId != null && activeTurnId != null && activeTurnId != expectedTurnId) {
+            return
+        }
+        if (activeTurnState == TurnState.IDLE && !_isBotWorking.value) {
+            return
+        }
+
+        val closedTurnId = activeTurnId
+        activeTurnState = TurnState.IDLE
+        activeTurnId = null
+        activeTurnConversationId = null
+        turnExplicitlyFinished = true
+        isSending = false
+
+        stopTimer()
         turnTimeoutJob?.cancel()
+        turnTimeoutJob = null
+        _isBotWorking.value = false
+
+        viewModelScope.launch {
+            botRepository.updateBotStatus(botId, BotStatus.IDLE)
+        }
+
+        when (reason) {
+            TurnTerminationReason.COMPLETED -> {
+                RequestTracer.logEvent(
+                    requestId = closedTurnId ?: "turn-$botId",
+                    event = RequestTracer.EVENT_RESPONSE_COMPLETED,
+                    botId = botId
+                )
+                updateNotification(TaskNotificationPhase.COMPLETED, "Réponse terminée.")
+                dispatchNextQueuedMessage()
+            }
+            TurnTerminationReason.CANCELLED -> {
+                RequestTracer.logEvent(
+                    requestId = closedTurnId ?: "turn-$botId",
+                    event = RequestTracer.EVENT_REQUEST_CANCELLED,
+                    botId = botId
+                )
+                updateNotification(TaskNotificationPhase.STOPPED, "Tâche interrompue par l'utilisateur.")
+                outgoingQueue.clear()
+                _queuedMessagesCount.value = 0
+            }
+            TurnTerminationReason.ERROR -> {
+                _errorMessage.value = errorDetails ?: "Erreur de transmission"
+                RequestTracer.logEvent(
+                    requestId = closedTurnId ?: "turn-$botId",
+                    event = RequestTracer.EVENT_REQUEST_FAILED,
+                    botId = botId,
+                    details = mapOf("error" to (errorDetails ?: "unknown"))
+                )
+                updateNotification(TaskNotificationPhase.FAILED, errorDetails ?: "Erreur de transmission")
+            }
+            TurnTerminationReason.EXPIRED -> {
+                val reasonText = errorDetails ?: "Délai d'attente dépassé"
+                _errorMessage.value = reasonText
+                RequestTracer.logEvent(
+                    requestId = closedTurnId ?: "turn-$botId",
+                    event = RequestTracer.EVENT_REQUEST_FAILED,
+                    botId = botId,
+                    details = mapOf("reason" to "turn_timeout")
+                )
+                updateNotification(TaskNotificationPhase.FAILED, reasonText)
+            }
+        }
+    }
+
+    private fun dispatchNextQueuedMessage() {
+        val nextMsg = outgoingQueue.poll() ?: return
+        _queuedMessagesCount.value = outgoingQueue.size
+        executeSendMessage(
+            text = nextMsg.text,
+            attachments = nextMsg.attachments,
+            reply = nextMsg.reply,
+            clientRequestId = nextMsg.clientRequestId,
+            targetConversationId = nextMsg.conversationId
+        )
+    }
+
+    private fun resetTurnTimeout(timeoutMs: Long, isStreaming: Boolean = false, expectedTurnId: String? = null) {
+        turnTimeoutJob?.cancel()
+        val turnId = expectedTurnId ?: activeTurnId
         turnTimeoutJob = viewModelScope.launch {
             delay(timeoutMs)
-            if (_isBotWorking.value) {
+            if (_isBotWorking.value && (turnId == null || activeTurnId == turnId)) {
                 val currentBot = botRepository.getBotById(botId)
                 if (currentBot?.status == BotStatus.WORKING || currentBot?.status == BotStatus.BUSY) {
                     android.util.Log.i("ChatViewModel", "Bot $botId is still reported as ${currentBot.status} on host, extending watchdog by 60s")
-                    resetTurnTimeout(60000L, isStreaming = isStreaming)
+                    resetTurnTimeout(60000L, isStreaming = isStreaming, expectedTurnId = turnId)
                     return@launch
                 }
-                _isBotWorking.value = false
-                botRepository.updateBotStatus(botId, BotStatus.IDLE)
                 val timeoutSec = timeoutMs / 1000
                 val reason = if (isStreaming) {
                     "Délai d'inactivité dépassé pendant la génération (${timeoutSec}s)."
                 } else {
                     "Délai d'attente dépassé (${timeoutSec}s). Le modèle ou le serveur n'a pas répondu à temps."
                 }
-                _errorMessage.value = reason
-                RequestTracer.logEvent(
-                    requestId = lastSentMessageId ?: "turn-$botId",
-                    event = RequestTracer.EVENT_REQUEST_FAILED,
-                    botId = botId,
-                    details = mapOf("reason" to "turn_timeout_${timeoutSec}s", "isStreaming" to isStreaming)
+                finishTurn(
+                    reason = TurnTerminationReason.EXPIRED,
+                    errorDetails = reason,
+                    expectedTurnId = turnId
                 )
-                val bot = botRepository.getBotById(botId)
-                val displayName = CodeStationNotificationManager.formatAgentDisplayName(botId, bot?.name)
-                val engine = bot?.provider?.backendId ?: "opencode"
-                context?.let { ctx ->
-                    CodeStationNotificationManager.updateTaskNotification(
-                        context = ctx,
-                        botId = botId,
-                        botName = displayName,
-                        agentBackend = engine,
-                        phase = TaskNotificationPhase.FAILED,
-                        summary = reason
-                    )
-                }
                 (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.insertNotice(
                     botId = botId,
                     text = "$reason Vérifiez que Termux et le CLI du bot sont actifs, puis appuyez sur Réessayer."
@@ -155,7 +295,9 @@ class ChatViewModel(
         val isVoiceRecording: Boolean,
         val voiceDurationSeconds: Int,
         val isTranscribing: Boolean,
-        val error: String?
+        val error: String?,
+        val generationElapsedSeconds: Int,
+        val queuedMessagesCount: Int
     )
 
     private val _botDataFlow = combine(
@@ -176,7 +318,9 @@ class ChatViewModel(
         _isVoiceRecording,
         _voiceDurationSeconds,
         _isTranscribing,
-        _errorMessage
+        _errorMessage,
+        _generationElapsedSeconds,
+        _queuedMessagesCount
     ) { args: Array<Any?> ->
         @Suppress("UNCHECKED_CAST")
         InputState(
@@ -189,7 +333,9 @@ class ChatViewModel(
             isVoiceRecording = args[6] as Boolean,
             voiceDurationSeconds = args[7] as Int,
             isTranscribing = args[8] as Boolean,
-            error = args[9] as String?
+            error = args[9] as String?,
+            generationElapsedSeconds = args[10] as Int,
+            queuedMessagesCount = args[11] as Int
         )
     }
 
@@ -218,11 +364,17 @@ class ChatViewModel(
             else -> "Discussion"
         }
 
+        val effectiveWorking = if (turnExplicitlyFinished && !input.working) {
+            false
+        } else {
+            input.working || bot?.status == BotStatus.WORKING
+        }
+
         ChatUiState(
             bot = bot,
             messages = messages,
             pendingApprovals = approvals,
-            isBotWorking = input.working || bot?.status == BotStatus.WORKING,
+            isBotWorking = effectiveWorking,
             currentWorkingSteps = input.steps,
             inputDraft = input.draft,
             editingMessage = input.editing,
@@ -236,7 +388,9 @@ class ChatViewModel(
             serverToken = sToken,
             activeConversationId = activeConvId,
             activeConversationTitle = activeTitle,
-            conversations = convList
+            conversations = convList,
+            generationElapsedSeconds = input.generationElapsedSeconds,
+            queuedMessagesCount = input.queuedMessagesCount
         )
     }.stateIn(
         scope = viewModelScope,
@@ -277,34 +431,39 @@ class ChatViewModel(
             }
         }
 
-        // Observer l'état du bot : s'il passe à IDLE, libérer l'état de génération (hors transition de démarrage)
+        // Observer l'état du bot : s'il passe à IDLE ou OFFLINE alors qu'on est en état RUNNING, clore le tour
         viewModelScope.launch {
             botRepository.getBotByIdStream(botId).collect { bot ->
-                if ((bot?.status == BotStatus.IDLE || bot?.status == BotStatus.OFFLINE) && _isBotWorking.value && (System.currentTimeMillis() - turnStartTimeMs > 1500L)) {
-                    turnTimeoutJob?.cancel()
-                    turnTimeoutJob = null
-                    _isBotWorking.value = false
+                if ((bot?.status == BotStatus.IDLE || bot?.status == BotStatus.OFFLINE) &&
+                    _isBotWorking.value &&
+                    activeTurnState == TurnState.RUNNING
+                ) {
+                    finishTurn(TurnTerminationReason.COMPLETED)
                 }
             }
         }
 
-        // Observer les messages : si une réponse finale du bot arrive, libérer l'état de génération.
+        // Observer les messages : si une réponse finale du bot arrive pour la conversation et le tour en cours, clore le tour.
         // Pendant le streaming actif (chunks), prolonger dynamiquement le délai d'inactivité.
         viewModelScope.launch {
             chatRepository.getMessagesStream(botId).collect { msgs ->
-                val lastBotMsg = msgs.filter { it.author.type == com.ghdinteractivestudio.codestation.domain.model.MessageAuthorType.BOT }.lastOrNull()
+                val currentConvId = _activeConversationId.value
+                val lastBotMsg = msgs
+                    .filter { it.author.type == MessageAuthorType.BOT }
+                    .filter { currentConvId == null || it.conversationId == currentConvId }
+                    .lastOrNull()
+
                 if (lastBotMsg != null) {
-                    if (lastBotMsg.isFinal) {
-                        turnTimeoutJob?.cancel()
-                        turnTimeoutJob = null
-                        _isBotWorking.value = false
+                    val isCurrentTurnMsg = lastBotMsg.timestamp >= (turnStartTimeMs - 5000L)
+                    if (lastBotMsg.isFinal && _isBotWorking.value && isCurrentTurnMsg) {
+                        finishTurn(TurnTerminationReason.COMPLETED)
                         lastBotMsgId = null
                         lastBotMsgLength = 0
-                    } else if (_isBotWorking.value) {
+                    } else if (_isBotWorking.value && isCurrentTurnMsg) {
                         if (lastBotMsg.id != lastBotMsgId || lastBotMsg.text.length != lastBotMsgLength) {
                             lastBotMsgId = lastBotMsg.id
                             lastBotMsgLength = lastBotMsg.text.length
-                            resetTurnTimeout(180000L, isStreaming = true)
+                            resetTurnTimeout(180000L, isStreaming = true, expectedTurnId = activeTurnId)
                         }
                     }
                 }
@@ -379,64 +538,115 @@ class ChatViewModel(
         sendMessage()
     }
 
-    fun sendMessage() {
-        if (isSending) return
-        val text = _inputDraft.value.trim()
-        val currentAttachments = _attachments.value
-        if (text.isBlank() && currentAttachments.isEmpty()) return
+    private suspend fun ensureActiveConversation(text: String, currentAttachments: List<PendingAttachment>): String? {
+        var currentConvId = _activeConversationId.value
+        val existingConv = if (!currentConvId.isNullOrBlank()) {
+            chatRepository.getConversationById(currentConvId)
+        } else null
 
-        isSending = true
-        val reply = _quotedReply.value
-        val clientMsgId = java.util.UUID.randomUUID().toString()
-        lastSentText = text
-        lastSentAttachments = currentAttachments
-        lastSentMessageId = clientMsgId
-        turnStartTimeMs = System.currentTimeMillis()
-        _inputDraft.value = ""
-        _editingMessage.value = null
-        _quotedReply.value = null
-        _attachments.value = emptyList()
-        _errorMessage.value = null
+        if (currentConvId.isNullOrBlank() || existingConv == null) {
+            val smartTitle = generateConversationTitle(text, currentAttachments.map { it.name })
+            val newConv = if (currentConvId.isNullOrBlank()) {
+                chatRepository.createConversation(botId, smartTitle).getOrNull()
+            } else {
+                chatRepository.createConversation(botId, smartTitle, null, null, currentConvId).getOrNull()
+            }
+            currentConvId = newConv?.id ?: currentConvId
+            _activeConversationId.value = currentConvId
+        } else {
+            if (isGenericConversationTitle(existingConv.title) || existingConv.messageCount == 0) {
+                val smartTitle = generateConversationTitle(text, currentAttachments.map { it.name })
+                chatRepository.renameConversation(existingConv.id, smartTitle)
+            }
+        }
+        return currentConvId
+    }
 
-        val reqId = clientMsgId
+    private suspend fun enqueueMessage(
+        clientRequestId: String,
+        text: String,
+        attachments: List<PendingAttachment>,
+        reply: QuotedReply?,
+        conversationId: String?
+    ) {
+        val domainAttachments = attachments.map {
+            FileAttachment(
+                id = it.id,
+                name = it.name,
+                sizeBytes = it.sizeBytes,
+                mimeType = it.mimeType,
+                localUri = it.uri.toString()
+            )
+        }
 
         RequestTracer.logEvent(
-            requestId = reqId,
+            requestId = clientRequestId,
+            event = RequestTracer.EVENT_MESSAGE_QUEUED,
+            botId = botId,
+            details = mapOf("length" to text.length, "attachments" to attachments.size)
+        )
+
+        outgoingQueue.add(
+            QueuedMessage(
+                clientRequestId = clientRequestId,
+                text = text,
+                attachments = attachments,
+                reply = reply,
+                conversationId = conversationId
+            )
+        )
+        _queuedMessagesCount.value = outgoingQueue.size
+
+        // Inscription locale immédiate en base Room avec isQueued = true (visible avec badge • En attente)
+        chatRepository.sendMessage(
+            botId = botId,
+            text = text,
+            replyTo = reply,
+            attachments = domainAttachments,
+            conversationId = conversationId,
+            clientRequestId = clientRequestId,
+            isQueued = true
+        )
+    }
+
+    private fun executeSendMessage(
+        text: String,
+        attachments: List<PendingAttachment>,
+        reply: QuotedReply?,
+        clientRequestId: String,
+        targetConversationId: String?
+    ) {
+        isSending = true
+        val turnId = UUID.randomUUID().toString()
+        activeTurnId = turnId
+        activeTurnConversationId = targetConversationId
+        activeTurnStartTimeMs = System.currentTimeMillis()
+        turnStartTimeMs = activeTurnStartTimeMs
+        activeTurnState = TurnState.STARTING
+        turnExplicitlyFinished = false
+
+        lastSentText = text
+        lastSentAttachments = attachments
+        lastSentMessageId = clientRequestId
+
+        _isBotWorking.value = true
+        startTimer()
+
+        RequestTracer.logEvent(
+            requestId = clientRequestId,
             event = RequestTracer.EVENT_MESSAGE_CREATED,
             botId = botId,
-            details = mapOf("length" to text.length, "attachments" to currentAttachments.size)
-        )
-        RequestTracer.logEvent(
-            requestId = reqId,
-            event = RequestTracer.EVENT_MESSAGE_QUEUED,
-            botId = botId
+            details = mapOf("length" to text.length, "attachments" to attachments.size)
         )
 
         viewModelScope.launch {
             try {
-                _isBotWorking.value = true
                 botRepository.updateBotStatus(botId, BotStatus.WORKING)
 
-                RequestTracer.logEvent(
-                    requestId = reqId,
-                    event = RequestTracer.EVENT_REQUEST_SENT,
-                    botId = botId
-                )
-                RequestTracer.logEvent(
-                    requestId = reqId,
-                    event = RequestTracer.EVENT_REQUEST_RECEIVED,
-                    botId = botId
-                )
-                RequestTracer.logEvent(
-                    requestId = reqId,
-                    event = RequestTracer.EVENT_BOT_RESOLVED,
-                    botId = botId
-                )
                 val bot = botRepository.getBotById(botId)
                 val displayName = CodeStationNotificationManager.formatAgentDisplayName(botId, bot?.name)
                 val engine = bot?.provider?.backendId ?: "opencode"
 
-                // Déclenchement immédiat de la notification persistante dans la barre d'état
                 context?.let { ctx ->
                     CodeStationNotificationManager.updateTaskNotification(
                         context = ctx,
@@ -449,28 +659,9 @@ class ChatViewModel(
                     )
                 }
 
-                RequestTracer.logEvent(
-                    requestId = reqId,
-                    event = RequestTracer.EVENT_CLI_RESOLVED,
-                    botId = botId,
-                    details = mapOf("engine" to engine, "model" to (bot?.model ?: "default"))
-                )
-                RequestTracer.logEvent(
-                    requestId = reqId,
-                    event = RequestTracer.EVENT_PROCESS_STARTED,
-                    botId = botId
-                )
-                RequestTracer.logEvent(
-                    requestId = reqId,
-                    event = RequestTracer.EVENT_CLI_INPUT_DELIVERED,
-                    botId = botId,
-                    details = mapOf("hasAttachments" to currentAttachments.isNotEmpty())
-                )
+                resetTurnTimeout(300000L, isStreaming = false, expectedTurnId = turnId)
 
-                // Démarrer un délai d'attente adaptatif (300s pour la phase initiale de démarrage/réflexion)
-                resetTurnTimeout(300000L, isStreaming = false)
-
-                val domainAttachments = currentAttachments.map {
+                val domainAttachments = attachments.map {
                     FileAttachment(
                         id = it.id,
                         name = it.name,
@@ -480,59 +671,33 @@ class ChatViewModel(
                     )
                 }
 
-                var currentConvId = _activeConversationId.value
-                val existingConv = if (!currentConvId.isNullOrBlank()) {
-                    chatRepository.getConversationById(currentConvId)
-                } else null
+                val result = chatRepository.sendMessage(
+                    botId = botId,
+                    text = text,
+                    replyTo = reply,
+                    attachments = domainAttachments,
+                    conversationId = targetConversationId,
+                    clientRequestId = clientRequestId,
+                    isQueued = false
+                )
 
-                if (currentConvId.isNullOrBlank() || existingConv == null) {
-                    val smartTitle = generateConversationTitle(text, currentAttachments.map { it.name })
-                    val newConv = if (currentConvId.isNullOrBlank()) {
-                        chatRepository.createConversation(botId, smartTitle).getOrNull()
-                    } else {
-                        chatRepository.createConversation(botId, smartTitle, null, null, currentConvId).getOrNull()
-                    }
-                    currentConvId = newConv?.id ?: currentConvId
-                    _activeConversationId.value = currentConvId
-                } else {
-                    // Si la discussion existe mais porte un titre générique ou compte 0 message,
-                    // déduire et persister un titre significatif depuis ce premier prompt utilisateur
-                    if (isGenericConversationTitle(existingConv.title) || existingConv.messageCount == 0) {
-                        val smartTitle = generateConversationTitle(text, currentAttachments.map { it.name })
-                        chatRepository.renameConversation(existingConv.id, smartTitle)
-                    }
-                }
-
-                val result = chatRepository.sendMessage(botId, text, reply, domainAttachments, currentConvId)
                 result.onSuccess {
+                    if (activeTurnId == turnId) {
+                        activeTurnState = TurnState.RUNNING
+                    }
                     RequestTracer.logEvent(
-                        requestId = reqId,
+                        requestId = clientRequestId,
                         event = RequestTracer.EVENT_PROVIDER_REQUEST_STARTED,
                         botId = botId
                     )
                 }
+
                 result.onFailure { error ->
-                    turnTimeoutJob?.cancel()
-                    turnTimeoutJob = null
-                    _isBotWorking.value = false
-                    botRepository.updateBotStatus(botId, BotStatus.IDLE)
-                    _errorMessage.value = error.message ?: "Échec de l'envoi au serveur"
-                    RequestTracer.logEvent(
-                        requestId = reqId,
-                        event = RequestTracer.EVENT_REQUEST_FAILED,
-                        botId = botId,
-                        details = mapOf("error" to error.localizedMessage)
+                    finishTurn(
+                        reason = TurnTerminationReason.ERROR,
+                        errorDetails = error.message ?: "Échec de l'envoi au serveur",
+                        expectedTurnId = turnId
                     )
-                    context?.let { ctx ->
-                        CodeStationNotificationManager.updateTaskNotification(
-                            context = ctx,
-                            botId = botId,
-                            botName = displayName,
-                            agentBackend = engine,
-                            phase = TaskNotificationPhase.FAILED,
-                            summary = "Erreur de transmission : ${error.localizedMessage}"
-                        )
-                    }
                     (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.insertNotice(
                         botId = botId,
                         text = "Erreur de transmission : ${error.localizedMessage}"
@@ -540,6 +705,44 @@ class ChatViewModel(
                 }
             } finally {
                 isSending = false
+            }
+        }
+    }
+
+    fun sendMessage() {
+        val text = _inputDraft.value.trim()
+        val currentAttachments = _attachments.value
+        if (text.isBlank() && currentAttachments.isEmpty()) return
+
+        val reply = _quotedReply.value
+        val clientMsgId = UUID.randomUUID().toString()
+
+        // Vider la saisie immédiatement car l'action d'envoi volontaire est validée
+        _inputDraft.value = ""
+        _editingMessage.value = null
+        _quotedReply.value = null
+        _attachments.value = emptyList()
+        _errorMessage.value = null
+
+        viewModelScope.launch {
+            val convId = ensureActiveConversation(text, currentAttachments)
+
+            if (_isBotWorking.value || activeTurnState != TurnState.IDLE || isSending) {
+                enqueueMessage(
+                    clientRequestId = clientMsgId,
+                    text = text,
+                    attachments = currentAttachments,
+                    reply = reply,
+                    conversationId = convId
+                )
+            } else {
+                executeSendMessage(
+                    text = text,
+                    attachments = currentAttachments,
+                    reply = reply,
+                    clientRequestId = clientMsgId,
+                    targetConversationId = convId
+                )
             }
         }
     }
@@ -594,15 +797,7 @@ class ChatViewModel(
     }
 
     fun stopTurn() {
-        turnTimeoutJob?.cancel()
-        turnTimeoutJob = null
-        isSending = false
-        _isBotWorking.value = false
-        com.ghdinteractivestudio.codestation.util.RequestTracer.logEvent(
-            requestId = "cancel-$botId",
-            event = com.ghdinteractivestudio.codestation.util.RequestTracer.EVENT_REQUEST_CANCELLED,
-            details = mapOf("botId" to botId)
-        )
+        finishTurn(TurnTerminationReason.CANCELLED)
         viewModelScope.launch {
             val bot = botRepository.getBotById(botId)
             val displayName = CodeStationNotificationManager.formatAgentDisplayName(botId, bot?.name)
@@ -616,13 +811,18 @@ class ChatViewModel(
                     summary = "Tâche interrompue par l'utilisateur."
                 )
             }
-            botRepository.updateBotStatus(botId, BotStatus.IDLE)
             botRepository.stopBotTurn(botId)
             (chatRepository as? com.ghdinteractivestudio.codestation.data.local.ChatRepositoryImpl)?.insertNotice(
                 botId = botId,
                 text = "Génération interrompue par l'utilisateur."
             )
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopTimer()
+        turnTimeoutJob?.cancel()
     }
 
     fun clearHistory() {

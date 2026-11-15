@@ -149,6 +149,7 @@ fun BoxScope.DynamicIslandBar(
     var isExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(activeBot?.id, activeBot?.status, camcsMission?.id, camcsMission?.status) {
+        val isTerminalCamcs = camcsMission != null && camcsMission?.status in listOf("COMPLETED", "CANCELLED", "FAILED", "TERMINATED", "DONE")
         if (activeBot != null || isCamcsActive) {
             if (previousWorkingBotId == null && startedAt == 0L) {
                 val botStart = activeBot?.lastActivityAt?.takeIf { it > 0 }
@@ -157,16 +158,18 @@ fun BoxScope.DynamicIslandBar(
                 previousWorkingBotId = activeBot?.id ?: camcsMission?.id
             }
             showCompletedBanner = false
-        } else if ((previousWorkingBotId != null || isCamcsCompleted) && activeBot == null && !isCamcsActive) {
+        } else if ((previousWorkingBotId != null || isCamcsCompleted || isTerminalCamcs) && activeBot == null && !isCamcsActive) {
             val candidate = bots.firstOrNull { it.id == previousWorkingBotId }
             lastCompletedBotId = previousWorkingBotId
             lastCompletedBotName = candidate?.name ?: camcsMission?.title ?: previousWorkingBotId
             previousWorkingBotId = null
+            startedAt = 0L // Stop counter immediately
             showCompletedBanner = true
             delay(4000)
             showCompletedBanner = false
-            startedAt = 0L
             isExpanded = false
+        } else {
+            startedAt = 0L
         }
     }
 

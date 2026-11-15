@@ -291,14 +291,29 @@ fun ChatMessageItem(
                 }
             }
 
-            if (isUser && message.timestamp > 0) {
-                Text(
-                    text = formatMessageTime(message.timestamp),
-                    style = Type.caption2,
-                    color = Palette.tertiary,
-                    maxLines = 1,
+            if (isUser) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.padding(end = 6.dp, top = 2.dp)
-                )
+                ) {
+                    if (!message.isFinal) {
+                        Text(
+                            text = "• En attente",
+                            style = Type.caption2,
+                            color = Palette.attention,
+                            maxLines = 1
+                        )
+                    }
+                    if (message.timestamp > 0) {
+                        Text(
+                            text = formatMessageTime(message.timestamp),
+                            style = Type.caption2,
+                            color = Palette.tertiary,
+                            maxLines = 1
+                        )
+                    }
+                }
             }
         }
     }

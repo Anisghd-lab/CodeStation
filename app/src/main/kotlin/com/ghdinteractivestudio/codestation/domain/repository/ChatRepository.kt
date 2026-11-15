@@ -23,7 +23,9 @@ interface ChatRepository {
         text: String,
         replyTo: QuotedReply? = null,
         attachments: List<com.ghdinteractivestudio.codestation.domain.model.FileAttachment> = emptyList(),
-        conversationId: String? = null
+        conversationId: String? = null,
+        clientRequestId: String? = null,
+        isQueued: Boolean = false
     ): Result<ChatMessage>
     suspend fun respondApproval(approvalId: String, status: ApprovalStatus, alwaysApprove: Boolean = false): Result<Unit>
     suspend fun clearHistory(botId: String): Result<Unit>

@@ -8,12 +8,12 @@ plugins {
 
 android {
     namespace = "com.ghdinteractivestudio.codestation"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.ghdinteractivestudio.codestation"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 18
         versionName = "1.2.3"
 

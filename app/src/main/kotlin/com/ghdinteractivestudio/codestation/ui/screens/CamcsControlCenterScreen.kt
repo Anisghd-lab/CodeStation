@@ -891,16 +891,30 @@ fun CamcsControlCenterScreen(
             }
         }
 
-        // 3. SCROLLABLE CONTENT BODY
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(scrollState)
-                .padding(horizontal = 10.dp, vertical = 5.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            when (activeTab) {
-                0 -> {
+        // 3. CONTENT BODY
+        if (activeTab == 4) {
+            // TAB 5: The Agency 283 Specialists (LazyColumn handles its own scrolling)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                AgencyAgentsScreen(
+                    modifier = Modifier.fillMaxSize(),
+                    bottomInset = 24.dp,
+                    includeStatusBarPadding = false
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                when (activeTab) {
+                    0 -> {
                     // TAB 1: Mission Dashboard, Dispatching Flow & Agents
                     if (activeMission != null) {
                         // Multi-mission selector chip bar
@@ -1018,17 +1032,12 @@ fun CamcsControlCenterScreen(
                         onInspectDeliverable = { selectedDeliverableForView = it }
                     )
                 }
-                4 -> {
-                    // TAB 5: The Agency 283 Specialists
-                    AgencyAgentsScreen(
-                        bottomInset = 24.dp
-                    )
-                }
             }
 
             Spacer(Modifier.height(28.dp))
         }
     }
+}
 
     // CLI Detail Dialog
     selectedCliForDetail?.let { cli ->
