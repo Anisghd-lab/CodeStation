@@ -28,4 +28,7 @@ __pycache__/
 build_output/
 output_artifacts/
 .kotlin/
+*.db
+*.sqlite3
+
 
