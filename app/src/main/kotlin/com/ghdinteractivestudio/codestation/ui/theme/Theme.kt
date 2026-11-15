@@ -51,11 +51,10 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun CodeStationTheme(
-    darkTheme: Boolean = true,
+    darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    // Mandat strict CodeStation : Dark Mode Obsidian Glass exclusif (OLED #0B0D12, Light Mode banni)
-    val colorScheme = DarkColorScheme
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
     val view = LocalView.current
 
     if (!view.isInEditMode) {
@@ -64,14 +63,14 @@ fun CodeStationTheme(
             window.statusBarColor = Color.Transparent.toArgb()
             window.navigationBarColor = Color.Transparent.toArgb()
             WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = false
-                isAppearanceLightNavigationBars = false
+                isAppearanceLightStatusBars = !darkTheme
+                isAppearanceLightNavigationBars = !darkTheme
             }
         }
     }
 
     CompositionLocalProvider(
-        LocalDark provides true
+        LocalDark provides darkTheme
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
