@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CodeStation & GHD Interactive Studio | Architecture Mobile, IA Autonome & Web 3D</title>
-    <meta name="description" content="Portfolio officiel de GHD Interactive Studio & Anis Ghediri. Conception d'applications Android natives haute performance, solutions d'IA multi-agents et sites web immersifs 3D avec l'esthétique Liquid Glass Obsidian.">
+    <title>CodeStation & GHD Interactive Studio | Jeux Vidéo, Applications & Web 3D</title>
+    <meta name="description" content="Portfolio d'Anis Ghediri & GHD Interactive Studio : vitrine interactive 3D de nos jeux mobiles, applications Android natives et hub d'agents IA CodeStation.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="style.css?v=20261120_codestation">
+    <link rel="stylesheet" href="style.css?v=20261120_v3">
     <!-- Three.js & GSAP -->
     <script src="three.min.js"></script>
     <script>
@@ -25,314 +25,252 @@
     </script>
 </head>
 <body class="obsidian-theme">
-    <!-- Ambient Dynamic Background Glow (Controlled via Scrollytelling) -->
+    <!-- Ambient Morphing Background Glow (Dynamically updated per product) -->
     <div id="ambient-glow" class="ambient-glow"></div>
 
-    <!-- WebGL 3D Canvas -->
+    <!-- WebGL 3D Canvas (Full-screen background & 3D Centerpiece) -->
     <canvas id="webgl-canvas"></canvas>
 
-    <!-- Top Status Banner -->
-    <div class="top-status-bar">
-        <div class="status-content">
-            <span class="live-dot pulse-emerald"></span>
-            <span class="status-text"><span class="badge-accent">GHD INTERACTIVE STUDIO</span> — Ingénierie Mobile Android Native, Solutions IA Multi-Agents & Web 3D Immersif</span>
-            <span class="status-meta">Disponibilité Projets Clients : <strong class="text-cyan">OUVERTE</strong></span>
-        </div>
-    </div>
-
-    <!-- Liquid Glass Navigation Header -->
-    <nav class="glass-nav" id="mainNav">
-        <a href="index.html" class="logo">
-            <div class="logo-mark">
-                <img src="assets/codestation/icon.png" alt="CodeStation Logo" class="logo-img" onerror="this.style.display='none'">
-                <span class="logo-code">CS</span>
-            </div>
-            <div class="logo-text">
-                <span class="brand-name">CodeStation</span>
-                <span class="brand-sub">GHD STUDIO</span>
-            </div>
-        </a>
-
-        <ul class="nav-links">
-            <li><a href="#hero" class="active">CodeStation</a></li>
-            <li><a href="#scrolly-section">Innovation 3D</a></li>
-            <li><a href="#solutions">Solutions Clients</a></li>
-            <li><a href="#portfolio">Écosystème GitHub</a></li>
-            <li><a href="#estimator">Estimer un Projet</a></li>
-            <li><a href="#contact">Contact</a></li>
-        </ul>
-
-        <div class="nav-actions">
-            <a href="https://github.com/Anisghd-lab/CodeStation/releases/latest" target="_blank" rel="noopener noreferrer" class="btn-glass-nav">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                <span>APK v1.2.7</span>
+    <!-- Top Fixed Glass Navigation Header -->
+    <header class="site-header">
+        <nav class="glass-nav" id="mainNav">
+            <a href="index.html" class="logo">
+                <div class="logo-mark">
+                    <img src="assets/codestation/icon.png" alt="CodeStation Logo" class="logo-img" onerror="this.style.display='none'">
+                    <span class="logo-code">CS</span>
+                </div>
+                <div class="logo-text">
+                    <span class="brand-name">CodeStation</span>
+                    <span class="brand-sub">GHD STUDIO</span>
+                </div>
             </a>
-            <button class="mobile-toggle" id="menuToggle" aria-label="Menu" onclick="document.getElementById('mainNav').classList.toggle('mobile-menu-active')">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-        </div>
-    </nav>
+
+            <ul class="nav-links">
+                <li><a href="#showcase" class="active">Showcase 3D</a></li>
+                <li><a href="#games">Nos Jeux</a></li>
+                <li><a href="#apps">Applications</a></li>
+                <li><a href="#solutions">Solutions Clients</a></li>
+                <li><a href="#estimator">Estimer un Projet</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+
+            <div class="nav-actions">
+                <a href="#estimator" class="btn-glass-nav">
+                    <span>✨ Lancer un Projet</span>
+                </a>
+                <button class="mobile-toggle" id="menuToggle" aria-label="Menu" onclick="document.getElementById('mainNav').classList.toggle('mobile-menu-active')">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </nav>
+    </header>
 
     <main>
         <!-- ═══════════════════════════════════════════════════════════════
-             HERO SECTION — CODESTATION FLAGSHIP
+             SECTION SCROLLYTELLING CINÉMATIQUE (EXACTEMENT COMME LA VIDÉO)
              ═══════════════════════════════════════════════════════════════ -->
-        <section class="hero-section" id="hero">
-            <div class="hero-container">
-                <div class="hero-badge">
-                    <span class="badge-icon">🚀</span>
-                    <span class="badge-text">TITRE PHARE • APPLICATION ANDROID NATIVE & MOTEUR RUST</span>
-                    <span class="badge-version">v1.2.7 STABLE</span>
-                </div>
-
-                <h1 class="hero-title">
-                    L'ÉCOSYSTÈME ULTIME<br>
-                    <span class="gradient-glow">CODESTATION</span>
-                </h1>
-
-                <p class="hero-lead">
-                    Hub d'orchestration d'agents IA autonomes directement depuis Android. Couplage inédit d'une interface native <strong>Jetpack Compose</strong> haute performance (120 FPS) et d'un hôte <strong>Rust 1.80+</strong> sécurisé en environnement local PRoot.
-                </p>
-
-                <div class="hero-stats-row">
-                    <div class="mini-stat-card">
-                        <span class="stat-number text-cyan">283</span>
-                        <span class="stat-label">Agents Agency Experts</span>
+        <section class="video-scrolly-section" id="showcase">
+            <div class="scrolly-sticky-container">
+                <!-- Top Mini Breadcrumb / Category Bar -->
+                <div class="scrolly-top-bar">
+                    <div class="catalog-indicator">
+                        <span class="pulse-dot"></span>
+                        <span class="catalog-title" id="slide-category-top">FLAGSHIP • HUB IA ANDROID</span>
                     </div>
-                    <div class="mini-stat-card">
-                        <span class="stat-number text-blue">120 FPS</span>
-                        <span class="stat-label">Rendu Compose Natif</span>
-                    </div>
-                    <div class="mini-stat-card">
-                        <span class="stat-number text-emerald">0 Token</span>
-                        <span class="stat-label">Discipline AST Graphify</span>
-                    </div>
-                    <div class="mini-stat-card">
-                        <span class="stat-number text-amber">8 États</span>
-                        <span class="stat-label">Dynamic Island Punch-Hole</span>
+                    <div class="catalog-counter font-mono">
+                        <span id="current-slide-num">01</span> / <span id="total-slides-num">07</span>
                     </div>
                 </div>
 
-                <div class="hero-cta-group">
-                    <a href="https://github.com/Anisghd-lab/CodeStation/releases/download/v1.2.7/app-debug.apk" class="btn-primary-glow">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="7 10 12 15 17 10"></polyline>
-                            <line x1="12" y1="15" x2="12" y2="3"></line>
-                        </svg>
-                        <span>Télécharger CodeStation APK</span>
-                        <span class="btn-subtext">Android 8.0 à 16 (API 26-35+)</span>
-                    </a>
-                    <a href="#estimator" class="btn-secondary-glass">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                        </svg>
-                        <span>Confier Votre Idée / Projet</span>
-                    </a>
-                    <a href="https://github.com/Anisghd-lab/CodeStation" target="_blank" rel="noopener noreferrer" class="btn-icon-glass" title="Code Source GitHub">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-                        </svg>
-                    </a>
+                <!-- The 3-Zone Scrollytelling Stage -->
+                <div class="scrolly-stage">
+                    <!-- LEFT ZONE : Title, Description, Buttons, Rating -->
+                    <div class="stage-left" id="stage-left">
+                        <div class="product-badge-pill" id="product-badge">⭐ PROJET PHARE DU STUDIO</div>
+                        <h1 class="product-title" id="product-title">CodeStation</h1>
+                        <p class="product-desc" id="product-desc">
+                            Hub d'orchestration mobile pour 283 agents IA autonomes. Interface native Jetpack Compose 120 FPS, Dynamic Island pour encoche caméra, graphe neuronal 3D cortical et hôte Rust PRoot en conteneur sécurisé.
+                        </p>
+                        
+                        <div class="product-actions" id="product-actions">
+                            <a href="https://github.com/Anisghd-lab/CodeStation/releases/latest" target="_blank" rel="noopener noreferrer" class="btn-hero-primary" id="btn-primary-action">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                <span id="btn-primary-text">Télécharger l'APK v1.2.7</span>
+                            </a>
+                            <a href="https://github.com/Anisghd-lab/CodeStation" target="_blank" rel="noopener noreferrer" class="btn-hero-glass" id="btn-secondary-action">
+                                <span id="btn-secondary-text">Dépôt GitHub</span>
+                            </a>
+                        </div>
+
+                        <div class="product-rating" id="product-rating">
+                            <span class="rating-stars">★★★★★</span>
+                            <span class="rating-val">4.9</span>
+                            <span class="rating-count">(3.4k utilisateurs)</span>
+                            <span class="rating-tag" id="rating-tag">• Android 8.0-16 • 100% Hors-Ligne</span>
+                        </div>
+                    </div>
+
+                    <!-- CENTER ZONE : The 3D Rotating Interactive Model (Handled by Three.js) -->
+                    <div class="stage-center">
+                        <div class="interactive-hint font-mono">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"></path></svg>
+                            <span>GLISSER OU SCROLLER POUR FAIRE PIVOTER EN 3D</span>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT ZONE : Status, Price, Discount, Specs Badge -->
+                    <div class="stage-right" id="stage-right">
+                        <div class="price-box">
+                            <span class="old-price" id="product-old-price">PROPRIÉTAIRE</span>
+                            <div class="main-price font-mono" id="product-price">GRATUIT</div>
+                            <span class="price-sub" id="product-price-sub">Open Source • Licence Libre</span>
+                        </div>
+
+                        <div class="discount-badge" id="product-discount">
+                            <span>100% LIBRE</span>
+                        </div>
+
+                        <div class="product-specs-list" id="product-specs">
+                            <div class="spec-item"><span class="spec-k">LANGAGES</span><span class="spec-v text-cyan">Kotlin & Rust</span></div>
+                            <div class="spec-item"><span class="spec-k">CADENCE</span><span class="spec-v text-emerald">120 FPS Natif</span></div>
+                            <div class="spec-item"><span class="spec-k">SWARM IA</span><span class="spec-v text-blue">283 Agents</span></div>
+                            <div class="spec-item"><span class="spec-k">DISCIPLINE</span><span class="spec-v text-amber">0-Token AST</span></div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="scroll-indicator">
-                    <span>SCROLLER POUR VIVRE L'EXPÉRIENCE 3D</span>
-                    <div class="scroll-mouse">
-                        <div class="scroll-wheel"></div>
+                <!-- Bottom Navigation Controls & Slides Bar -->
+                <div class="scrolly-controls">
+                    <button class="nav-arrow-btn" onclick="prevSlide()" aria-label="Produit précédent">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    
+                    <div class="slides-pills-bar" id="slides-pills">
+                        <button class="slide-pill active" onclick="goToSlide(0)"><span class="pill-dot"></span> CodeStation</button>
+                        <button class="slide-pill" onclick="goToSlide(1)"><span class="pill-dot"></span> Lupus Arena</button>
+                        <button class="slide-pill" onclick="goToSlide(2)"><span class="pill-dot"></span> Block Blast Color</button>
+                        <button class="slide-pill" onclick="goToSlide(3)"><span class="pill-dot"></span> Football Sort Mania</button>
+                        <button class="slide-pill" onclick="goToSlide(4)"><span class="pill-dot"></span> The Echo of Shadows</button>
+                        <button class="slide-pill" onclick="goToSlide(5)"><span class="pill-dot"></span> JobHunter AI</button>
+                        <button class="slide-pill" onclick="goToSlide(6)"><span class="pill-dot"></span> MovieBox TV Bridge</button>
                     </div>
+
+                    <button class="nav-arrow-btn" onclick="nextSlide()" aria-label="Produit suivant">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
                 </div>
             </div>
         </section>
 
         <!-- ═══════════════════════════════════════════════════════════════
-             SECTION SCROLLYTELLING 3D : LE SHOWCASE WAOUH INTERACTIF
+             SECTION JEUX VIDÉO DU STUDIO (GRID DÉTAILLÉE)
              ═══════════════════════════════════════════════════════════════ -->
-        <section class="scrolly-section" id="scrolly-section">
-            <div class="scrolly-intro">
-                <span class="section-tag text-cyan">SCROLL-DRIVEN SHOWCASE • EXPÉRIENCE IMMERSIVE</span>
-                <h2 class="section-title">Anatomie d'une Révolution Mobile</h2>
-                <p class="section-desc">Faites défiler l'écran pour découvrir les couches technologiques de CodeStation au rythme de la modélisation interactive et du morphing d'ambiance.</p>
-            </div>
+        <section class="games-section" id="games">
+            <div class="section-container">
+                <div class="section-tag text-emerald">🎮 GAMING & EXPÉRIENCES INTERACTIVES</div>
+                <h2 class="section-title">Les Jeux Vidéo Conçus par le Studio</h2>
+                <p class="section-desc">De la stratégie multijoueur vocale aux casse-têtes addictifs conformes Google Play Target SDK 35, découvrez nos univers de jeu créés pour mobile et web.</p>
 
-            <div class="scrolly-container" id="scrolly-wrapper">
-                <!-- Pinned Sticky Interactive Viewport (The Waouh Device) -->
-                <div class="scrolly-viewport">
-                    <div class="scrolly-device-card glass-outer" id="device-card">
-                        <!-- Specular Highlight Top Edge -->
+                <div class="games-cards-grid">
+                    <!-- Game 1: Lupus Arena -->
+                    <div class="game-card glass-outer" style="border-color: rgba(239, 68, 68, 0.4);">
                         <div class="glass-specular-edge"></div>
-
-                        <!-- Device Top Notch & Real Interactive Dynamic Island -->
-                        <div class="device-hardware-top">
-                            <div class="device-speaker"></div>
-                            <!-- Dynamic Island Live Component -->
-                            <div class="dynamic-island-shell" id="hero-dynamic-island" data-state="WORKING">
-                                <div class="island-left">
-                                    <span class="island-dot" id="island-dot"></span>
-                                    <span class="island-text" id="island-text">STREAMING SSE</span>
-                                </div>
-                                <div class="island-right">
-                                    <span class="island-timer font-mono" id="island-timer">00:14.8s</span>
-                                    <span class="island-badge" id="island-badge">120 t/s</span>
-                                </div>
-                            </div>
-                            <div class="device-camera"></div>
-                        </div>
-
-                        <!-- Inner Stabilized Content Plate -->
-                        <div class="device-screen-plate" id="device-screen">
-                            <!-- Step 1: Dynamic Island State Machine -->
-                            <div class="screen-view active" id="view-step-1">
-                                <div class="view-header">
-                                    <span class="tag-pill text-blue">Composant Système Android</span>
-                                    <h3 class="view-title">Dynamic Island & Encoche Frontale</h3>
-                                    <p class="view-desc">Intégration millimétrique à gauche du Punch Hole sans chevauchement de la barre d'état. Machine à 8 états stricts.</p>
-                                </div>
-                                <div class="state-buttons-grid">
-                                    <button class="state-chip active" onclick="setIslandState('WORKING')"><span class="dot-green"></span> WORKING</button>
-                                    <button class="state-chip" onclick="setIslandState('STREAMING')"><span class="dot-blue"></span> STREAMING</button>
-                                    <button class="state-chip" onclick="setIslandState('NEEDS_APPROVAL')"><span class="dot-amber"></span> APPROVAL</button>
-                                    <button class="state-chip" onclick="setIslandState('ERROR')"><span class="dot-red"></span> ERROR</button>
-                                    <button class="state-chip" onclick="setIslandState('COMPLETED')"><span class="dot-cyan"></span> COMPLETED</button>
-                                    <button class="state-chip" onclick="setIslandState('READY')"><span class="dot-dim"></span> READY</button>
-                                </div>
-                                <div class="interactive-console font-mono">
-                                    <div class="console-line text-slate">$ codestation island --attach-notch</div>
-                                    <div class="console-line text-emerald">> Overlay TYPE_APPLICATION_OVERLAY actif</div>
-                                    <div class="console-line text-cyan">> Découpe caméra détectée : cutoutLeftPx - 5dp</div>
-                                    <div class="console-line text-white">> État courant : <span id="console-state" class="text-amber">WORKING (4.2s restant)</span></div>
-                                </div>
-                            </div>
-
-                            <!-- Step 2: Cortical Neural Graph -->
-                            <div class="screen-view" id="view-step-2">
-                                <div class="view-header">
-                                    <span class="tag-pill text-cyan">Mémoire Collective Temps Réel</span>
-                                    <h3 class="view-title">Graphe Neuronal Cortical 3D</h3>
-                                    <p class="view-desc">Cartographie vivante des expériences partagées, découpée selon les 4 lobes cérébraux.</p>
-                                </div>
-                                <div class="lobes-mini-matrix">
-                                    <div class="lobe-box"><span class="font-mono text-cyan">FRONTAL</span><small>Planification & Exécution</small></div>
-                                    <div class="lobe-box"><span class="font-mono text-blue">PARIÉTAL</span><small>Syntaxe & Modèles AST</small></div>
-                                    <div class="lobe-box"><span class="font-mono text-emerald">OCCIPITAL</span><small>UI & Rendu Visuel</small></div>
-                                    <div class="lobe-box"><span class="font-mono text-amber">TEMPORAL</span><small>Mémoire & Contexte</small></div>
-                                </div>
-                                <div class="neural-nodes-canvas-box">
-                                    <canvas id="mini-neural-canvas"></canvas>
-                                </div>
-                            </div>
-
-                            <!-- Step 3: 283 Agency Agents Swarm -->
-                            <div class="screen-view" id="view-step-3">
-                                <div class="view-header">
-                                    <span class="tag-pill text-emerald">Swarm Intelligence</span>
-                                    <h3 class="view-title">283 Experts Autonomes The Agency</h3>
-                                    <p class="view-desc">Activation contextuelle selon la mission. Aucune hallucination, livrables certifiés.</p>
-                                </div>
-                                <div class="agents-live-tape">
-                                    <div class="agent-tag">⚡ agency-frontend-developer</div>
-                                    <div class="agent-tag">🛡️ agency-application-security-engineer</div>
-                                    <div class="agent-tag">🧪 agency-reality-checker</div>
-                                    <div class="agent-tag">📱 agency-mobile-app-builder</div>
-                                    <div class="agent-tag">🦀 agency-rust-refactoring-specialist</div>
-                                    <div class="agent-tag">🎮 agency-game-designer</div>
-                                    <div class="agent-tag">🌐 agency-web-gis-developer</div>
-                                    <div class="agent-tag">📊 agency-statistician</div>
-                                </div>
-                                <div class="interactive-console font-mono">
-                                    <div class="console-line text-emerald">🎭 AGENCY ACTIVATION : agency-frontend-developer</div>
-                                    <div class="console-line text-white">🎯 Rôle : Implémentation Liquid Glass Obsidian</div>
-                                    <div class="console-line text-slate">📂 Source : ~/.agents/skills/agency-frontend-developer</div>
-                                </div>
-                            </div>
-
-                            <!-- Step 4: Rust PRoot & 0-Token Discipline -->
-                            <div class="screen-view" id="view-step-4">
-                                <div class="view-header">
-                                    <span class="tag-pill text-amber">Performance & Rigueur</span>
-                                    <h3 class="view-title">Moteur Rust 1.80+ & Zéro Gaspillage</h3>
-                                    <p class="view-desc">Exécution locale ultra-sécurisée PRoot sans root, couplée à l'indexation AST locale Tree-sitter.</p>
-                                </div>
-                                <div class="perf-metric-bars">
-                                    <div class="metric-row">
-                                        <span>Rendu UI Compose</span>
-                                        <div class="bar-outer"><div class="bar-inner bar-cyan" style="width: 98%"></div></div>
-                                        <span class="font-mono text-cyan">120 FPS</span>
-                                    </div>
-                                    <div class="metric-row">
-                                        <span>Exécution Hôte Rust</span>
-                                        <div class="bar-outer"><div class="bar-inner bar-emerald" style="width: 95%"></div></div>
-                                        <span class="font-mono text-emerald">0.42 ms</span>
-                                    </div>
-                                    <div class="metric-row">
-                                        <span>Coût Tokens Requête AST</span>
-                                        <div class="bar-outer"><div class="bar-inner bar-blue" style="width: 100%"></div></div>
-                                        <span class="font-mono text-blue">0 Token</span>
-                                    </div>
-                                </div>
-                                <div class="security-chip">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                                    <span>Conforme Google Play Protect & Isolation Android Sandbox</span>
-                                </div>
+                        <div class="game-card-banner banner-lupus">
+                            <span class="game-tag-badge bg-red">STRATÉGIE VOCALE MULTIJOUEUR</span>
+                            <div class="game-banner-icon">
+                                <img src="assets/lupus-arena/icon.png" alt="Lupus Arena Logo" onerror="this.src='assets/codestation/icon.png'">
                             </div>
                         </div>
-
-                        <!-- Device Bottom Handle Indicator -->
-                        <div class="device-bottom-bar">
-                            <div class="home-indicator"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Scrolling Story Triggers -->
-                <div class="scrolly-narrative">
-                    <div class="narrative-step active" data-step="1">
-                        <div class="step-badge text-blue">PILIER 01</div>
-                        <h3>Intégration Matérielle & Dynamic Island</h3>
-                        <p>CodeStation s'adapte à l'écran de votre smartphone en logeant une capsule interactive à gauche exacte de la découpe physique de la caméra frontale. Elle remonte en temps réel l'état des agents IA, les approbations requises et le débit de streaming SSE.</p>
-                        <div class="step-features">
-                            <span>• 15 dp de hauteur ergonomique</span>
-                            <span>• 8 états réactifs à priorité stricte</span>
-                            <span>• Flottant système (Overlay)</span>
+                        <div class="game-plate">
+                            <h3 class="game-title">Lupus Arena</h3>
+                            <p class="game-desc">Jeu de déduction sociale et de stratégie inspiré des Loups-Garous de Thiercelieux. Chat vocal temps réel, 30+ rôles illustrés, parties privées et publiques, ambiance nocturne immersive.</p>
+                            <div class="game-tech-tags">
+                                <span>Multiplayer Voice</span>
+                                <span>WebSockets</span>
+                                <span>Node.js Backend</span>
+                                <span>Web & Android</span>
+                            </div>
+                            <div class="game-actions">
+                                <a href="lupus-arena.html" class="btn-card-primary" style="background: linear-gradient(135deg, #EF4444, #B91C1C); color: #fff;">Explorer Lupus Arena</a>
+                                <a href="https://github.com/Anisghd-lab/LUPUS-ARENA" target="_blank" rel="noopener noreferrer" class="btn-card-link">GitHub</a>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="narrative-step" data-step="2">
-                        <div class="step-badge text-cyan">PILIER 02</div>
-                        <h3>Réseau Neuronal 3D & Mémoire Collective</h3>
-                        <p>Fini les contextes perdus à chaque session. Le système de mémoire corticale cartographie les apprentissages, les corrections de code et les architectures créées, accessibles en un tap sous forme d'un réseau de neurones 3D interactif.</p>
-                        <div class="step-features">
-                            <span>• Découpage en 4 lobes cognitifs</span>
-                            <span>• Partage d'expériences multi-agents</span>
-                            <span>• Persistance locale SQLite Room chiffrée</span>
+                    <!-- Game 2: Block Blast Color -->
+                    <div class="game-card glass-outer" style="border-color: rgba(16, 185, 129, 0.4);">
+                        <div class="glass-specular-edge"></div>
+                        <div class="game-card-banner banner-block">
+                            <span class="game-tag-badge bg-emerald">CASSE-TÊTE PUZZLE VIRAL</span>
+                            <div class="game-banner-icon">
+                                <img src="assets/block-blast/icon.svg" alt="Block Blast Icon">
+                            </div>
+                        </div>
+                        <div class="game-plate">
+                            <h3 class="game-title">Block Blast Color</h3>
+                            <p class="game-desc">Jeu de puzzle de blocs colorés ultra-fluide développé sous Flutter 3.x. Combos explosifs, retours haptiques dynamiques, Target SDK 35 et 100% conforme aux règles Google Play Store.</p>
+                            <div class="game-tech-tags">
+                                <span>Flutter 3.x</span>
+                                <span>Target SDK 35</span>
+                                <span>60-120 FPS</span>
+                                <span>Zéro Lag</span>
+                            </div>
+                            <div class="game-actions">
+                                <a href="https://github.com/Anisghd-lab/block-blast-android/releases" target="_blank" rel="noopener noreferrer" class="btn-card-primary" style="background: linear-gradient(135deg, #10B981, #059669); color: #fff;">Télécharger APK</a>
+                                <a href="https://github.com/Anisghd-lab/block-blast-android" target="_blank" rel="noopener noreferrer" class="btn-card-link">GitHub</a>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="narrative-step" data-step="3">
-                        <div class="step-badge text-emerald">PILIER 03</div>
-                        <h3>Le Catalogue The Agency (283 Agents)</h3>
-                        <p>L'intégralité du catalogue The Agency est embarquée et opérationnelle hors-ligne. Chaque mission déclenche l'activation automatique de l'agent idoine (Ingénierie, Sécurité offensive, Testing E2E, UI Liquid Glass, SIG, Gamedev...).</p>
-                        <div class="step-features">
-                            <span>• 20 divisions métiers couvertes</span>
-                            <span>• Adoption stricte de la personnalité experte</span>
-                            <span>• Rapport et traçabilité zéro-dette</span>
+                    <!-- Game 3: Football Mania: Color Sort Puzzle -->
+                    <div class="game-card glass-outer" style="border-color: rgba(251, 191, 36, 0.4);">
+                        <div class="glass-specular-edge"></div>
+                        <div class="game-card-banner banner-football">
+                            <span class="game-tag-badge bg-amber">CASUAL SPORT & TRI</span>
+                            <div class="game-banner-icon">
+                                <img src="assets/football-sort/icon.svg" alt="Football Sort Icon">
+                            </div>
+                        </div>
+                        <div class="game-plate">
+                            <h3 class="game-title">Football Mania : Color Sort</h3>
+                            <p class="game-desc">Jeu de réflexion et de tri de ballons de football aux couleurs des clubs légendaires. Niveaux progressifs, physique de rebond naturelle et compatibilité tactile smartphones/tablettes.</p>
+                            <div class="game-tech-tags">
+                                <span>Android & Web</span>
+                                <span>Target SDK 35</span>
+                                <span>Physique Canvas</span>
+                                <span>Score Cloud</span>
+                            </div>
+                            <div class="game-actions">
+                                <a href="https://github.com/Anisghd-lab/football-sort-mania" target="_blank" rel="noopener noreferrer" class="btn-card-primary" style="background: linear-gradient(135deg, #F59E0B, #D97706); color: #000; font-weight: 800;">Voir sur GitHub</a>
+                                <a href="https://github.com/Anisghd-lab/football-sort-mania/releases" target="_blank" rel="noopener noreferrer" class="btn-card-link">Releases</a>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="narrative-step" data-step="4">
-                        <div class="step-badge text-amber">PILIER 04</div>
-                        <h3>Hôte Rust & Discipline Zéro Gaspillage</h3>
-                        <p>Sous l'élégance de Jetpack Compose tourne un moteur écrit en Rust dans un environnement PRoot Linux autonome. Grâce à Graphify AST, le code est exploré localement via Tree-sitter sans dépenser un seul token LLM en lectures aveugles.</p>
-                        <div class="step-features">
-                            <span>• Rust 1.80+ compilé ARM64</span>
-                            <span>• Graphify AST 100% déterministe</span>
-                            <span>• Synchronisation native GitHub & Notion</span>
+                    <!-- Game 4: The Echo of Shadows -->
+                    <div class="game-card glass-outer" style="border-color: rgba(168, 85, 247, 0.4);">
+                        <div class="glass-specular-edge"></div>
+                        <div class="game-card-banner banner-echo">
+                            <span class="game-tag-badge bg-purple">NARRATION & CHOIX MULTIPLES</span>
+                            <div class="game-banner-icon">
+                                <img src="assets/echo-shadows/icon.svg" alt="The Echo of Shadows Icon">
+                            </div>
+                        </div>
+                        <div class="game-plate">
+                            <h3 class="game-title">The Echo of Shadows</h3>
+                            <p class="game-desc">Aventure narrative interactive à embranchements multiples. Chaque décision modifie la psychologie des protagonistes et déclenche l'une des multiples fins alternatives.</p>
+                            <div class="game-tech-tags">
+                                <span>Arbre de Choix</span>
+                                <span>Sound Design 3D</span>
+                                <span>Ambiance Sombre</span>
+                                <span>Fins Multiples</span>
+                            </div>
+                            <div class="game-actions">
+                                <a href="https://github.com/Anisghd-lab/The-Echo-of-Shadows" target="_blank" rel="noopener noreferrer" class="btn-card-primary" style="background: linear-gradient(135deg, #A855F7, #7E22CE); color: #fff;">Consulter le Projet</a>
+                                <a href="https://github.com/Anisghd-lab/The-Echo-of-Shadows" target="_blank" rel="noopener noreferrer" class="btn-card-link">GitHub</a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -344,76 +282,52 @@
              ═══════════════════════════════════════════════════════════════ -->
         <section class="services-section" id="solutions">
             <div class="section-container">
-                <div class="section-tag text-emerald">SOLUTIONS & SERVICES SUR-MESURE</div>
-                <h2 class="section-title">De Votre Idée à la Réalité</h2>
-                <p class="section-desc">Vous avez un concept innovant, une application mobile ambitieuse ou besoin d'un site web au design époustouflant ? GHD Interactive Studio transforme vos visions en produits opérationnels, testés et prêts pour la production.</p>
+                <div class="section-tag text-cyan">EXPERTISE TECHNIQUE & RÉALISATIONS</div>
+                <h2 class="section-title">Confiez-nous la Réalisation de vos Idées</h2>
+                <p class="section-desc">Vous avez un projet d'application mobile, un jeu vidéo ou besoin d'un site web au rendu époustouflant ? GHD Interactive Studio concrétise votre vision de A à Z avec rigueur et transparence.</p>
 
                 <div class="services-grid">
-                    <!-- Service 1: Applications Android Natives -->
                     <div class="service-card glass-outer">
                         <div class="glass-specular-edge"></div>
                         <div class="service-icon-box bg-blue-subtle">
                             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
                         </div>
                         <div class="service-plate">
-                            <h3 class="service-title">Applications Android Natives & Multiplateformes</h3>
-                            <p class="service-text">Conception d'applications Android modernes en <strong>Kotlin & Jetpack Compose</strong> ou <strong>Flutter</strong>. Fluidité 120 FPS, architecture MVVM/MVI Clean, conformité totale Google Play SDK 35 et respect rigoureux de la vie privée.</p>
-                            <ul class="service-bullets">
-                                <li>Intégration hardware (Caméra, MediaPipe, Bluetooth, NPU)</li>
-                                <li>Mode hors-ligne résilient et base de données SQLite locale</li>
-                                <li>Publication clé en main sur le Google Play Store</li>
-                            </ul>
+                            <h3 class="service-title">Applications Mobiles Android Natives</h3>
+                            <p class="service-text">Développement haut de gamme en <strong>Kotlin & Jetpack Compose</strong> ou <strong>Flutter</strong>. Rendu 120 FPS, architecture MVVM/MVI, conformité Google Play Target SDK 35 et intégration de capteurs/NPU.</p>
                         </div>
                     </div>
 
-                    <!-- Service 2: Sites Web Immersifs 3D & Scrollytelling -->
                     <div class="service-card glass-outer">
                         <div class="glass-specular-edge"></div>
                         <div class="service-icon-box bg-cyan-subtle">
                             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
                         </div>
                         <div class="service-plate">
-                            <h3 class="service-title">Sites Web Immersifs & Effet Waouh (3D & Scrollytelling)</h3>
-                            <p class="service-text">Création de vitrines web d'exception avec <strong>Three.js</strong>, <strong>WebGL</strong> et animations synchronisées au scroll (GSAP ScrollTrigger). Marquez durablement vos clients dès les premières secondes de consultation.</p>
-                            <ul class="service-bullets">
-                                <li>Présentation de produits 3D interactifs temps réel</li>
-                                <li>Design System signature Liquid Glass Obsidian Dark Mode</li>
-                                <li>Score de performance Google Lighthouse 95+</li>
-                            </ul>
+                            <h3 class="service-title">Sites Web Immersifs 3D & Scrollytelling</h3>
+                            <p class="service-text">Conception de vitrines web d'exception avec <strong>Three.js</strong>, WebGL et animations synchronisées au scroll (GSAP). Suscitez un coup de cœur immédiat auprès de vos clients avec l'effet Waouh.</p>
                         </div>
                     </div>
 
-                    <!-- Service 3: IA Autonome & Systèmes Multi-Agents -->
                     <div class="service-card glass-outer">
                         <div class="glass-specular-edge"></div>
                         <div class="service-icon-box bg-emerald-subtle">
-                            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"></path><rect x="4" y="8" width="16" height="12" rx="2"></rect><path d="M2 14h2"></path><path d="M20 14h2"></path><path d="M15 13v2"></path><path d="M9 13v2"></path></svg>
+                            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
                         </div>
                         <div class="service-plate">
-                            <h3 class="service-title">IA Autonome, RAG & Systèmes Multi-Agents</h3>
-                            <p class="service-text">Déploiement d'agents intelligents spécialisés pour automatiser vos processus métiers les plus complexes. Protocoles MCP (Model Context Protocol), pipelines RAG et intégration de modèles locaux/cloud.</p>
-                            <ul class="service-bullets">
-                                <li>Agents autonomes 24/7 (veille, sourcing, prospection, support)</li>
-                                <li>Architecture zéro hallucination avec validation de faits</li>
-                                <li>Intégration d'outils n8n, API REST et Webhooks</li>
-                            </ul>
+                            <h3 class="service-title">Développement de Jeux Vidéo Mobiles & Web</h3>
+                            <p class="service-text">Création de jeux 2D/3D (Godot, Unity, Flutter, WebGL). Mécaniques addictives, sound design immersif, monétisation éthique et optimisation drastique des performances batterie/mémoire.</p>
                         </div>
                     </div>
 
-                    <!-- Service 4: Modernisation & Ingénierie Rust -->
                     <div class="service-card glass-outer">
                         <div class="glass-specular-edge"></div>
                         <div class="service-icon-box bg-amber-subtle">
                             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
                         </div>
                         <div class="service-plate">
-                            <h3 class="service-title">Refactorisation Rust & Backends Hautes Performances</h3>
-                            <p class="service-text">Audit de code, élimination des fuites mémoire et accélération logicielle par réécriture en <strong>Rust</strong>. Architecture de microservices ultra-rapides, passerelles gRPC et serveurs à faible empreinte.</p>
-                            <ul class="service-bullets">
-                                <li>Optimisation du débit réseau et temps de réponse sub-milliseconde</li>
-                                <li>Sécurité mémoire garantie par le compilateur</li>
-                                <li>Conteneurisation et déploiement CI/CD automatisé</li>
-                            </ul>
+                            <h3 class="service-title">Systèmes IA Multi-Agents & Automatisation</h3>
+                            <p class="service-text">Déploiement d'agents IA autonomes, protocoles MCP, intégration de modèles LLM en local et architectures backend Rust scalables pour automatiser vos opérations critiques.</p>
                         </div>
                     </div>
                 </div>
@@ -421,231 +335,36 @@
         </section>
 
         <!-- ═══════════════════════════════════════════════════════════════
-             PORTFOLIO & ÉCOSYSTÈME DE RÉALISATIONS GITHUB
-             ═══════════════════════════════════════════════════════════════ -->
-        <section class="portfolio-section" id="portfolio">
-            <div class="section-container">
-                <div class="section-tag text-blue">ÉCOSYSTÈME & RÉALISATIONS</div>
-                <h2 class="section-title">Applications Conçues & Déployées</h2>
-                <p class="section-desc">Chaque projet est le fruit d'une ingénierie rigoureuse. Retrouvez les applications développées par Anis Ghediri (GHD Interactive Studio), avec dépôts GitHub ouverts et versions compilées.</p>
-
-                <div class="projects-grid">
-                    <!-- Project 1: CodeStation -->
-                    <div class="project-card glass-outer highlight-card">
-                        <div class="glass-specular-edge"></div>
-                        <div class="project-card-header">
-                            <div class="project-icon-box">
-                                <img src="assets/codestation/icon.png" alt="CodeStation Icon">
-                            </div>
-                            <div class="project-title-meta">
-                                <div class="badge-status-green">⭐ FLAGSHIP • v1.2.7</div>
-                                <h3 class="project-name">CodeStation</h3>
-                                <span class="project-category">Hub Mobile d'Agents IA Autonomes</span>
-                            </div>
-                        </div>
-                        <div class="project-card-body">
-                            <p class="project-desc">Plateforme Android native permettant d'orchestrer 283 agents IA en local. Intègre la Dynamic Island pour encoche caméra, un graphe neuronal 3D cortical et un hôte Rust PRoot ultra-rapide.</p>
-                            <div class="tech-tags">
-                                <span>Kotlin</span>
-                                <span>Jetpack Compose</span>
-                                <span>Rust 1.80+</span>
-                                <span>PRoot Linux</span>
-                                <span>Room SQLite</span>
-                            </div>
-                        </div>
-                        <div class="project-card-footer">
-                            <a href="https://github.com/Anisghd-lab/CodeStation" target="_blank" rel="noopener noreferrer" class="btn-card-link">GitHub</a>
-                            <a href="https://github.com/Anisghd-lab/CodeStation/releases/latest" target="_blank" rel="noopener noreferrer" class="btn-card-primary">Télécharger APK</a>
-                        </div>
-                    </div>
-
-                    <!-- Project 2: JobHunter AI -->
-                    <div class="project-card glass-outer">
-                        <div class="glass-specular-edge"></div>
-                        <div class="project-card-header">
-                            <div class="project-icon-box">
-                                <img src="assets/jobhunter/icon.png" alt="JobHunter AI Icon">
-                            </div>
-                            <div class="project-title-meta">
-                                <div class="badge-status-blue">v1.0.0 RELEASE</div>
-                                <h3 class="project-name">JobHunter AI</h3>
-                                <span class="project-category">Agent Autonome de Recrutement 24/7</span>
-                            </div>
-                        </div>
-                        <div class="project-card-body">
-                            <p class="project-desc">Agent autonome explorant en continu les offres d'emploi, analysant et adaptant sur-mesure CVs et lettres de motivation, avec envoi multiplateforme et interface Liquid Glass CodeStation.</p>
-                            <div class="tech-tags">
-                                <span>Android Compose</span>
-                                <span>Multi-Agent IA</span>
-                                <span>ATS Optimization</span>
-                                <span>Clean Architecture</span>
-                            </div>
-                        </div>
-                        <div class="project-card-footer">
-                            <a href="https://github.com/Anisghd-lab/JobHunter-AI" target="_blank" rel="noopener noreferrer" class="btn-card-link">GitHub</a>
-                            <a href="https://github.com/Anisghd-lab/JobHunter-AI/releases/latest" target="_blank" rel="noopener noreferrer" class="btn-card-primary">Télécharger APK</a>
-                        </div>
-                    </div>
-
-                    <!-- Project 3: MovieBox TV Bridge -->
-                    <div class="project-card glass-outer">
-                        <div class="glass-specular-edge"></div>
-                        <div class="project-card-header">
-                            <div class="project-icon-box">
-                                <img src="assets/moviebox/icon.png" alt="MovieBox TV Bridge Icon">
-                            </div>
-                            <div class="project-title-meta">
-                                <div class="badge-status-cyan">ANDROID TV</div>
-                                <h3 class="project-name">MovieBox TV Bridge</h3>
-                                <span class="project-category">Passerelle Leanback Home Channels</span>
-                            </div>
-                        </div>
-                        <div class="project-card-body">
-                            <p class="project-desc">Application pour Android TV intégrant MovieBox directement aux canaux officiels de l'écran d'accueil Google TV / Android TV Leanback avec lecture multimédia synchronisée.</p>
-                            <div class="tech-tags">
-                                <span>Android TV Leanback</span>
-                                <span>Kotlin</span>
-                                <span>TvLauncher Channels</span>
-                                <span>Background Service</span>
-                            </div>
-                        </div>
-                        <div class="project-card-footer">
-                            <a href="https://github.com/Anisghd-lab/moviebox-tv-bridge" target="_blank" rel="noopener noreferrer" class="btn-card-link">GitHub</a>
-                            <a href="https://github.com/Anisghd-lab/moviebox-tv-bridge/releases" target="_blank" rel="noopener noreferrer" class="btn-card-primary">Voir Dépôt</a>
-                        </div>
-                    </div>
-
-                    <!-- Project 4: ApexStudio -->
-                    <div class="project-card glass-outer">
-                        <div class="glass-specular-edge"></div>
-                        <div class="project-card-header">
-                            <div class="project-icon-box default-apex-icon">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
-                            </div>
-                            <div class="project-title-meta">
-                                <div class="badge-status-amber">v1.1.0 RELEASE</div>
-                                <h3 class="project-name">ApexStudio</h3>
-                                <span class="project-category">Factory Mobile d'Applications IA</span>
-                            </div>
-                        </div>
-                        <div class="project-card-body">
-                            <p class="project-desc">Studio mobile autonome de génération d'applications piloté par le swarm des 283 agents Agency et intégré à l'environnement hôte Termux Ubuntu.</p>
-                            <div class="tech-tags">
-                                <span>Autonomous Swarm</span>
-                                <span>Termux Host</span>
-                                <span>Code Generation</span>
-                                <span>Liquid Glass</span>
-                            </div>
-                        </div>
-                        <div class="project-card-footer">
-                            <a href="https://github.com/Anisghd-lab/ApexStudio" target="_blank" rel="noopener noreferrer" class="btn-card-link">GitHub</a>
-                            <a href="https://github.com/Anisghd-lab/ApexStudio/releases/latest" target="_blank" rel="noopener noreferrer" class="btn-card-primary">Télécharger APK</a>
-                        </div>
-                    </div>
-
-                    <!-- Project 5: Football AI Engine -->
-                    <div class="project-card glass-outer">
-                        <div class="glass-specular-edge"></div>
-                        <div class="project-card-header">
-                            <div class="project-icon-box default-football-icon">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
-                            </div>
-                            <div class="project-title-meta">
-                                <div class="badge-status-emerald">SPORTS ANALYTICS</div>
-                                <h3 class="project-name">Football AI Engine</h3>
-                                <span class="project-category">Client Android Natif de Prédictions</span>
-                            </div>
-                        </div>
-                        <div class="project-card-body">
-                            <p class="project-desc">Client Android Jetpack Compose analysant en temps réel les cotes et probabilités de rencontres sportives mondiales avec graphiques vectoriels et design Liquid Glass.</p>
-                            <div class="tech-tags">
-                                <span>Jetpack Compose</span>
-                                <span>Data Science</span>
-                                <span>Live WebSockets</span>
-                                <span>SportMonks API</span>
-                            </div>
-                        </div>
-                        <div class="project-card-footer">
-                            <a href="https://github.com/Anisghd-lab/football-ai-android" target="_blank" rel="noopener noreferrer" class="btn-card-link">GitHub</a>
-                            <a href="https://github.com/Anisghd-lab/football-ai-android" target="_blank" rel="noopener noreferrer" class="btn-card-primary">Voir Projet</a>
-                        </div>
-                    </div>
-
-                    <!-- Project 6: Stickr -->
-                    <div class="project-card glass-outer">
-                        <div class="glass-specular-edge"></div>
-                        <div class="project-card-header">
-                            <div class="project-icon-box default-stickr-icon">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                            </div>
-                            <div class="project-title-meta">
-                                <div class="badge-status-cyan">IA EMBARQUÉE</div>
-                                <h3 class="project-name">Stickr</h3>
-                                <span class="project-category">Studio de Stickers avec IA Locale</span>
-                            </div>
-                        </div>
-                        <div class="project-card-body">
-                            <p class="project-desc">Application Android native de détourage d'images et création instantanée de stickers pour messageries, avec modèle IA MediaPipe exécuté 100% hors-ligne sur le NPU du smartphone.</p>
-                            <div class="tech-tags">
-                                <span>Google MediaPipe</span>
-                                <span>On-Device NPU</span>
-                                <span>Kotlin</span>
-                                <span>WhatsApp Provider</span>
-                            </div>
-                        </div>
-                        <div class="project-card-footer">
-                            <a href="https://github.com/Anisghd-lab/Stickr" target="_blank" rel="noopener noreferrer" class="btn-card-link">GitHub</a>
-                            <a href="https://github.com/Anisghd-lab/Stickr/releases" target="_blank" rel="noopener noreferrer" class="btn-card-primary">Télécharger APK</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- ═══════════════════════════════════════════════════════════════
-             SIMULATEUR INTERACTIF D'ESTIMATION DE PROJET (LEAD GENERATION)
+             SIMULATEUR INTERACTIF DE DEVIS / ESTIMATOR
              ═══════════════════════════════════════════════════════════════ -->
         <section class="estimator-section" id="estimator">
             <div class="section-container">
-                <div class="section-tag text-cyan">CONFIGURATEUR INTERACTIF EN DIRECT</div>
+                <div class="section-tag text-cyan">CONFIGURATEUR INTERACTIF</div>
                 <h2 class="section-title">Estimez Votre Projet en 30 Secondes</h2>
-                <p class="section-desc">Sélectionnez la typologie de solution souhaitée et ses fonctionnalités clés pour obtenir instantanément une estimation indicative de durée et d'architecture technique.</p>
+                <p class="section-desc">Sélectionnez la nature de votre besoin et obtenez une synthèse immédiate du délai et de la stack technique recommandée.</p>
 
                 <div class="estimator-grid glass-outer">
                     <div class="glass-specular-edge"></div>
 
-                    <!-- Left: Configuration Form -->
                     <div class="estimator-controls">
                         <div class="control-group">
-                            <label class="control-label">1. Type de Solution Souhaitée</label>
+                            <label class="control-label">1. Type de Solution</label>
                             <div class="type-selector-grid">
                                 <button type="button" class="type-btn active" data-type="android" onclick="selectProjectType('android', this)">
                                     <span class="type-icon">📱</span>
-                                    <div class="type-texts">
-                                        <strong>App Android Native</strong>
-                                        <small>Kotlin / Jetpack Compose / Play Store</small>
-                                    </div>
+                                    <div class="type-texts"><strong>App Android Native</strong><small>Compose / 120 FPS / SDK 35</small></div>
+                                </button>
+                                <button type="button" class="type-btn" data-type="game" onclick="selectProjectType('game', this)">
+                                    <span class="type-icon">🎮</span>
+                                    <div class="type-texts"><strong>Jeu Vidéo Mobile / Web</strong><small>2D/3D / Godot / Flutter</small></div>
                                 </button>
                                 <button type="button" class="type-btn" data-type="web3d" onclick="selectProjectType('web3d', this)">
                                     <span class="type-icon">🌐</span>
-                                    <div class="type-texts">
-                                        <strong>Site Web 3D Scrollytelling</strong>
-                                        <small>Three.js / GSAP / Liquid Glass</small>
-                                    </div>
+                                    <div class="type-texts"><strong>Site Web 3D Scrollytelling</strong><small>Three.js / GSAP / Effet Waouh</small></div>
                                 </button>
                                 <button type="button" class="type-btn" data-type="ai" onclick="selectProjectType('ai', this)">
                                     <span class="type-icon">🤖</span>
-                                    <div class="type-texts">
-                                        <strong>Système IA Multi-Agents</strong>
-                                        <small>Swarms / MCP / RAG / Automatisation</small>
-                                    </div>
-                                </button>
-                                <button type="button" class="type-btn" data-type="fullstack" onclick="selectProjectType('fullstack', this)">
-                                    <span class="type-icon">⚡</span>
-                                    <div class="type-texts">
-                                        <strong>Projet Clé en Main</strong>
-                                        <small>App Mobile + Site Web + Backend</small>
-                                    </div>
+                                    <div class="type-texts"><strong>Système IA / Multi-Agents</strong><small>Swarms / MCP / Rust</small></div>
                                 </button>
                             </div>
                         </div>
@@ -661,36 +380,22 @@
                                 <label class="checkbox-pill">
                                     <input type="checkbox" id="opt-3d" checked onchange="calculateEstimate()">
                                     <span class="check-box"></span>
-                                    <span class="check-label">Modélisation & Rendu 3D interactif WebGL / Filament (+3j)</span>
+                                    <span class="check-label">Modélisation & Rendu 3D interactif WebGL / Canvas (+3j)</span>
                                 </label>
                                 <label class="checkbox-pill">
                                     <input type="checkbox" id="opt-backend" onchange="calculateEstimate()">
                                     <span class="check-box"></span>
-                                    <span class="check-label">Backend dédié haute performance (Rust / Node / SQLite) (+4j)</span>
+                                    <span class="check-label">Backend dédié haute performance & Base de données (+4j)</span>
                                 </label>
                                 <label class="checkbox-pill">
                                     <input type="checkbox" id="opt-store" checked onchange="calculateEstimate()">
                                     <span class="check-box"></span>
-                                    <span class="check-label">Préparation & Publication Google Play Store (Target SDK 35) (+2j)</span>
+                                    <span class="check-label">Publication Google Play Store clé en main (+2j)</span>
                                 </label>
-                                <label class="checkbox-pill">
-                                    <input type="checkbox" id="opt-ai" onchange="calculateEstimate()">
-                                    <span class="check-box"></span>
-                                    <span class="check-label">Intégration d'agents IA autonomes / LLM en local (+3j)</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="control-group">
-                            <label class="control-label">3. Degré d'Urgence du Projet</label>
-                            <div class="urgency-selector">
-                                <button type="button" class="urgency-btn active" data-urgency="standard" onclick="selectUrgency('standard', this)">Standard (Cadence normale)</button>
-                                <button type="button" class="urgency-btn" data-urgency="express" onclick="selectUrgency('express', this)">Express / Sprint Accéléré</button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Right: Live Result Card -->
                     <div class="estimator-result-card">
                         <div class="result-header">
                             <span class="font-mono text-cyan">SYNTHÈSE D'ESTIMATION</span>
@@ -702,18 +407,13 @@
                                 <div class="metric-value text-emerald font-mono" id="estimate-time">14 à 18 Jours</div>
                             </div>
                             <div class="result-metric">
-                                <span class="metric-title">Stack Technique Recommandée :</span>
+                                <span class="metric-title">Stack Technique :</span>
                                 <div class="metric-stack font-mono" id="estimate-stack">Kotlin, Jetpack Compose, Three.js, Room SQLite</div>
                             </div>
-                            <div class="result-metric">
-                                <span class="metric-title">Engagement Qualité :</span>
-                                <div class="metric-quality text-slate">100% Dark Mode Obsidian, Zéro dette technique, Code source fourni avec documentation et support.</div>
-                            </div>
                         </div>
-
                         <div class="result-actions">
                             <a href="#contact" class="btn-primary-glow btn-full" onclick="fillContactWithEstimate()">
-                                <span>Valider et Demander un Devis Précis</span>
+                                <span>Valider et Demander un Devis</span>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                             </a>
                         </div>
@@ -723,60 +423,50 @@
         </section>
 
         <!-- ═══════════════════════════════════════════════════════════════
-             SECTION CONTACT & TERMINAL INTERACTIF
+             SECTION CONTACT DIRECT
              ═══════════════════════════════════════════════════════════════ -->
         <section class="contact-section" id="contact">
             <div class="section-container">
-                <div class="section-tag text-emerald">CANAL DIRECT • STUDIO</div>
-                <h2 class="section-title">Prenons Contact & Concrétisons Votre Projet</h2>
-                <p class="section-desc">Discutons de vos besoins, analysons la faisabilité technique et construisons ensemble la solution idéale.</p>
+                <div class="section-tag text-emerald">CANAL DIRECT • ANIS GHEDIRI</div>
+                <h2 class="section-title">Discutons de Votre Projet</h2>
+                <p class="section-desc">Échangez directement avec le fondateur et architecte principal pour concrétiser votre application ou site web.</p>
 
                 <div class="contact-terminal glass-outer">
                     <div class="glass-specular-edge"></div>
                     <div class="terminal-bar">
-                        <div class="terminal-dots">
-                            <span class="dot red"></span>
-                            <span class="dot yellow"></span>
-                            <span class="dot green"></span>
-                        </div>
-                        <span class="terminal-title font-mono">ghd-studio@codestation: ~/contact-client</span>
+                        <div class="terminal-dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+                        <span class="terminal-title font-mono">ghd-studio@codestation: ~/contact</span>
                         <span class="terminal-status font-mono text-cyan">ONLINE [24/7]</span>
                     </div>
 
                     <div class="terminal-body">
-                        <div class="terminal-row">
-                            <span class="prompt text-emerald">ghd@codestation:~$</span>
-                            <span class="command text-white">codestation connect --developer</span>
-                        </div>
                         <div class="terminal-output font-mono">
-                            <p class="text-slate">Connecté à l'architecte <strong>Anis Ghediri</strong> (GHD Interactive Studio).</p>
+                            <p class="text-slate">Architecte : <strong>Anis Ghediri</strong> (GHD Interactive Studio)</p>
                             <p class="text-slate">Email direct : <a href="mailto:m_ghediri@yahoo.com" class="text-cyan text-glow">m_ghediri@yahoo.com</a></p>
                             <p class="text-slate">GitHub : <a href="https://github.com/Anisghd-lab" target="_blank" rel="noopener noreferrer" class="text-blue">https://github.com/Anisghd-lab</a></p>
                         </div>
 
-                        <!-- Interactive Contact Form -->
                         <form class="terminal-form" id="contactForm" onsubmit="handleContactSubmit(event)">
                             <div class="form-row">
                                 <div class="form-field">
                                     <label for="contact-name">Votre Nom ou Entreprise</label>
-                                    <input type="text" id="contact-name" required placeholder="Ex: Alex Martin / Startup Studio" class="glass-input font-mono">
+                                    <input type="text" id="contact-name" required placeholder="Alex Martin" class="glass-input font-mono">
                                 </div>
                                 <div class="form-field">
-                                    <label for="contact-email">Votre Email de Contact</label>
-                                    <input type="email" id="contact-email" required placeholder="alex@entreprise.com" class="glass-input font-mono">
+                                    <label for="contact-email">Votre Email</label>
+                                    <input type="email" id="contact-email" required placeholder="contact@entreprise.com" class="glass-input font-mono">
                                 </div>
                             </div>
                             <div class="form-field">
-                                <label for="contact-message">Décrivez votre Projet ou Besoin</label>
-                                <textarea id="contact-message" rows="4" required placeholder="Décrivez votre idée, le type d'application ou de site souhaité, ainsi que vos attentes..." class="glass-input font-mono"></textarea>
+                                <label for="contact-message">Description de votre Besoin</label>
+                                <textarea id="contact-message" rows="4" required placeholder="Parlez-moi de votre jeu, application ou site web souhaité..." class="glass-input font-mono"></textarea>
                             </div>
                             <div class="form-submit-row">
-                                <button type="submit" class="btn-primary-glow" id="btn-submit-contact">
+                                <button type="submit" class="btn-primary-glow">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                                     <span>Envoyer le Message Directement</span>
                                 </button>
                                 <button type="button" class="btn-secondary-glass" onclick="copyContactEmail()">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                                     <span id="copy-email-btn-text">Copier l'Email (m_ghediri@yahoo.com)</span>
                                 </button>
                             </div>
@@ -794,20 +484,20 @@
             <div class="footer-left">
                 <div class="footer-logo">
                     <span class="logo-code">CS</span>
-                    <span class="font-mono">CodeStation • GHD Interactive Studio</span>
+                    <span class="font-mono">CodeStation & GHD Interactive Studio</span>
                 </div>
-                <p class="footer-copy">Tous droits réservés © 2026 GHD Interactive Studio. Identifiant d'application : <code>com.ghdinteractivestudio.codestation</code>. Architecture sous thème exclusif Dark Mode Obsidian Glass.</p>
+                <p class="footer-copy">Tous droits réservés © 2026 GHD Interactive Studio. Identifiant d'application : <code>com.ghdinteractivestudio.codestation</code>. Thème exclusif Dark Mode Obsidian Glass.</p>
             </div>
             <div class="footer-right">
-                <a href="#hero">Retour en Haut</a>
-                <a href="applications.html">Applications</a>
+                <a href="#showcase">Showcase 3D</a>
+                <a href="#games">Jeux Vidéo</a>
                 <a href="https://github.com/Anisghd-lab/CodeStation" target="_blank" rel="noopener noreferrer">CodeStation GitHub</a>
-                <a href="reglementation.html">Réglementation</a>
+                <a href="https://github.com/Anisghd-lab" target="_blank" rel="noopener noreferrer">Profil GitHub</a>
             </div>
         </div>
     </footer>
 
-    <!-- App Scripts -->
-    <script src="main.js?v=20261120_codestation"></script>
+    <!-- Scripts -->
+    <script src="main.js?v=20261120_v3"></script>
 </body>
 </html>

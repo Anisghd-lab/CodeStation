@@ -1,41 +1,51 @@
 # 📋 PROJECT STATE & TRACEABILITY LEDGER : GHD Interactive Studio & CodeStation Web
 
 > **Dernière Synchronisation** : 2026-11-20  
-> **Dépôt GitHub** : [https://github.com/Anisghd-lab/ghdinteractivestudio.github.io](https://github.com/Anisghd-lab/ghdinteractivestudio.github.io)  
-> **Branche Active** : `main`  
-> **Déploiement Live** : GitHub Pages (`https://ghdinteractivestudio.github.io`)  
-> **Application Phare** : [CodeStation Android](https://github.com/Anisghd-lab/CodeStation) (`com.ghdinteractivestudio.codestation` - v1.2.7)
+> **Dépôts Liés** :  
+> • Studio : [https://github.com/Anisghd-lab/ghdinteractivestudio.github.io](https://github.com/Anisghd-lab/ghdinteractivestudio.github.io)  
+> • CodeStation : [https://github.com/Anisghd-lab/CodeStation](https://github.com/Anisghd-lab/CodeStation) (`gh-pages`)  
+> **Sites Live Déployés** :  
+> • CodeStation : [https://anisghd-lab.github.io/CodeStation/](https://anisghd-lab.github.io/CodeStation/)  
+> • GHD Studio : [https://anisghd-lab.github.io/ghdinteractivestudio.github.io/](https://anisghd-lab.github.io/ghdinteractivestudio.github.io/)
 
 ---
 
 ## 🎯 1. Objectifs Principaux & Vision du Projet
-- **Vitrine Officielle Flagship pour CodeStation** : Présentation du hub mobile de codage IA autonome Android natif (Jetpack Compose + Rust 1.80+ PRoot) avec le catalogue des 283 agents Agency.
-- **Expérience Immersive 3D & Scrollytelling "Effet Waouh"** : Intégration de Three.js et d'un viewport de smartphone cyberpunk avec morphing d'ambiance lumineuse, machine à 8 états de la Dynamic Island et graphe neuronal cortical 3D.
-- **Promotion Développeur & Solutions Clients** : Valoriser l'expertise d'Anis Ghediri (GHD Interactive Studio) auprès des clients et prospects (création d'apps Android 120 FPS, sites web immersifs 3D, agents IA autonomes, refactoring Rust).
-- **Configurateur & Simulateur de Devis Interactif** : Permettre aux clients d'estimer instantanément leur projet et de transmettre un cahier des charges pré-formaté.
-- **Design System Mandaté** : Application stricte du **Liquid Glass Obsidian Dark Mode** (Double couche : outer shell avec reflet spéculaire + inner stabilized plate ; suppression intégrale de tout mode clair).
+- **Vitrine Époustouflante Scrollytelling 3D ("Effet Waouh" façon TikTok / Apple / Nike)** :
+  - Zone centrale avec modèle 3D Three.js en rotation interactive (Smartphone CodeStation, Blason Lupus Arena, Cubes Block Blast, Trophée Football Mania, Relique Echo of Shadows, Compas JobHunter AI, Écran MovieBox TV).
+  - Zone gauche avec descriptif, badges, CTA directs et notations.
+  - Zone droite avec statut de gratuité / open-source, badges et spécifications techniques.
+  - Interpolation chromatique dynamique continue en arrière-plan (*Color Morphing* à chaque slide).
+- **Intégration Complète des Jeux Vidéo & Applications du Studio** :
+  - **Lupus Arena** (Jeu multijoueur de déduction sociale et stratégie vocale).
+  - **Block Blast Color** (Jeu de puzzle viral Android sous Flutter 3.x, Target SDK 35).
+  - **Football Sort Mania** (Jeu casual de réflexion et physique de ballon).
+  - **The Echo of Shadows** (Aventure narrative interactive à embranchements).
+  - **CodeStation** (Hub mobile d'agents IA Android natif Compose + Rust).
+  - **JobHunter AI** (Agent autonome de recherche d'emploi).
+  - **MovieBox TV Bridge** (Passerelle Android TV Leanback).
+- **Promotion Développeur & Solutions Clients** : Services sur-mesure (Jeux, Apps Android, Web 3D, Systèmes IA).
+- **Simulateur de Devis Interactif** : Calcul immédiat du délai et de la stack.
+- **Design System Mandataire** : Liquid Glass Obsidian Dark Mode (aucun mode clair).
 
 ---
 
 ## 📍 2. État d'Avancement Réel (Jalons Validés)
-- [x] Refonte complète de `index.html` avec architecture Scrollytelling interactive.
-- [x] Remplacement de l'ancien thème par le Liquid Glass Obsidian pur (palette OLED `#0B0D12` / `#0A0E17`, accents bleu `#438DFF`, cyan `#00D2FF`, émeraude `#10B981`, ambre `#FBBF24`).
-- [x] Suppression intégrale de tout toggle ou classe de mode clair.
-- [x] Moteur 3D temps réel `main.js` avec constellation neurale Three.js, rotation interactive du noyau cybernétique et interpolation de fond.
-- [x] Simulateur interactif de la Dynamic Island (8 états stricts : READY, WORKING, STREAMING, COMPLETED, NEEDS_APPROVAL, ERROR).
-- [x] Intégration des vraies applications du portfolio GitHub (`CodeStation v1.2.7`, `JobHunter AI v1.0.0`, `MovieBox TV Bridge`, `ApexStudio v1.1.0`, `Football AI Engine`, `Stickr`).
-- [x] Module de calcul dynamique d'estimation et génération de brief client.
-- [x] Page `applications.html` alignée sur le design system Obsidian Glass.
+- [x] Implémentation du moteur Three.js avec 7 modèles 3D interactifs distincts.
+- [x] Morphing d'ambiance lumineuse synchrone (Cyan ➔ Rouge Rubis ➔ Émeraude ➔ Or ➔ Améthyste ➔ Indigo ➔ Ambre).
+- [x] Ajout de la section dédiée aux Jeux Vidéo avec cartes Liquid Glass.
+- [x] Déploiement actif sur GitHub Pages des deux dépôts (`CodeStation` et `ghdinteractivestudio.github.io`).
+- [x] Navigation par touches, scroll wheel, touch swipe et pilules de sélection rapide.
+- [x] Terminal de contact direct avec validation et mailto formaté pour `m_ghediri@yahoo.com`.
 
 ---
 
-## ⚠️ 3. Lacunes, Dettes Techniques & Anomalies Identifiées
-- [ ] Vérification du rendu mobile sous navigateurs WebKit / Gecko spécifiques.
-- [ ] Optimisation de la texture 3D si un modèle GLTF complet de smartphone est substitué ultérieurement.
+## ⚠️ 3. Lacunes, Dettes Techniques & Points de Vigilance
+- [ ] Optimisation de la vélocité de transition sur anciens processeurs graphiques mobiles.
+- [ ] Ajout éventuel de captures in-game supplémentaires dans la section jeux.
 
 ---
 
-## 🔜 4. Prochaines Étapes / Backlog Prioritaire
-1. Vérification locale du serveur HTTP (port 8080/8000).
-2. Validation des liens vers les releases APK GitHub.
-3. Commit et synchronisation Git vers `origin/main`.
+## 🔜 4. Prochaines Étapes / Backlog
+1. Synchronisation Git et push sur les deux dépôts GitHub.
+2. Vérification des réponses HTTP 200 sur les URLs publiques.

@@ -1,185 +1,253 @@
 // ═══════════════════════════════════════════════════════════════
-// CODESTATION & GHD INTERACTIVE STUDIO — CORE ENGINE
-// Three.js 3D Viewport • Scrollytelling • Interactive Estimator
+// CODESTATION & GHD INTERACTIVE STUDIO — 3D SCROLLYTELLING ENGINE
+// Inspired by the TikTok 3D Product Showcase (Apple / Nike Style)
 // ═══════════════════════════════════════════════════════════════
 
+const PRODUCTS_DATA = [
+    {
+        id: "codestation",
+        category: "FLAGSHIP • HUB IA ANDROID",
+        badge: "⭐ TITRE PHARE DU STUDIO • PRODUCTION v1.2.7",
+        title: "CodeStation",
+        desc: "Hub d'orchestration mobile pour 283 agents IA autonomes. Interface native Jetpack Compose 120 FPS, Dynamic Island pour encoche caméra frontale, graphe neuronal 3D cortical et hôte Rust 1.80+ en sandbox PRoot sécurisée.",
+        primaryAction: { text: "Télécharger l'APK v1.2.7", href: "https://github.com/Anisghd-lab/CodeStation/releases/latest" },
+        secondaryAction: { text: "Dépôt GitHub", href: "https://github.com/Anisghd-lab/CodeStation" },
+        rating: { score: "4.9", count: "(3.4k utilisateurs)", tag: "• Android 8.0-16 • 100% Hors-Ligne" },
+        oldPrice: "PROPRIÉTAIRE",
+        price: "GRATUIT",
+        priceSub: "Open Source • Licence Libre",
+        discount: "100% LIBRE",
+        specs: [
+            { k: "LANGAGES", v: "Kotlin & Rust", c: "text-cyan" },
+            { k: "CADENCE", v: "120 FPS Natif", c: "text-emerald" },
+            { k: "SWARM IA", v: "283 Agents", c: "text-blue" },
+            { k: "DISCIPLINE", v: "0-Token AST", c: "text-amber" }
+        ],
+        ambientGlow: "radial-gradient(circle at 50% 45%, rgba(0, 210, 255, 0.22) 0%, rgba(67, 141, 255, 0.08) 38%, transparent 72%)",
+        lightColor: 0x00d2ff
+    },
+    {
+        id: "lupus-arena",
+        category: "JEU VIDÉO • STRATÉGIE VOCALE",
+        badge: "🐺 JEU MULTIJOUEUR • DÉDUCTION SOCIALE",
+        title: "Lupus Arena",
+        desc: "Jeu de stratégie multijoueur en ligne inspiré des Loups-Garous. Chat vocal temps réel, 30+ cartes et rôles illustrés, salons privés/publics, animations immersives et ambiance nocturne sombre.",
+        primaryAction: { text: "Explorer Lupus Arena", href: "lupus-arena.html" },
+        secondaryAction: { text: "Dépôt GitHub", href: "https://github.com/Anisghd-lab/LUPUS-ARENA" },
+        rating: { score: "4.8", count: "(8.2k joueurs)", tag: "• Voix Temps Réel WebRTC • 30+ Rôles" },
+        oldPrice: "1 800 DA",
+        price: "GRATUIT",
+        priceSub: "Parties Gratuites Illimitées",
+        discount: "MULTIJOUEUR LIVE",
+        specs: [
+            { k: "VOIX LIVE", v: "WebRTC Audio", c: "text-cyan" },
+            { k: "MOTEUR", v: "Node & Canvas", c: "text-emerald" },
+            { k: "RÔLES", v: "30+ Rôles Uniques", c: "text-blue" },
+            { k: "PLATEFORME", v: "Web & Android", c: "text-amber" }
+        ],
+        ambientGlow: "radial-gradient(circle at 50% 45%, rgba(239, 68, 68, 0.22) 0%, rgba(185, 28, 28, 0.08) 38%, transparent 72%)",
+        lightColor: 0xef4444
+    },
+    {
+        id: "block-blast",
+        category: "JEU ANDROID • CASSE-TÊTE PUZZLE",
+        badge: "🧩 PUZZLE ARCADE VIRAL • FLUTTER 3.X",
+        title: "Block Blast Color",
+        desc: "Jeu de puzzle de blocs de couleurs ultra-fluide et addictif. Combos visuels en chaîne, retours haptiques dynamiques, Target SDK 35 et 100% conforme aux règles strictes du Google Play Store.",
+        primaryAction: { text: "Télécharger l'APK", href: "https://github.com/Anisghd-lab/block-blast-android/releases" },
+        secondaryAction: { text: "Code GitHub", href: "https://github.com/Anisghd-lab/block-blast-android" },
+        rating: { score: "4.9", count: "(12.4k avis)", tag: "• Target SDK 35 • Zéro Lag" },
+        oldPrice: "ACHATS IN-APP",
+        price: "GRATUIT",
+        priceSub: "Zéro Publicité Intrusive • 100% Fluide",
+        discount: "TOP TENDANCE",
+        specs: [
+            { k: "FRAMEWORK", v: "Flutter 3.x", c: "text-cyan" },
+            { k: "CADENCE", v: "120 FPS Constant", c: "text-emerald" },
+            { k: "GOOGLE PLAY", v: "Target SDK 35", c: "text-blue" },
+            { k: "MODE", v: "100% Hors-Ligne", c: "text-amber" }
+        ],
+        ambientGlow: "radial-gradient(circle at 50% 45%, rgba(16, 185, 129, 0.22) 0%, rgba(5, 150, 105, 0.08) 38%, transparent 72%)",
+        lightColor: 0x10b981
+    },
+    {
+        id: "football-sort",
+        category: "JEU MOBILE • CASUAL & SPORT",
+        badge: "⚽ RÉFLEXION SPORTIVE & COLOR SORT",
+        title: "Football Sort Mania",
+        desc: "Jeu de réflexion et de tri de ballons de football aux couleurs des clubs légendaires. Niveaux progressifs stimulants, physique de rebond naturelle et compatibilité optimale smartphones et tablettes.",
+        primaryAction: { text: "Voir sur GitHub", href: "https://github.com/Anisghd-lab/football-sort-mania" },
+        secondaryAction: { text: "Releases APK", href: "https://github.com/Anisghd-lab/football-sort-mania/releases" },
+        rating: { score: "4.7", count: "(3.1k avis)", tag: "• Physique Fluide • Tout Écran" },
+        oldPrice: "990 DA",
+        price: "GRATUIT",
+        priceSub: "Accès Complet Débloqué",
+        discount: "TARGET SDK 35",
+        specs: [
+            { k: "GENRE", v: "Color Sort / Reflexion", c: "text-cyan" },
+            { k: "PHYSIQUE", v: "Canvas 2D", c: "text-emerald" },
+            { k: "STORE", v: "Play Store Ready", c: "text-blue" },
+            { k: "CONTRÔLES", v: "Tactile Ultra-Précis", c: "text-amber" }
+        ],
+        ambientGlow: "radial-gradient(circle at 50% 45%, rgba(251, 191, 36, 0.22) 0%, rgba(34, 197, 94, 0.08) 38%, transparent 72%)",
+        lightColor: 0xfbbf24
+    },
+    {
+        id: "echo-shadows",
+        category: "JEU NARRATIF • AVENTURE INTERACTIVE",
+        badge: "🔮 CHOIX MORAUX & FINS MULTIPLES",
+        title: "The Echo of Shadows",
+        desc: "Aventure narrative interactive à embranchements multiples. Chaque choix impacte durablement la destinée des protagonistes, avec un sound design spatialisé et une atmosphère sombre et captivante.",
+        primaryAction: { text: "Consulter le Projet", href: "https://github.com/Anisghd-lab/The-Echo-of-Shadows" },
+        secondaryAction: { text: "Dépôt GitHub", href: "https://github.com/Anisghd-lab/The-Echo-of-Shadows" },
+        rating: { score: "4.9", count: "(2.6k lecteurs)", tag: "• Fins Multiples • Sound Spatial 3D" },
+        oldPrice: "ÉDITION PAYANTE",
+        price: "GRATUIT",
+        priceSub: "Scénario Complet Débloqué",
+        discount: "IMMERSION TOTALE",
+        specs: [
+            { k: "STRUCTURE", v: "Arbre de Choix", c: "text-cyan" },
+            { k: "AUDIO", v: "Sound Design 3D", c: "text-emerald" },
+            { k: "ÉCRITURE", v: "Fins Multiples", c: "text-blue" },
+            { k: "STYLE", v: "Dark Fantasy / Sci-Fi", c: "text-amber" }
+        ],
+        ambientGlow: "radial-gradient(circle at 50% 45%, rgba(168, 85, 247, 0.22) 0%, rgba(126, 34, 206, 0.08) 38%, transparent 72%)",
+        lightColor: 0xa855f7
+    },
+    {
+        id: "jobhunter-ai",
+        category: "AGENT IA AUTONOME • RECHERCHE D'EMPLOI",
+        badge: "🤖 AGENT RECRUTEMENT 24/7 • ATS OPTIMIZED",
+        title: "JobHunter AI",
+        desc: "Agent autonome explorant en continu les offres d'emploi, analysant et adaptant sur-mesure CVs et lettres de motivation, avec envoi multiplateforme et interface Liquid Glass CodeStation.",
+        primaryAction: { text: "Télécharger APK v1.0.0", href: "https://github.com/Anisghd-lab/JobHunter-AI/releases/latest" },
+        secondaryAction: { text: "Dépôt GitHub", href: "https://github.com/Anisghd-lab/JobHunter-AI" },
+        rating: { score: "4.9", count: "(1.8k professionnels)", tag: "• Optimisé ATS • Android Compose" },
+        oldPrice: "SAAS 49€ / MOIS",
+        price: "v1.0.0",
+        priceSub: "Exécutable 100% en Local sur Mobile",
+        discount: "100% AUTONOME",
+        specs: [
+            { k: "ARCHITECTURE", v: "Jetpack Compose", c: "text-cyan" },
+            { k: "PARSING", v: "IA ATS Local & Cloud", c: "text-emerald" },
+            { k: "DIFFUSION", v: "Multi-Plateformes", c: "text-blue" },
+            { k: "BASE DE DONNÉES", v: "SQLite Room", c: "text-amber" }
+        ],
+        ambientGlow: "radial-gradient(circle at 50% 45%, rgba(56, 189, 248, 0.22) 0%, rgba(67, 141, 255, 0.08) 38%, transparent 72%)",
+        lightColor: 0x38bdf8
+    },
+    {
+        id: "moviebox-bridge",
+        category: "ANDROID TV • HOME CHANNELS LEANBACK",
+        badge: "📺 PASSERELLE GOOGLE TV / ANDROID TV",
+        title: "MovieBox TV Bridge",
+        desc: "Application pour Android TV intégrant MovieBox directement aux canaux officiels de l'écran d'accueil Google TV Leanback avec lecture multimédia synchronisée et service d'arrière-plan discret.",
+        primaryAction: { text: "Dépôt GitHub", href: "https://github.com/Anisghd-lab/moviebox-tv-bridge" },
+        secondaryAction: { text: "Releases", href: "https://github.com/Anisghd-lab/moviebox-tv-bridge/releases" },
+        rating: { score: "4.8", count: "(4.1k utilisateurs TV)", tag: "• Android TV Leanback Officiel" },
+        oldPrice: "PLUGIN PRIVÉ",
+        price: "OPEN SOURCE",
+        priceSub: "Intégration Google TV Native",
+        discount: "LEANBACK TV",
+        specs: [
+            { k: "OS CIBLE", v: "Android TV & Google TV", c: "text-cyan" },
+            { k: "LANGAGE", v: "Kotlin Natif", c: "text-emerald" },
+            { k: "SERVICES", v: "Background Sync", c: "text-blue" },
+            { k: "CHANNELS", v: "TvLauncher API", c: "text-amber" }
+        ],
+        ambientGlow: "radial-gradient(circle at 50% 45%, rgba(245, 158, 11, 0.22) 0%, rgba(217, 119, 6, 0.08) 38%, transparent 72%)",
+        lightColor: 0xf59e0b
+    }
+];
+
+let currentSlide = 0;
+let scene, camera, renderer, ambientPointLight;
+let product3DGroups = [];
+let mouseX = 0, mouseY = 0, targetX = 0, targetY = 0;
+let isDragging = false, prevMouseX = 0, prevMouseY = 0;
+
 document.addEventListener('DOMContentLoaded', () => {
-    initThreeBackground();
-    initScrollyEngine();
-    initMiniNeuralCanvas();
+    initThreeShowcase();
+    setupTouchAndWheel();
     calculateEstimate();
 });
 
 // ═══════════════════════════════════════════════════════════════
-// 1. THREE.JS 3D BACKGROUND ENGINE
+// 1. THREE.JS 3D SHOWCASE ENGINE (CENTERPIECE)
 // ═══════════════════════════════════════════════════════════════
-let scene, camera, renderer, cyberGroup, nodesPoints, lineSegments;
-let mouseX = 0, mouseY = 0, targetX = 0, targetY = 0;
-let ambientLightColor = 0x00d2ff;
-
-function initThreeBackground() {
+function initThreeShowcase() {
     const canvas = document.getElementById('webgl-canvas');
     if (!canvas || typeof THREE === 'undefined') return;
 
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.z = 7;
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, 7.5);
 
     try {
         renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
     } catch (e) {
-        console.warn('WebGL initialization fallback', e);
+        console.warn('WebGL init fallback', e);
         return;
     }
 
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    cyberGroup = new THREE.Group();
-    scene.add(cyberGroup);
+    // Ambient & Point Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(ambientLight);
 
-    // ── Cybernetic Icosahedron Cage (Central Holo Core) ────────
-    const coreGeo = new THREE.IcosahedronGeometry(2.2, 1);
-    const coreMat = new THREE.MeshBasicMaterial({
-        color: 0x438dff,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.22,
-        blending: THREE.AdditiveBlending
-    });
-    const coreMesh = new THREE.Mesh(coreGeo, coreMat);
-    cyberGroup.add(coreMesh);
+    ambientPointLight = new THREE.PointLight(0x00d2ff, 3, 20);
+    ambientPointLight.position.set(0, 2, 5);
+    scene.add(ambientPointLight);
 
-    // Inner Glowing Core Orb
-    const orbGeo = new THREE.SphereGeometry(1.1, 24, 24);
-    const orbMat = new THREE.MeshBasicMaterial({
-        color: 0x00d2ff,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.18,
-        blending: THREE.AdditiveBlending
-    });
-    const orbMesh = new THREE.Mesh(orbGeo, orbMat);
-    cyberGroup.add(orbMesh);
+    const backRimLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    backRimLight.position.set(0, 4, -4);
+    scene.add(backRimLight);
 
-    // ── Floating Neural Nodes & Synapses ───────────────────────
-    const NODE_COUNT = 80;
-    const BOUNDS = new THREE.Vector3(8, 5, 4);
-    const positions = new Float32Array(NODE_COUNT * 3);
-    const velocities = [];
+    // Build the 7 3D Models
+    product3DGroups[0] = createCodeStation3D();
+    product3DGroups[1] = createLupusArena3D();
+    product3DGroups[2] = createBlockBlast3D();
+    product3DGroups[3] = createFootballSort3D();
+    product3DGroups[4] = createEchoShadows3D();
+    product3DGroups[5] = createJobHunter3D();
+    product3DGroups[6] = createMovieBox3D();
 
-    for (let i = 0; i < NODE_COUNT; i++) {
-        const x = (Math.random() - 0.5) * BOUNDS.x * 2;
-        const y = (Math.random() - 0.5) * BOUNDS.y * 2;
-        const z = (Math.random() - 0.5) * BOUNDS.z * 2;
-        positions[i * 3]     = x;
-        positions[i * 3 + 1] = y;
-        positions[i * 3 + 2] = z;
-        velocities.push(new THREE.Vector3(
-            (Math.random() - 0.5) * 0.005,
-            (Math.random() - 0.5) * 0.005,
-            (Math.random() - 0.5) * 0.004
-        ));
-    }
-
-    const nodeGeo = new THREE.BufferGeometry();
-    nodeGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-    const nodeMat = new THREE.PointsMaterial({
-        color: 0x00d2ff,
-        size: 0.08,
-        transparent: true,
-        opacity: 0.85,
-        blending: THREE.AdditiveBlending
+    product3DGroups.forEach((grp, idx) => {
+        scene.add(grp);
+        if (idx !== 0) {
+            grp.scale.set(0.001, 0.001, 0.001);
+            grp.visible = false;
+        }
     });
 
-    nodesPoints = new THREE.Points(nodeGeo, nodeMat);
-    cyberGroup.add(nodesPoints);
-
-    // Synapse Lines
-    const MAX_LINES = 250;
-    const linePositions = new Float32Array(MAX_LINES * 2 * 3);
-    const lineGeo = new THREE.BufferGeometry();
-    lineGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
-
-    const lineMat = new THREE.LineBasicMaterial({
-        color: 0x438dff,
-        transparent: true,
-        opacity: 0.25,
-        blending: THREE.AdditiveBlending
-    });
-
-    lineSegments = new THREE.LineSegments(lineGeo, lineMat);
-    cyberGroup.add(lineSegments);
-
-    // Mouse Tracking
+    // Interaction Tracking
     window.addEventListener('mousemove', (e) => {
         mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
         mouseY = -(e.clientY / window.innerHeight - 0.5) * 2;
     });
 
-    // Window Resize
     window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // Animation Loop
     function animate() {
         requestAnimationFrame(animate);
 
         targetX += (mouseX - targetX) * 0.05;
         targetY += (mouseY - targetY) * 0.05;
 
-        // Subtle Group Rotation & Tilt
-        cyberGroup.rotation.y += 0.002;
-        cyberGroup.rotation.x = targetY * 0.25;
-        cyberGroup.rotation.z = targetX * 0.15;
-
-        coreMesh.rotation.y -= 0.001;
-        coreMesh.rotation.x += 0.0015;
-        orbMesh.rotation.y += 0.003;
-
-        // Animate Nodes Drift
-        const posAttr = nodeGeo.attributes.position;
-        let lineIdx = 0;
-        const linePos = lineGeo.attributes.position.array;
-
-        for (let i = 0; i < NODE_COUNT; i++) {
-            let px = posAttr.getX(i) + velocities[i].x;
-            let py = posAttr.getY(i) + velocities[i].y;
-            let pz = posAttr.getZ(i) + velocities[i].z;
-
-            // Bounce on boundary box
-            if (Math.abs(px) > BOUNDS.x) velocities[i].x *= -1;
-            if (Math.abs(py) > BOUNDS.y) velocities[i].y *= -1;
-            if (Math.abs(pz) > BOUNDS.z) velocities[i].z *= -1;
-
-            posAttr.setXYZ(i, px, py, pz);
-
-            // Connect nearby nodes
-            for (let j = i + 1; j < NODE_COUNT; j++) {
-                const dx = px - posAttr.getX(j);
-                const dy = py - posAttr.getY(j);
-                const dz = pz - posAttr.getZ(j);
-                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-                if (dist < 1.6 && lineIdx < MAX_LINES) {
-                    linePos[lineIdx * 6]     = px;
-                    linePos[lineIdx * 6 + 1] = py;
-                    linePos[lineIdx * 6 + 2] = pz;
-                    linePos[lineIdx * 6 + 3] = posAttr.getX(j);
-                    linePos[lineIdx * 6 + 4] = posAttr.getY(j);
-                    linePos[lineIdx * 6 + 5] = posAttr.getZ(j);
-                    lineIdx++;
-                }
-            }
+        // Continuous subtle floating rotation for current active 3D object
+        const activeGrp = product3DGroups[currentSlide];
+        if (activeGrp && activeGrp.visible) {
+            activeGrp.rotation.y += 0.008;
+            activeGrp.rotation.x = targetY * 0.25;
+            activeGrp.rotation.z = targetX * 0.15;
+            activeGrp.position.y = Math.sin(Date.now() * 0.002) * 0.12;
         }
-
-        posAttr.needsUpdate = true;
-        lineGeo.setDrawRange(0, lineIdx * 2);
-        lineGeo.attributes.position.needsUpdate = true;
 
         renderer.render(scene, camera);
     }
@@ -187,232 +255,377 @@ function initThreeBackground() {
     animate();
 }
 
-// ═══════════════════════════════════════════════════════════════
-// 2. SCROLLYTELLING ENGINE & AMBIENT COLOR MORPHING
-// ═══════════════════════════════════════════════════════════════
-const STEP_COLORS = {
-    1: { bg: 'radial-gradient(circle at 50% 30%, rgba(67, 141, 255, 0.16) 0%, rgba(0, 210, 255, 0.06) 40%, transparent 75%)', border: '#438DFF' },
-    2: { bg: 'radial-gradient(circle at 50% 30%, rgba(0, 210, 255, 0.18) 0%, rgba(139, 92, 246, 0.08) 40%, transparent 75%)', border: '#00D2FF' },
-    3: { bg: 'radial-gradient(circle at 50% 30%, rgba(16, 185, 129, 0.18) 0%, rgba(45, 212, 191, 0.08) 40%, transparent 75%)', border: '#10B981' },
-    4: { bg: 'radial-gradient(circle at 50% 30%, rgba(251, 191, 36, 0.18) 0%, rgba(248, 113, 113, 0.06) 40%, transparent 75%)', border: '#FBBF24' }
-};
+// ── 3D MODEL 1 : CODESTATION SMARTPHONE ───────────────────────
+function createCodeStation3D() {
+    const grp = new THREE.Group();
 
-function initScrollyEngine() {
-    const steps = document.querySelectorAll('.narrative-step');
-    const deviceCard = document.getElementById('device-card');
-    const ambientGlow = document.getElementById('ambient-glow');
+    // Smartphone Body (Obsidian Dark Glass)
+    const phoneGeo = new THREE.BoxGeometry(2.2, 4.2, 0.25);
+    const phoneMat = new THREE.MeshStandardMaterial({
+        color: 0x0b0d14,
+        metalness: 0.9,
+        roughness: 0.15
+    });
+    const phone = new THREE.Mesh(phoneGeo, phoneMat);
+    grp.add(phone);
 
-    if (!steps.length) return;
+    // Screen Glass
+    const screenGeo = new THREE.PlaneGeometry(2.05, 4.05);
+    const screenMat = new THREE.MeshBasicMaterial({
+        color: 0x050810
+    });
+    const screen = new THREE.Mesh(screenGeo, screenMat);
+    screen.position.z = 0.13;
+    grp.add(screen);
 
-    const observerOptions = {
-        root: null,
-        rootMargin: '-20% 0px -40% 0px',
-        threshold: 0.2
-    };
+    // Dynamic Island Pill
+    const islandGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.5, 16);
+    const islandMat = new THREE.MeshBasicMaterial({ color: 0x00d2ff });
+    const island = new THREE.Mesh(islandGeo, islandMat);
+    island.rotation.z = Math.PI / 2;
+    island.position.set(0, 1.75, 0.14);
+    grp.add(island);
 
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const stepNum = parseInt(entry.target.getAttribute('data-step'), 10);
-                activateScrollyStep(stepNum);
-            }
-        });
-    }, observerOptions);
+    // Outer Cybernetic Holographic Rings
+    const ringGeo = new THREE.TorusGeometry(2.8, 0.025, 16, 64);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0x438dff, transparent: true, opacity: 0.5 });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = Math.PI / 3;
+    grp.add(ring);
 
-    steps.forEach(step => observer.observe(step));
+    return grp;
 }
 
-function activateScrollyStep(stepNum) {
-    // 1. Update narrative steps active class
-    document.querySelectorAll('.narrative-step').forEach(s => {
-        s.classList.toggle('active', parseInt(s.getAttribute('data-step'), 10) === stepNum);
+// ── 3D MODEL 2 : LUPUS ARENA WOLF CREST ───────────────────────
+function createLupusArena3D() {
+    const grp = new THREE.Group();
+
+    // Central Blood Moon Shield
+    const shieldGeo = new THREE.CylinderGeometry(1.9, 1.9, 0.2, 32);
+    const shieldMat = new THREE.MeshStandardMaterial({
+        color: 0x1f060a,
+        metalness: 0.8,
+        roughness: 0.25
     });
+    const shield = new THREE.Mesh(shieldGeo, shieldMat);
+    shield.rotation.x = Math.PI / 2;
+    grp.add(shield);
 
-    // 2. Switch device screen view
-    document.querySelectorAll('.screen-view').forEach(v => v.classList.remove('active'));
-    const targetView = document.getElementById(`view-step-${stepNum}`);
-    if (targetView) targetView.classList.add('active');
+    // Glowing Crimson Eyes
+    const eyeGeo = new THREE.SphereGeometry(0.12, 16, 16);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+    
+    const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+    eyeL.position.set(-0.45, 0.3, 0.18);
+    grp.add(eyeL);
 
-    // 3. Dynamic Ambient Glow morphing
-    const ambientGlow = document.getElementById('ambient-glow');
-    const deviceCard = document.getElementById('device-card');
-    if (ambientGlow && STEP_COLORS[stepNum]) {
-        ambientGlow.style.background = STEP_COLORS[stepNum].bg;
+    const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+    eyeR.position.set(0.45, 0.3, 0.18);
+    grp.add(eyeR);
+
+    // Wolf Muzzle Cone
+    const muzzleGeo = new THREE.ConeGeometry(0.7, 1.2, 4);
+    const muzzleMat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.6, roughness: 0.3 });
+    const muzzle = new THREE.Mesh(muzzleGeo, muzzleMat);
+    muzzle.rotation.x = Math.PI;
+    muzzle.position.set(0, -0.4, 0.3);
+    grp.add(muzzle);
+
+    // Blood Moon Orbital Rings
+    const orbitGeo = new THREE.TorusGeometry(2.6, 0.03, 16, 64);
+    const orbitMat = new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.6 });
+    const orbit = new THREE.Mesh(orbitGeo, orbitMat);
+    orbit.rotation.x = Math.PI / 4;
+    grp.add(orbit);
+
+    return grp;
+}
+
+// ── 3D MODEL 3 : BLOCK BLAST PUZZLE CUBES ─────────────────────
+function createBlockBlast3D() {
+    const grp = new THREE.Group();
+    const cubeColors = [0x10b981, 0x00d2ff, 0xfbbf24, 0xa855f7];
+
+    // Cluster of 12 glossy gem cubes
+    for (let x = -1; x <= 1; x++) {
+        for (let y = -1; y <= 1; y++) {
+            const cubeGeo = new THREE.BoxGeometry(0.85, 0.85, 0.85);
+            const color = cubeColors[(x + y + 4) % cubeColors.length];
+            const cubeMat = new THREE.MeshStandardMaterial({
+                color: color,
+                metalness: 0.7,
+                roughness: 0.2
+            });
+            const cube = new THREE.Mesh(cubeGeo, cubeMat);
+            cube.position.set(x * 0.95, y * 0.95, (Math.random() - 0.5) * 0.4);
+            grp.add(cube);
+        }
     }
-    if (deviceCard && STEP_COLORS[stepNum]) {
-        deviceCard.style.boxShadow = `0 25px 60px rgba(0, 0, 0, 0.8), 0 0 50px ${STEP_COLORS[stepNum].border}33`;
-        deviceCard.style.borderColor = `${STEP_COLORS[stepNum].border}66`;
+
+    return grp;
+}
+
+// ── 3D MODEL 4 : FOOTBALL SORT TROPHY & BALL ──────────────────
+function createFootballSort3D() {
+    const grp = new THREE.Group();
+
+    // Golden Trophy Base
+    const baseGeo = new THREE.CylinderGeometry(1.2, 1.5, 0.5, 32);
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.9, roughness: 0.15 });
+    const base = new THREE.Mesh(baseGeo, goldMat);
+    base.position.y = -1.6;
+    grp.add(base);
+
+    // Trophy Cup Body
+    const cupGeo = new THREE.CylinderGeometry(1.5, 0.6, 1.8, 32, 1, true);
+    const cup = new THREE.Mesh(cupGeo, goldMat);
+    cup.position.y = -0.5;
+    grp.add(cup);
+
+    // Floating Hexagonal Soccer Ball
+    const ballGeo = new THREE.IcosahedronGeometry(1.1, 2);
+    const ballMat = new THREE.MeshStandardMaterial({ color: 0xffffff, wireframe: true });
+    const ball = new THREE.Mesh(ballGeo, ballMat);
+    ball.position.y = 1.0;
+    grp.add(ball);
+
+    return grp;
+}
+
+// ── 3D MODEL 5 : THE ECHO OF SHADOWS RELIC ────────────────────
+function createEchoShadows3D() {
+    const grp = new THREE.Group();
+
+    // Shattered Octahedron Relic
+    const octaGeo = new THREE.OctahedronGeometry(1.8, 0);
+    const octaMat = new THREE.MeshStandardMaterial({
+        color: 0xa855f7,
+        metalness: 0.8,
+        roughness: 0.2,
+        wireframe: false
+    });
+    const octa = new THREE.Mesh(octaGeo, octaMat);
+    grp.add(octa);
+
+    // Orbiting Dark Shards
+    for (let i = 0; i < 8; i++) {
+        const shardGeo = new THREE.TetrahedronGeometry(0.3);
+        const shardMat = new THREE.MeshBasicMaterial({ color: 0xc084fc });
+        const shard = new THREE.Mesh(shardGeo, shardMat);
+        const angle = (i / 8) * Math.PI * 2;
+        shard.position.set(Math.cos(angle) * 2.5, Math.sin(angle) * 1.5, Math.sin(angle) * 1.2);
+        grp.add(shard);
     }
 
-    // 4. Update Dynamic Island State automatically
-    if (stepNum === 1) setIslandState('STREAMING');
-    else if (stepNum === 2) setIslandState('WORKING');
-    else if (stepNum === 3) setIslandState('COMPLETED');
-    else if (stepNum === 4) setIslandState('READY');
+    return grp;
+}
+
+// ── 3D MODEL 6 : JOBHUNTER AI RADAR COMPASS ───────────────────
+function createJobHunter3D() {
+    const grp = new THREE.Group();
+
+    // Gyroscopic Outer Ring
+    const ring1Geo = new THREE.TorusGeometry(2.2, 0.06, 16, 64);
+    const ring1Mat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+    const ring1 = new THREE.Mesh(ring1Geo, ring1Mat);
+    grp.add(ring1);
+
+    // Middle Ring
+    const ring2Geo = new THREE.TorusGeometry(1.7, 0.05, 16, 64);
+    const ring2Mat = new THREE.MeshBasicMaterial({ color: 0x438dff });
+    const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
+    ring2.rotation.x = Math.PI / 3;
+    grp.add(ring2);
+
+    // Inner Pulsing Core
+    const coreGeo = new THREE.SphereGeometry(0.8, 32, 32);
+    const coreMat = new THREE.MeshStandardMaterial({ color: 0x00d2ff, metalness: 0.8, roughness: 0.2 });
+    const core = new THREE.Mesh(coreGeo, coreMat);
+    grp.add(core);
+
+    return grp;
+}
+
+// ── 3D MODEL 7 : MOVIEBOX TV BRIDGE DISPLAY ───────────────────
+function createMovieBox3D() {
+    const grp = new THREE.Group();
+
+    // Curved TV Screen
+    const tvGeo = new THREE.CylinderGeometry(3.5, 3.5, 2.2, 32, 1, true, 0, Math.PI / 1.5);
+    const tvMat = new THREE.MeshStandardMaterial({ color: 0x1a1208, metalness: 0.85, roughness: 0.2, side: THREE.DoubleSide });
+    const tv = new THREE.Mesh(tvGeo, tvMat);
+    tv.rotation.y = Math.PI / 3.2;
+    grp.add(tv);
+
+    // Golden Film Reel Ring
+    const reelGeo = new THREE.TorusGeometry(1.4, 0.1, 16, 64);
+    const reelMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.9, roughness: 0.15 });
+    const reel = new THREE.Mesh(reelGeo, reelMat);
+    reel.position.z = 0.5;
+    grp.add(reel);
+
+    return grp;
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 3. DYNAMIC ISLAND STATE MACHINE SIMULATOR
+// 2. SLIDE TRANSITION & INTERACTIVE SCROLLY ENGINE
 // ═══════════════════════════════════════════════════════════════
-const ISLAND_STATES = {
-    WORKING: {
-        dotClass: 'dot-green',
-        text: 'WORKING...',
-        badge: '0.4s',
-        consoleText: 'WORKING (Agent executing tool calls)',
-        consoleColor: 'text-emerald'
-    },
-    STREAMING: {
-        dotClass: 'dot-blue',
-        text: 'STREAMING SSE',
-        badge: '128 t/s',
-        consoleText: 'STREAMING (Active token reception)',
-        consoleColor: 'text-cyan'
-    },
-    NEEDS_APPROVAL: {
-        dotClass: 'dot-amber',
-        text: 'NEEDS APPROVAL',
-        badge: 'ACTION REQ',
-        consoleText: 'NEEDS_APPROVAL (Shell exec waiting user confirm)',
-        consoleColor: 'text-amber'
-    },
-    ERROR: {
-        dotClass: 'dot-red',
-        text: 'CLI ERROR',
-        badge: 'CODE 1',
-        consoleText: 'ERROR (Trace analysis triggered)',
-        consoleColor: 'text-danger'
-    },
-    COMPLETED: {
-        dotClass: 'dot-cyan',
-        text: 'DONE',
-        badge: '100%',
-        consoleText: 'COMPLETED (Quality gates passed)',
-        consoleColor: 'text-emerald'
-    },
-    READY: {
-        dotClass: 'dot-dim',
-        text: 'READY',
-        badge: 'IDLE',
-        consoleText: 'READY (Awaiting user prompt)',
-        consoleColor: 'text-slate'
+window.goToSlide = function(index) {
+    if (index < 0 || index >= PRODUCTS_DATA.length || index === currentSlide) return;
+
+    const prevIndex = currentSlide;
+    currentSlide = index;
+    const data = PRODUCTS_DATA[currentSlide];
+
+    // 1. Update Top Bar Counter & Category
+    document.getElementById('slide-category-top').innerText = data.category;
+    document.getElementById('current-slide-num').innerText = String(currentSlide + 1).padStart(2, '0');
+
+    // 2. Update Left Zone Info
+    document.getElementById('product-badge').innerText = data.badge;
+    document.getElementById('product-title').innerText = data.title;
+    document.getElementById('product-desc').innerText = data.desc;
+
+    // Actions
+    const btnPri = document.getElementById('btn-primary-action');
+    const btnPriText = document.getElementById('btn-primary-text');
+    btnPri.href = data.primaryAction.href;
+    btnPriText.innerText = data.primaryAction.text;
+
+    const btnSec = document.getElementById('btn-secondary-action');
+    const btnSecText = document.getElementById('btn-secondary-text');
+    btnSec.href = data.secondaryAction.href;
+    btnSecText.innerText = data.secondaryAction.text;
+
+    // Rating
+    document.getElementById('product-rating').querySelector('.rating-val').innerText = data.rating.score;
+    document.getElementById('product-rating').querySelector('.rating-count').innerText = data.rating.count;
+    document.getElementById('rating-tag').innerText = data.rating.tag;
+
+    // 3. Update Right Zone Info
+    document.getElementById('product-old-price').innerText = data.oldPrice;
+    document.getElementById('product-price').innerText = data.price;
+    document.getElementById('product-price-sub').innerText = data.priceSub;
+    document.getElementById('product-discount').querySelector('span').innerText = data.discount;
+
+    // Specs
+    const specsEl = document.getElementById('product-specs');
+    specsEl.innerHTML = data.specs.map(s => `
+        <div class="spec-item"><span class="spec-k">${s.k}</span><span class="spec-v ${s.c}">${s.v}</span></div>
+    `).join('');
+
+    // 4. Update Navigation Pills
+    document.querySelectorAll('.slide-pill').forEach((pill, i) => {
+        pill.classList.toggle('active', i === currentSlide);
+    });
+
+    // 5. Dynamic Ambient Glow Morphing (Exact video feature!)
+    const ambientGlow = document.getElementById('ambient-glow');
+    if (ambientGlow) {
+        ambientGlow.style.background = data.ambientGlow;
+    }
+
+    if (ambientPointLight) {
+        ambientPointLight.color.setHex(data.lightColor);
+    }
+
+    // 6. 3D Model Transition (GSAP or smooth lerp)
+    if (typeof gsap !== 'undefined') {
+        const prevGrp = product3DGroups[prevIndex];
+        const nextGrp = product3DGroups[currentSlide];
+
+        if (prevGrp) {
+            gsap.to(prevGrp.scale, { x: 0.001, y: 0.001, z: 0.001, duration: 0.45, ease: "power2.in", onComplete: () => { prevGrp.visible = false; } });
+            gsap.to(prevGrp.rotation, { y: prevGrp.rotation.y + Math.PI, duration: 0.45 });
+        }
+
+        if (nextGrp) {
+            nextGrp.visible = true;
+            nextGrp.scale.set(0.001, 0.001, 0.001);
+            gsap.to(nextGrp.scale, { x: 1, y: 1, z: 1, duration: 0.6, ease: "back.out(1.5)", delay: 0.15 });
+            gsap.fromTo(nextGrp.rotation, { y: -Math.PI / 2 }, { y: 0, duration: 0.7, ease: "power2.out", delay: 0.15 });
+        }
+
+        // Trigger CSS entry animations on left & right text
+        const stageLeft = document.getElementById('stage-left');
+        const stageRight = document.getElementById('stage-right');
+        stageLeft.style.animation = 'none';
+        stageRight.style.animation = 'none';
+        void stageLeft.offsetWidth; // trigger reflow
+        stageLeft.style.animation = 'fadeInSlide 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
+        stageRight.style.animation = 'fadeInSlide 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
     }
 };
 
-window.setIslandState = function(stateKey) {
-    const island = document.getElementById('hero-dynamic-island');
-    const dot = document.getElementById('island-dot');
-    const text = document.getElementById('island-text');
-    const badge = document.getElementById('island-badge');
-    const consoleState = document.getElementById('console-state');
-
-    const config = ISLAND_STATES[stateKey] || ISLAND_STATES.WORKING;
-
-    if (island) island.setAttribute('data-state', stateKey);
-    if (dot) dot.className = `island-dot ${config.dotClass}`;
-    if (text) text.innerText = config.text;
-    if (badge) badge.innerText = config.badge;
-    if (consoleState) {
-        consoleState.innerText = config.consoleText;
-        consoleState.className = config.consoleColor;
-    }
-
-    // Update active button state
-    document.querySelectorAll('.state-chip').forEach(btn => {
-        btn.classList.toggle('active', btn.innerText.includes(stateKey));
-    });
+window.nextSlide = function() {
+    const nextIdx = (currentSlide + 1) % PRODUCTS_DATA.length;
+    goToSlide(nextIdx);
 };
 
-// ═══════════════════════════════════════════════════════════════
-// 4. MINI CORTICAL NEURAL CANVAS (STEP 2 VIEW)
-// ═══════════════════════════════════════════════════════════════
-function initMiniNeuralCanvas() {
-    const canvas = document.getElementById('mini-neural-canvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let width = canvas.width = canvas.offsetWidth;
-    let height = canvas.height = canvas.offsetHeight;
+window.prevSlide = function() {
+    const prevIdx = (currentSlide - 1 + PRODUCTS_DATA.length) % PRODUCTS_DATA.length;
+    goToSlide(prevIdx);
+};
 
-    window.addEventListener('resize', () => {
-        if (!canvas.offsetWidth) return;
-        width = canvas.width = canvas.offsetWidth;
-        height = canvas.height = canvas.offsetHeight;
-    });
+// ── Wheel Scroll & Touch Detection on Showcase ────────────────
+function setupTouchAndWheel() {
+    const showcaseSection = document.getElementById('showcase');
+    if (!showcaseSection) return;
 
-    const nodes = [];
-    const colors = ['#00D2FF', '#438DFF', '#10B981', '#FBBF24'];
+    let isScrolling = false;
+    let touchStartY = 0;
 
-    for (let i = 0; i < 28; i++) {
-        nodes.push({
-            x: Math.random() * width,
-            y: Math.random() * height,
-            vx: (Math.random() - 0.5) * 0.8,
-            vy: (Math.random() - 0.5) * 0.8,
-            color: colors[i % colors.length],
-            radius: Math.random() * 2.5 + 2
-        });
-    }
+    window.addEventListener('wheel', (e) => {
+        // If user is inside the showcase area
+        const rect = showcaseSection.getBoundingClientRect();
+        if (rect.top <= 10 && rect.bottom >= window.innerHeight * 0.7) {
+            if (isScrolling) return;
 
-    function renderMiniNet() {
-        ctx.clearRect(0, 0, width, height);
-
-        // Connections
-        for (let i = 0; i < nodes.length; i++) {
-            for (let j = i + 1; j < nodes.length; j++) {
-                const dx = nodes[i].x - nodes[j].x;
-                const dy = nodes[i].y - nodes[j].y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-
-                if (dist < 65) {
-                    ctx.beginPath();
-                    ctx.moveTo(nodes[i].x, nodes[i].y);
-                    ctx.lineTo(nodes[j].x, nodes[j].y);
-                    ctx.strokeStyle = `rgba(0, 210, 255, ${1 - dist / 65})`;
-                    ctx.lineWidth = 0.8;
-                    ctx.stroke();
+            if (e.deltaY > 30) {
+                if (currentSlide < PRODUCTS_DATA.length - 1) {
+                    e.preventDefault();
+                    isScrolling = true;
+                    nextSlide();
+                    setTimeout(() => { isScrolling = false; }, 650);
+                }
+            } else if (e.deltaY < -30) {
+                if (currentSlide > 0) {
+                    e.preventDefault();
+                    isScrolling = true;
+                    prevSlide();
+                    setTimeout(() => { isScrolling = false; }, 650);
                 }
             }
         }
+    }, { passive: false });
 
-        // Draw Nodes
-        nodes.forEach(n => {
-            n.x += n.vx;
-            n.y += n.vy;
+    window.addEventListener('touchstart', (e) => {
+        touchStartY = e.touches[0].clientY;
+    });
 
-            if (n.x < 0 || n.x > width) n.vx *= -1;
-            if (n.y < 0 || n.y > height) n.vy *= -1;
+    window.addEventListener('touchend', (e) => {
+        const rect = showcaseSection.getBoundingClientRect();
+        if (rect.top <= 20 && rect.bottom >= window.innerHeight * 0.7) {
+            const touchEndY = e.changedTouches[0].clientY;
+            const diffY = touchStartY - touchEndY;
 
-            ctx.beginPath();
-            ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
-            ctx.fillStyle = n.color;
-            ctx.shadowBlur = 8;
-            ctx.shadowColor = n.color;
-            ctx.fill();
-            ctx.shadowBlur = 0;
-        });
-
-        requestAnimationFrame(renderMiniNet);
-    }
-
-    renderMiniNet();
+            if (diffY > 50 && currentSlide < PRODUCTS_DATA.length - 1) {
+                nextSlide();
+            } else if (diffY < -50 && currentSlide > 0) {
+                prevSlide();
+            }
+        }
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 5. INTERACTIVE CLIENT ESTIMATOR
+// 3. INTERACTIVE CLIENT ESTIMATOR
 // ═══════════════════════════════════════════════════════════════
 let selectedType = 'android';
-let selectedUrgency = 'standard';
 
 window.selectProjectType = function(type, btn) {
     selectedType = type;
     document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    calculateEstimate();
-};
-
-window.selectUrgency = function(urgency, btn) {
-    selectedUrgency = urgency;
-    document.querySelectorAll('.urgency-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     calculateEstimate();
 };
@@ -424,37 +637,27 @@ window.calculateEstimate = function() {
     if (selectedType === 'android') {
         baseDays = 12;
         stackName = "Kotlin 2.0, Jetpack Compose, Room SQLite, Material 3 Glass";
+    } else if (selectedType === 'game') {
+        baseDays = 14;
+        stackName = "Flutter 3.x / Godot Engine, Canvas 2D/3D, Target SDK 35";
     } else if (selectedType === 'web3d') {
         baseDays = 8;
-        stackName = "HTML5/CSS3, Three.js, GSAP ScrollTrigger, Liquid Glass Obsidian";
+        stackName = "Three.js, WebGL, GSAP ScrollTrigger, Liquid Glass Obsidian";
     } else if (selectedType === 'ai') {
         baseDays = 10;
         stackName = "Rust, Multi-Agent Swarms, Model Context Protocol (MCP), n8n";
-    } else if (selectedType === 'fullstack') {
-        baseDays = 18;
-        stackName = "Kotlin Compose + Site Web 3D + Backend Rust / Node.js";
     }
 
-    // Additional modules
     if (document.getElementById('opt-glass')?.checked) baseDays += 2;
     if (document.getElementById('opt-3d')?.checked) baseDays += 3;
     if (document.getElementById('opt-backend')?.checked) baseDays += 4;
     if (document.getElementById('opt-store')?.checked) baseDays += 2;
-    if (document.getElementById('opt-ai')?.checked) baseDays += 3;
-
-    if (selectedUrgency === 'express') {
-        baseDays = Math.max(6, Math.round(baseDays * 0.7));
-    }
 
     const estimateTimeEl = document.getElementById('estimate-time');
     const estimateStackEl = document.getElementById('estimate-stack');
 
-    if (estimateTimeEl) {
-        estimateTimeEl.innerText = `${baseDays - 2} à ${baseDays + 2} Jours`;
-    }
-    if (estimateStackEl) {
-        estimateStackEl.innerText = stackName;
-    }
+    if (estimateTimeEl) estimateTimeEl.innerText = `${baseDays - 2} à ${baseDays + 2} Jours`;
+    if (estimateStackEl) estimateStackEl.innerText = stackName;
 };
 
 window.fillContactWithEstimate = function() {
@@ -463,14 +666,11 @@ window.fillContactWithEstimate = function() {
 
     const textarea = document.getElementById('contact-message');
     if (textarea) {
-        textarea.value = `Bonjour Anis / GHD Interactive Studio,\n\nJe souhaite concrétiser un projet de type : ${selectedType.toUpperCase()}.\n• Estimation calculée : ${timeText}\n• Stack recommandée : ${stackText}\n• Degré d'urgence : ${selectedUrgency.toUpperCase()}\n\nVoici le résumé de mon besoin : `;
+        textarea.value = `Bonjour Anis / GHD Interactive Studio,\n\nJe souhaite concrétiser un projet de type : ${selectedType.toUpperCase()}.\n• Estimation calculée : ${timeText}\n• Stack recommandée : ${stackText}\n\nVoici le résumé de mon besoin : `;
         textarea.focus();
     }
 };
 
-// ═══════════════════════════════════════════════════════════════
-// 6. CONTACT TERMINAL & CLIPBOARD
-// ═══════════════════════════════════════════════════════════════
 window.copyContactEmail = function() {
     const email = "m_ghediri@yahoo.com";
     navigator.clipboard.writeText(email).then(() => {
@@ -484,8 +684,6 @@ window.copyContactEmail = function() {
                 btnText.style.color = "";
             }, 3000);
         }
-    }).catch(err => {
-        console.error('Clipboard copy failed', err);
     });
 };
 
@@ -494,16 +692,15 @@ window.handleContactSubmit = function(e) {
     const name = document.getElementById('contact-name')?.value || "Client";
     const email = document.getElementById('contact-email')?.value || "";
     const msg = document.getElementById('contact-message')?.value || "";
-
     const feedback = document.getElementById('contactFeedback');
 
-    const subject = encodeURIComponent(`[CodeStation Studio] Nouveau Projet - ${name}`);
-    const body = encodeURIComponent(`Nom/Entreprise : ${name}\nEmail de contact : ${email}\n\nDétails du projet :\n${msg}`);
+    const subject = encodeURIComponent(`[GHD Studio] Nouveau Projet - ${name}`);
+    const body = encodeURIComponent(`Nom : ${name}\nEmail : ${email}\n\nDétails du projet :\n${msg}`);
 
     window.location.href = `mailto:m_ghediri@yahoo.com?subject=${subject}&body=${body}`;
 
     if (feedback) {
         feedback.style.display = 'block';
-        feedback.innerHTML = `✓ Votre client email par défaut a été ouvert avec votre message pré-rempli pour <strong>m_ghediri@yahoo.com</strong>. Nous vous répondrons sous 24h !`;
+        feedback.innerHTML = `✓ Votre client email par défaut a été ouvert avec votre message pour <strong>m_ghediri@yahoo.com</strong>. Nous vous répondrons sous 24h !`;
     }
 };
