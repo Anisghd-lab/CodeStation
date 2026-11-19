@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Centre de Réglementation & Conformité Google Play | GHD Interactive Studio</title>
+    <meta name="description" content="Centre de conformité légale et politique de confidentialité globale de GHD Interactive Studio pour la distribution sur le Google Play Store et le respect du RGPD.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="style.css?v=20260928g">
+    <!-- Local Scripts with CDN Fallback -->
+    <script src="three.min.js"></script>
+    <script>
+        if (typeof THREE === 'undefined') {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+        }
+    </script>
+    <script src="gsap.min.js"></script>
+    <script>
+        if (typeof gsap === 'undefined') {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"><\/script>');
+        }
+    </script>
+    <!-- Anti-flash theme detection -->
+    <script>
+        (function(){
+            try {
+                var s = localStorage.getItem('ghd_theme');
+                var light = s === 'light' || (!s && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+                if (light) document.documentElement.classList.add('light-mode');
+            } catch(e) {}
+        })();
+    </script>
+</head>
+<body>
+    <!-- Canvas 3D Background -->
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- Glassmorphism Navigation -->
+    <nav class="glass-nav" id="mainNav">
+        <a href="index.html" class="logo">GHD<span>.</span></a>
+                <ul class="nav-links">
+            <li><a href="index.html">Accueil</a></li>
+            <li><a href="applications.html">Nos Applications</a></li>
+            <li><a href="reglementation.html" class="active" style="color: #ffffff; text-shadow: 0 0 12px rgba(255, 255, 255, 0.9), 0 0 25px var(--google-blue);">Réglementation</a></li>
+        <li class="mobile-contact-link"><a href="index.html#contact">Contact</a></li>
+        </ul>
+        <div class="nav-controls">
+        <button class="mobile-toggle" aria-label="Menu de navigation"
+            onclick="(function(btn){var nav=btn.closest('nav');nav.classList.toggle('mobile-menu-active');btn.setAttribute('aria-expanded', nav.classList.contains('mobile-menu-active'))})(this)">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a href="index.html#contact" class="btn-contact-nav">Contact</a>
+                <button class="theme-toggle" id="themeToggle" aria-label="Mode clair" title="Passer en mode clair">
+            <!-- Moon (shown in dark mode) -->
+            <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+            <!-- Sun (shown in light mode) -->
+            <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="5"/>
+                <line x1="12" y1="1" x2="12" y2="3"/>
+                <line x1="12" y1="21" x2="12" y2="23"/>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                <line x1="1" y1="12" x2="3" y2="12"/>
+                <line x1="21" y1="12" x2="23" y2="12"/>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+        </button>
+        </div>
+    </nav>
+
+    <!-- Policy Section -->
+    <main class="policy-section">
+        <div class="policy-container">
+            <header class="policy-header">
+                <div class="policy-badge">
+                    <span>✓</span> Conforme aux Politiques du Programme Développeur Google Play
+                </div>
+                <h1 class="policy-title">Centre de Conformité & <span class="highlight">Réglementation</span></h1>
+                <p style="color: var(--text-secondary); max-width: 680px; margin: 0 auto; line-height: 1.6;">
+                    Dernière mise à jour : 28 Septembre 2026. Ce portail juridique centralise les politiques de confidentialité, les conditions d'utilisation et les fiches de sécurité des données de toutes les applications Android publiées par GHD Interactive Studio.
+                </p>
+            </header>
+
+            <!-- Quick Access by Application -->
+            <div style="background: rgba(251, 188, 5, 0.08); border: 1px solid rgba(251, 188, 5, 0.3); border-radius: 20px; padding: 2rem; margin-bottom: 2.5rem;">
+                <h3 style="color: #ffffff; font-size: 1.3rem; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 10px;">
+                    <span>🐺</span> Politiques Spécifiques par Application
+                </h3>
+                <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 1.5rem;">
+                    Google Play exige une politique de confidentialité personnalisée pour chaque application utilisant des permissions sensibles ou du contenu interactif. Accédez directement aux documents dédiés :
+                </p>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.2rem;">
+                    <div style="background: rgba(14, 18, 28, 0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 1.4rem;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 0.8rem;">
+                            <img src="assets/lupus-arena/icon.png" alt="Lupus Arena" style="width: 44px; height: 44px; border-radius: 10px;">
+                            <div>
+                                <h4 style="color: #ffffff; margin: 0; font-size: 1.1rem;">Lupus Arena</h4>
+                                <small style="color: var(--text-secondary);">com.ghdinteractivestudio.lupusarena</small>
+                            </div>
+                        </div>
+                        <p style="color: #94a3b8; font-size: 0.88rem; margin-bottom: 1rem;">
+                            Jeu de Loup-Garou vocal et stratégique multijoueur.
+                        </p>
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <a href="lupus-arena-privacy.html" style="color: var(--google-yellow); font-size: 0.88rem; text-decoration: none; font-weight: 600;">→ Politique de Confidentialité Lupus Arena</a>
+                            <a href="lupus-arena.html#data-safety" style="color: #38bdf8; font-size: 0.88rem; text-decoration: none; font-weight: 600;">→ Fiche Sécurité des Données Google Play</a>
+                            <a href="lupus-arena.html#terms" style="color: #cbd5e1; font-size: 0.88rem; text-decoration: none; font-weight: 600;">→ Conditions & Charte Vocale</a>
+                        </div>
+
+                    </div>
+
+                    <div style="background: rgba(14, 18, 28, 0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 1.4rem;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 0.8rem;">
+                            <div style="width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, var(--google-blue), var(--play-green)); display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">🛡️</div>
+                            <div>
+                                <h4 style="color: #ffffff; margin: 0; font-size: 1.1rem;">Studio GHD Global</h4>
+                                <small style="color: var(--text-secondary);">Toutes les applications du studio</small>
+                            </div>
+                        </div>
+                        <p style="color: #94a3b8; font-size: 0.88rem; margin-bottom: 1rem;">
+                            Cadre général applicable à tous nos jeux et utilitaires Android.
+                        </p>
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <a href="#engagement" style="color: var(--google-yellow); font-size: 0.88rem; text-decoration: none; font-weight: 600;">→ Voir les Principes Généraux ci-dessous</a>
+                            <a href="index.html#contact" style="color: #38bdf8; font-size: 0.88rem; text-decoration: none; font-weight: 600;">→ Contacter le Support Développeur</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Global Studio Policy Content -->
+            <div class="policy-card">
+                <!-- Section 1 -->
+                <article id="engagement" class="policy-block">
+                    <h2><span>01.</span> Engagement Global & Champ d'Application</h2>
+                    <p>
+                        Chez <strong>GHD Interactive Studio</strong>, la protection de vos données personnelles et le respect de votre vie privée sont au cœur de nos priorités d'ingénierie logicielle. Cette politique générale détaille de façon transparente la manière dont nos applications mobiles Android collectent, utilisent, protègent et suppriment vos informations, en stricte conformité avec le Règlement Général sur la Protection des Données (RGPD - Règlement UE 2016/679) et le règlement du programme pour les développeurs Google Play.
+                    </p>
+                </article>
+
+                <!-- Section 2 -->
+                <article class="policy-block">
+                    <h2><span>02.</span> Principes de Collecte & Section Sécurité des Données</h2>
+                    <p>
+                        Conformément à la section « Sécurité des données » de la console Google Play, nos applications limitent systématiquement la collecte au strict minimum nécessaire à leur bon fonctionnement :
+                    </p>
+                    <ul>
+                        <li><strong>Principe de Minimisation :</strong> Aucune donnée personnelle nominative n'est exigée pour jouer à nos jeux ou utiliser nos applications de base.</li>
+                        <li><strong>Données techniques et de diagnostic :</strong> Journaux de plantage anonymisés (Google Firebase Crashlytics) et métriques de performances pour garantir la stabilité et corriger les anomalies matérielles.</li>
+                        <li><strong>Identifiants d'appareil anonymisés :</strong> Utilisés uniquement pour la persistance locale de session ou la synchronisation de salon multijoueur.</li>
+                        <li><strong>Chiffrement en Transit :</strong> Toutes les communications réseau vers nos serveurs ou prestataires cloud sont obligatoirement chiffrées via les protocoles TLS 1.3 / HTTPS / WSS.</li>
+                    </ul>
+                </article>
+
+                <!-- Section 3 -->
+                <article class="policy-block">
+                    <h2><span>03.</span> Traitement des Permissions Sensibles Android</h2>
+                    <p>
+                        Nos applications appliquent le principe du moindre privilège (Principle of Least Privilege). Les autorisations requises sont strictement justifiées par une fonctionnalité utilisateur évidente :
+                    </p>
+                    <ul>
+                        <li><code>RECORD_AUDIO</code> : Sollicitée <u>uniquement</u> dans les jeux intégrant des communications vocales en direct (comme <strong>Lupus Arena</strong>). La captation micro est strictement éphémère et ne fait l'objet d'aucun enregistrement permanent sur nos serveurs.</li>
+                        <li><code>INTERNET</code> & <code>ACCESS_NETWORK_STATE</code> : Requis pour la synchronisation en temps réel des salons de jeu et l'accès aux serveurs cloud.</li>
+                        <li><code>BLUETOOTH_CONNECT</code> : Utilisé pour le routage audio vers les casques et dispositifs d'écoute Bluetooth sans fil.</li>
+                        <li><code>POST_NOTIFICATIONS</code> (Android 13+) : Demandée explicitement via une boîte de dialogue système si l'utilisateur souhaite recevoir des alertes de début de partie.</li>
+                        <li><code>VIBRATE</code> : Retours haptiques pour une immersion sensorielle accrue.</li>
+                    </ul>
+                </article>
+
+                <!-- Section 4 -->
+                <article class="policy-block">
+                    <h2><span>04.</span> Sous-Traitants & SDKs Tiers Certifiés</h2>
+                    <p>
+                        GHD Interactive Studio sélectionne exclusivement des prestataires tiers de classe mondiale adhérant aux standards stricts du Google Play SDK Index :
+                    </p>
+                    <ul>
+                        <li><strong>Google LLC (Firebase Realtime Database & Crashlytics) :</strong> Synchronisation des données de jeu chiffrées et suivi des anomalies techniques.</li>
+                        <li><strong>Agora Inc. (Agora RTC Engine) :</strong> Infrastructure audio mondiale temps réel à latence ultra-faible pour le chat vocal entre joueurs.</li>
+                    </ul>
+                </article>
+
+                <!-- Section 5 -->
+                <article class="policy-block">
+                    <h2><span>05.</span> Protection des Mineurs & Familles (COPPA)</h2>
+                    <p>
+                        GHD Interactive Studio veille scrupuleusement à la protection des enfants :
+                    </p>
+                    <ul>
+                        <li>Nos jeux incorporant des interactions vocales ouvertes (ex: Lupus Arena) reçoivent une classification d'âge appropriée (PEGI 12 / USK 12) et ne ciblent pas les enfants de moins de 13 ans sans accord parental.</li>
+                        <li>Nous nous conformons rigoureusement au Children's Online Privacy Protection Act (COPPA) et à la politique de Google Play pour les familles.</li>
+                        <li>Aucun profilage publicitaire comportemental n'est réalisé auprès de mineurs.</li>
+                    </ul>
+                </article>
+
+                <!-- Section 6 -->
+                <article class="policy-block">
+                    <h2><span>06.</span> Droit à l'Effacement & Suppression des Données</h2>
+                    <p>
+                        Conformément au RGPD et aux règles de Google Play, tout utilisateur peut exiger l'effacement de ses informations en formulant simplement sa demande par email à <a href="mailto:ghdinteractivestudio@gmail.com" style="color: var(--google-yellow); font-weight: 700;">ghdinteractivestudio@gmail.com</a>. Les données sont purgées dans un délai maximum de 48 heures ouvrées.
+                    </p>
+                </article>
+
+                <!-- Section 7 -->
+                <article class="policy-block">
+                    <h2><span>07.</span> Contact &amp; Délégué à la Protection des Données</h2>
+                    <p>
+                        Pour toute question, requête d'exercice de vos droits ou signalement relatif à la conformité de nos applications Android :
+                    </p>
+                    <p style="color: #ffffff; background: rgba(255, 255, 255, 0.05); padding: 1.2rem 1.5rem; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.1); margin-top: 1rem; line-height: 1.8;">
+                        <strong>GHD Interactive Studio — Conformité &amp; Sécurité Google Play</strong><br>
+                        Email Officiel Développeur &amp; Données : <a href="mailto:ghdinteractivestudio@gmail.com" style="color: var(--google-yellow); text-decoration: none; font-weight: 700;">ghdinteractivestudio@gmail.com</a><br>
+                        Site officiel : <a href="https://ghdinteractivestudio.github.io/" style="color: #38bdf8; text-decoration: none; font-weight: 600;">ghdinteractivestudio.github.io</a><br>
+                        Support en ligne : Via le formulaire de contact du site.
+                    </p>
+                </article>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-content">
+            <a href="index.html" class="logo">GHD<span>.</span></a>
+            <ul class="footer-links">
+                <li><a href="index.html">Accueil</a></li>
+                <li><a href="applications.html">Nos Applications</a></li>
+                <li><a href="lupus-arena.html">Lupus Arena</a></li>
+                <li><a href="reglementation.html">Réglementation</a></li>
+                <li><a href="index.html#contact">Contact</a></li>
+            </ul>
+            <p class="footer-copy">© 2026 GHD INTERACTIVE STUDIO. Tous droits réservés. Site officiel : <a href="https://ghdinteractivestudio.github.io/" style="color: #38bdf8; text-decoration: none;">ghdinteractivestudio.github.io</a> • Contact : <a href="mailto:ghdinteractivestudio@gmail.com" style="color: #cbd5e1; text-decoration: none;">ghdinteractivestudio@gmail.com</a></p>
+        </div>
+    </footer>
+
+    <!-- Three.js Interactive Engine -->
+    <script src="main.js?v=20260928g"></script>
+
+    <!-- GSAP Entrance Animation -->
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            gsap.fromTo(".policy-header", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.9, delay: 0.3 });
+            gsap.fromTo(".policy-card", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 1, delay: 0.5 });
+        });
+    </script>
+</body>
+</html>

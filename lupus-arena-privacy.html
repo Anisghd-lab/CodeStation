@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Politique de Confidentialité | Lupus Arena | GHD Interactive Studio</title>
+    <meta name="description" content="Politique de confidentialité officielle de Lupus Arena (com.ghdinteractivestudio.lupusarena) pour le Google Play Store et la conformité RGPD.">
+    <link rel="canonical" href="https://ghdinteractivestudio.github.io/lupus-arena-privacy.html">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="style.css?v=20260928g">
+    <script src="three.min.js"></script>
+    <script>
+        if (typeof THREE === 'undefined') {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+        }
+    </script>
+    <script src="gsap.min.js"></script>
+    <script>
+        if (typeof gsap === 'undefined') {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"><\/script>');
+        }
+    </script>
+    <!-- Anti-flash theme detection -->
+    <script>
+        (function(){
+            try {
+                var s = localStorage.getItem('ghd_theme');
+                var light = s === 'light' || (!s && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+                if (light) document.documentElement.classList.add('light-mode');
+            } catch(e) {}
+        })();
+    </script>
+</head>
+<body>
+    <canvas id="webgl-canvas"></canvas>
+
+    <nav class="glass-nav" id="mainNav">
+        <a href="index.html" class="logo">GHD<span>.</span></a>
+                <ul class="nav-links">
+            <li><a href="index.html">Accueil</a></li>
+            <li><a href="applications.html">Nos Applications</a></li>
+            <li><a href="reglementation.html" class="active">Réglementation</a></li>
+        <li class="mobile-contact-link"><a href="index.html#contact">Contact</a></li>
+        </ul>
+        <div class="nav-controls">
+        <button class="mobile-toggle" aria-label="Menu de navigation"
+            onclick="(function(btn){var nav=btn.closest('nav');nav.classList.toggle('mobile-menu-active');btn.setAttribute('aria-expanded', nav.classList.contains('mobile-menu-active'))})(this)">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a href="index.html#contact" class="btn-contact-nav">Contact</a>
+                <button class="theme-toggle" id="themeToggle" aria-label="Mode clair" title="Passer en mode clair">
+            <!-- Moon (shown in dark mode) -->
+            <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+            <!-- Sun (shown in light mode) -->
+            <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="5"/>
+                <line x1="12" y1="1" x2="12" y2="3"/>
+                <line x1="12" y1="21" x2="12" y2="23"/>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                <line x1="1" y1="12" x2="3" y2="12"/>
+                <line x1="21" y1="12" x2="23" y2="12"/>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+        </button>
+        </div>
+    </nav>
+
+    <main class="policy-section">
+        <div class="policy-container">
+            <header class="policy-header">
+                <div class="policy-badge">
+                    ✓ Google Play Console • Politique de Confidentialité Certifiée
+                </div>
+                <h1 class="policy-title">Politique de Confidentialité — <span class="highlight">Lupus Arena</span></h1>
+                <p style="color: var(--text-secondary); max-width: 650px; margin: 0 auto; line-height: 1.6;">
+                    <strong>Application :</strong> Lupus Arena (Android)<br>
+                    <strong>Identifiant de paquet (Package ID) :</strong> <code>com.ghdinteractivestudio.lupusarena</code><br>
+                    <strong>Développeur & Éditeur :</strong> GHD Interactive Studio<br>
+                    <strong>Dernière mise à jour :</strong> 28 Septembre 2026
+                </p>
+            </header>
+
+            <div class="policy-card">
+                <div class="compliance-callout">
+                    <h4>Engagement de Transparence Google Play</h4>
+                    <p>La présente politique informe de façon claire et exhaustive les utilisateurs de l'application <strong>Lupus Arena</strong> sur la collecte, l'utilisation, le chiffrement et la suppression de leurs données conformément aux exigences du Google Play Developer Program Policy et au RGPD.</p>
+                </div>
+
+                <article class="policy-block">
+                    <h2><span>01.</span> Responsable de Traitement</h2>
+                    <p>L'application mobile <strong>Lupus Arena</strong> est développée et exploitée par le studio indépendant <strong>GHD Interactive Studio</strong>.</p>
+                    <p>Pour exercer vos droits ou contacter notre responsable de la protection des données :<br>
+                    Email : <a href="mailto:ghdinteractivestudio@gmail.com" style="color: var(--google-yellow); font-weight: 700;">ghdinteractivestudio@gmail.com</a><br>
+                    Site officiel : <a href="https://ghdinteractivestudio.github.io/" style="color: #38bdf8; font-weight: 600;">ghdinteractivestudio.github.io</a>
+                    </p>
+
+                </article>
+
+                <article class="policy-block">
+                    <h2><span>02.</span> Traitement des Données Vocales & Microphone (Agora RTC)</h2>
+                    <p>
+                        Lupus Arena requiert l'accès au microphone de l'appareil via l'autorisation Android standard <code>android.permission.RECORD_AUDIO</code>.
+                    </p>
+                    <ul>
+                        <li><strong>Finalité exclusive :</strong> Permettre le débat vocal en direct entre joueurs humains au cours des phases de jeu diurnes, ainsi que les conciliabules nocturnes sécurisés au sein de la meute de loups.</li>
+                        <li><strong>Aucun enregistrement permanent :</strong> Les flux vocaux sont acheminés en temps réel de bout en bout grâce à la technologie <strong>Agora RTC Voice</strong>. Ni GHD Interactive Studio ni Agora n'enregistrent, n'analysent ni ne conservent d'enregistrements audio sur leurs serveurs. Le flux vocal est strictement éphémère.</li>
+                        <li><strong>Contrôle total :</strong> Le joueur peut couper son micro à tout instant via le commutateur in-game ou révoquer la permission au niveau du système d'exploitation Android.</li>
+                    </ul>
+                </article>
+
+                <article class="policy-block">
+                    <h2><span>03.</span> Données Collectées & Justification</h2>
+                    <ul>
+                        <li><strong>Pseudonyme & Avatar :</strong> Renseigné par l'utilisateur lors de son entrée dans un salon de jeu pour identifier son personnage. Aucune obligation d'utiliser son identité réelle.</li>
+                        <li><strong>Identifiant Technique Anonyme (UUID) :</strong> Généré aléatoirement sur l'appareil pour maintenir la reconnexion à la partie en cas de micro-coupure réseau.</li>
+                        <li><strong>États de Jeu (Firebase Realtime Database) :</strong> Cartes distribuées, votes, actions de nuit, heure de début du tour. Ces données sont stockées sous forme chiffrée pendant la durée de la partie, puis purgées.</li>
+                        <li><strong>Informations Système & Diagnostics :</strong> Modèle de terminal, version d'Android, journaux de plantage (Crashlytics) pour garantir la compatibilité et la fluidité sur tous les appareils Android.</li>
+                    </ul>
+                </article>
+
+                <article class="policy-block">
+                    <h2><span>04.</span> Liste Détaillée des Permissions Android Sollicitées</h2>
+                    <div class="data-table-responsive">
+                        <table class="data-safety-table">
+                            <thead>
+                                <tr>
+                                    <th>Permission</th>
+                                    <th>Finalité</th>
+                                    <th>Type d'accès</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td data-label="Permission"><code>RECORD_AUDIO</code></td>
+                                    <td data-label="Finalité">Discussion vocale en temps réel entre joueurs</td>
+                                    <td data-label="Accès">Microphone matériel (temps réel, non conservé)</td>
+                                </tr>
+                                <tr>
+                                    <td data-label="Permission"><code>INTERNET</code> &amp; <code>ACCESS_NETWORK_STATE</code></td>
+                                    <td data-label="Finalité">Connexion aux serveurs de jeu et synchronisation de salon</td>
+                                    <td data-label="Accès">Réseau TCP/IP &amp; WebSockets sécurisés</td>
+                                </tr>
+                                <tr>
+                                    <td data-label="Permission"><code>BLUETOOTH_CONNECT</code></td>
+                                    <td data-label="Finalité">Prise en charge des casques sans fil &amp; oreillettes Bluetooth</td>
+                                    <td data-label="Accès">Routage audio sans accès aux données personnelles</td>
+                                </tr>
+                                <tr>
+                                    <td data-label="Permission"><code>POST_NOTIFICATIONS</code></td>
+                                    <td data-label="Finalité">Alertes de début de partie ou de tour de vote</td>
+                                    <td data-label="Accès">Notifications système (désactivables)</td>
+                                </tr>
+                                <tr>
+                                    <td data-label="Permission"><code>VIBRATE</code></td>
+                                    <td data-label="Finalité">Retour haptique lors du tirage de rôle secret</td>
+                                    <td data-label="Accès">Moteur vibreur uniquement</td>
+                                </tr>
+                                <tr>
+                                    <td data-label="Permission"><code>WAKE_LOCK</code></td>
+                                    <td data-label="Finalité">Maintien de l'écran éveillé pendant la partie</td>
+                                    <td data-label="Accès">Gestionnaire d'alimentation Android</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+
+                <article class="policy-block">
+                    <h2><span>05.</span> Partenaires Tiers & Sous-Traitants</h2>
+                    <p>Lupus Arena utilise deux partenaires techniques mondiaux de premier plan :</p>
+                    <ul>
+                        <li><strong>Google Firebase (Google LLC) :</strong> Hébergement des bases de données en temps réel (Firebase Realtime Database) et suivi des plantages. Données chiffrées en transit (TLS 1.3) et au repos.</li>
+                        <li><strong>Agora.io (Agora Inc.) :</strong> Transmission de flux audio en temps réel pour le canal vocal.</li>
+                    </ul>
+                </article>
+
+                <article class="policy-block">
+                    <h2><span>06.</span> Protection des Mineurs &amp; Directives Familles</h2>
+                    <p>L'application Lupus Arena est classée <strong>PEGI 12 / USK 12+</strong> en raison des interactions vocales ouvertes avec d'autres utilisateurs. L'application ne s'adresse pas directement aux enfants de moins de 13 ans sans accord parental. Aucune information nominative n'est collectée auprès des mineurs.</p>
+                </article>
+
+                <article class="policy-block">
+                    <h2><span>07.</span> Contact &amp; Informations Développeur</h2>
+                    <p style="background: rgba(255, 255, 255, 0.04); padding: 1.2rem; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.1); line-height: 1.8;">
+                        <strong>GHD Interactive Studio</strong><br>
+                        Contact Développeur &amp; Support Unique : <a href="mailto:ghdinteractivestudio@gmail.com" style="color: var(--google-yellow); font-weight: 700;">ghdinteractivestudio@gmail.com</a><br>
+                        Site officiel : <a href="https://ghdinteractivestudio.github.io/" style="color: #38bdf8; font-weight: 600;">ghdinteractivestudio.github.io</a>
+                    </p>
+                </article>
+            </div>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-content">
+            <a href="index.html" class="logo">GHD<span>.</span></a>
+            <ul class="footer-links">
+                <li><a href="index.html">Accueil</a></li>
+                <li><a href="applications.html">Nos Applications</a></li>
+                <li><a href="lupus-arena.html">Lupus Arena</a></li>
+                <li><a href="reglementation.html">Réglementation</a></li>
+                <li><a href="index.html#contact">Contact</a></li>
+            </ul>
+            <p class="footer-copy">© 2026 GHD INTERACTIVE STUDIO. Tous droits réservés. Site officiel : <a href="https://ghdinteractivestudio.github.io/" style="color: #38bdf8; text-decoration: none;">ghdinteractivestudio.github.io</a> • Contact : <a href="mailto:ghdinteractivestudio@gmail.com" style="color: #cbd5e1; text-decoration: none;">ghdinteractivestudio@gmail.com</a></p>
+        </div>
+    </footer>
+
+    <script src="main.js?v=20260928g"></script>
+</body>
+</html>

@@ -1,9 +1,0 @@
-{
-  "bot_id": "bot-codebuddy",
-  "engine": "codebuddy",
-  "model": "hy3",
-  "rootfs": "/root/CodeStation/environments/bot-codebuddy/rootfs",
-  "created_at": 1793486012794,
-  "status": "READY",
-  "run_script": "/root/CodeStation/environments/bot-codebuddy/run.sh"
-}

@@ -1,9 +1,0 @@
-{
-  "status": "READY",
-  "updated_at": 1793451818233,
-  "bot_id": "bot-kimi",
-  "engine": "kimi",
-  "model": "openrouter/flint-v1",
-  "rootfs": "/root/CodeStation/environments/bot-kimi/rootfs",
-  "run_script": "/root/CodeStation/environments/bot-kimi/run.sh"
-}

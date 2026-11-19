@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lupus Arena | Jeu Loup-Garou Multijoueur Android | GHD Interactive Studio</title>
+    <meta name="description" content="Lupus Arena – Le jeu du Loup-Garou réinventé sur Android. Bluff, stratégie et chat vocal en temps réel pour 6 à 24 joueurs. Disponible sur Google Play.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="style.css?v=20260928g">
+    <script src="three.min.js"></script>
+    <script>
+        if (typeof THREE === 'undefined') {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+        }
+    </script>
+    <script src="gsap.min.js"></script>
+    <script>
+        if (typeof gsap === 'undefined') {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"><\/script>');
+        }
+    </script>
+    <style>
+        /* ── Centrage images Lupus Arena ───────────────────── */
+        .la-img-center {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+        .la-img-center img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 16px;
+            border: 1px solid rgba(251,188,5,0.25);
+            box-shadow: 0 12px 35px rgba(0,0,0,0.75);
+        }
+
+        /* ── Grille screenshots centrée ─────────────────────── */
+        .screenshots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.2rem;
+            justify-items: center;
+            margin: 2rem 0;
+        }
+        .screenshots-grid img {
+            width: 100%;
+            max-width: 280px;
+            height: auto;
+            border-radius: 18px;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 10px 28px rgba(0,0,0,0.7);
+            display: block;
+        }
+
+        /* ── Role cards centrées ─────────────────────────────── */
+        .cards-showcase-grid {
+            justify-items: center;
+        }
+        .role-card-item { width: 100%; max-width: 200px; }
+
+        /* ── Lobby screenshot centré ─────────────────────────── */
+        .lobby-preview {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+        }
+        @media (min-width: 768px) {
+            .lobby-preview { flex-direction: row; }
+            .lobby-preview .lobby-text { flex: 1; }
+            .lobby-preview .lobby-img  { flex: 1; }
+        }
+        .lobby-img img {
+            width: 100%;
+            max-width: 340px;
+            height: auto;
+            display: block;
+            border-radius: 18px;
+            border: 1px solid rgba(251,188,5,0.3);
+            box-shadow: 0 12px 36px rgba(0,0,0,0.8);
+            margin: 0 auto;
+        }
+
+        /* ── Hero icon centré ────────────────────────────────── */
+        .game-hero-icon {
+            margin: 0 auto 1.5rem;
+        }
+    </style>
+    <!-- Anti-flash theme detection -->
+    <script>
+        (function(){
+            try {
+                var s = localStorage.getItem('ghd_theme');
+                var light = s === 'light' || (!s && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+                if (light) document.documentElement.classList.add('light-mode');
+            } catch(e) {}
+        })();
+    </script>
+</head>
+<body>
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- Navigation -->
+    <nav class="glass-nav" id="mainNav">
+        <a href="index.html" class="logo">GHD<span>.</span></a>
+                <ul class="nav-links">
+            <li><a href="index.html">Accueil</a></li>
+            <li><a href="applications.html" class="active" style="color:#fff;text-shadow:0 0 12px rgba(255,255,255,.9),0 0 25px var(--google-blue);">Nos Applications</a></li>
+            <li><a href="reglementation.html">Réglementation</a></li>
+            <li class="mobile-contact-link"><a href="index.html#contact">Contact</a></li>
+        </ul>
+        <div class="nav-controls">
+        <button class="mobile-toggle" aria-label="Menu de navigation"
+            onclick="(function(btn){var nav=btn.closest('nav');nav.classList.toggle('mobile-menu-active');btn.setAttribute('aria-expanded', nav.classList.contains('mobile-menu-active'))})(this)">
+            <span></span><span></span><span></span>
+        </button>
+        <a href="index.html#contact" class="btn-contact-nav">Contact</a>
+                <button class="theme-toggle" id="themeToggle" aria-label="Mode clair" title="Passer en mode clair">
+            <!-- Moon (shown in dark mode) -->
+            <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+            <!-- Sun (shown in light mode) -->
+            <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="5"/>
+                <line x1="12" y1="1" x2="12" y2="3"/>
+                <line x1="12" y1="21" x2="12" y2="23"/>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                <line x1="1" y1="12" x2="3" y2="12"/>
+                <line x1="21" y1="12" x2="23" y2="12"/>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+        </button>
+        </div>
+    </nav>
+
+    <!-- ═══════════════════════════════════════════════
+         HERO
+    ═══════════════════════════════════════════════ -->
+    <header class="hero-section" style="min-height:80vh;padding-top:130px;padding-bottom:40px;">
+        <div class="game-header">
+
+            <div style="margin-bottom:1.2rem;">
+                <a href="applications.html" style="color:#94a3b8;text-decoration:none;font-size:.9rem;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);padding:.4rem 1rem;border-radius:20px;border:1px solid rgba(255,255,255,.1);">
+                    ← Retour à Nos Applications
+                </a>
+            </div>
+
+            <!-- Icone centrée -->
+            <div class="la-img-center" style="margin-bottom:1.5rem;">
+                <div class="game-hero-icon" style="width:110px;height:110px;border-radius:26px;border:3px solid rgba(251,188,5,.7);box-shadow:0 15px 35px rgba(251,188,5,.35);overflow:hidden;">
+                    <img src="assets/lupus-arena/icon.png" alt="Lupus Arena" width="110" height="110" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:0;">
+                </div>
+            </div>
+
+            <div class="featured-badge-top" style="margin-bottom:1.2rem;">
+                🐺 Titre Phare Android • Version v1.0.1
+            </div>
+
+            <h1 class="hero-title" style="margin-bottom:1rem;">
+                LUPUS <span class="studio-gradient-text">ARENA</span>
+            </h1>
+
+            <p class="hero-subtitle" style="max-width:760px;margin-bottom:2rem;">
+                La nuit tombe sur le village. Les loups rôdent, les villageois murmurent, et chaque mot peut trahir ou sauver.
+                <strong>Lupus Arena</strong> est le jeu de déduction sociale qui met ta voix, ton instinct et tes nerfs à rude épreuve.
+                Ose démasquer les traîtres… ou être l'un d'eux.
+            </p>
+
+            <div class="game-tags" style="justify-content:center;">
+                <span class="game-tag tag-accent">🎙️ Chat Vocal en Temps Réel</span>
+                <span class="game-tag tag-accent">🎭 Plus de 30 Rôles Uniques</span>
+                <span class="game-tag">👥 6 à 24 Joueurs</span>
+                <span class="game-tag">🔐 Salons Privés &amp; Public</span>
+                <span class="game-tag">🛡️ Conforme Google Play</span>
+                <span class="game-tag">📱 Android 7.0+</span>
+            </div>
+
+            <div class="hero-cta" style="margin-top:1.8rem;">
+                <a href="#gameplay" class="btn-primary">
+                    <span>Découvrir le Jeu</span>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </a>
+                <a href="#privacy" class="btn-secondary">
+                    <span>Confidentialité &amp; Légal</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation rapide -->
+    <div class="game-quick-nav">
+        <a href="#gameplay" class="active">🎮 Le Jeu</a>
+        <a href="#roles">🃏 Les Rôles</a>
+        <a href="#privacy">🔒 Confidentialité</a>
+        <a href="#data-safety">🛡️ Sécurité Données</a>
+        <a href="#terms">📜 Conditions</a>
+        <a href="#support">✉️ Support</a>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         CONTENU PRINCIPAL
+    ═══════════════════════════════════════════════ -->
+    <main class="policy-section" style="padding-top:20px;">
+        <div class="policy-container">
+
+            <!-- ── SECTION 1 : LE JEU ───────────────────────── -->
+            <section id="gameplay" class="policy-card" style="margin-bottom:3.5rem;">
+                <div class="policy-header" style="text-align:center;margin-bottom:2.5rem;">
+                    <div class="policy-badge" style="background:rgba(251,188,5,.15);border-color:rgba(251,188,5,.4);color:var(--google-yellow);">
+                        🎮 Expérience de Jeu
+                    </div>
+                    <h2 class="section-title" style="font-size:2.2rem;color:#fff;">Une Nuit, Tous les Suspects</h2>
+                    <p style="color:var(--text-secondary);margin-top:.8rem;max-width:680px;margin-left:auto;margin-right:auto;line-height:1.7;">
+                        Dans <strong style="color:#fff;">Lupus Arena</strong>, chaque joueur reçoit secrètement un rôle. 
+                        Villageois ou Loup-Garou, ton destin dépend de ta capacité à convaincre, à analyser… 
+                        et parfois à mentir brillamment. Le chat vocal crée une tension unique : 
+                        tu entends les hésitations, les silences, les faux-semblants.
+                    </p>
+                </div>
+
+                <!-- 3 piliers du jeu -->
+                <div class="features-grid" style="margin-bottom:3rem;">
+                    <div class="feature-card" style="text-align:center;padding:2rem 1.5rem;">
+                        <div class="feature-icon-box" style="background:rgba(0,86,145,.2);color:#38bdf8;margin:0 auto 1.2rem;font-size:1.6rem;">🎙️</div>
+                        <h3>Joue à la Voix</h3>
+                        <p>Débats, accuse, défends-toi. Le chat vocal en temps réel rend chaque échange intense et humain. Chaque intonation peut trahir le loup caché parmi vous.</p>
+                    </div>
+                    <div class="feature-card" style="text-align:center;padding:2rem 1.5rem;">
+                        <div class="feature-icon-box" style="background:rgba(251,188,5,.18);color:var(--google-yellow);margin:0 auto 1.2rem;font-size:1.6rem;">🧠</div>
+                        <h3>Bluff &amp; Stratégie</h3>
+                        <p>Analyse le comportement de tes alliés, identifie les incohérences, construis des alliances… ou trahis-les au bon moment. La victoire se joue dans les détails.</p>
+                    </div>
+                    <div class="feature-card" style="text-align:center;padding:2rem 1.5rem;">
+                        <div class="feature-icon-box" style="background:rgba(1,135,95,.2);color:#34d399;margin:0 auto 1.2rem;font-size:1.6rem;">🌙</div>
+                        <h3>La Nuit Change Tout</h3>
+                        <p>Le jour, le village vote. La nuit, les loups agissent en secret. Chaque phase renouvelle la tension. Aucune partie ne se ressemble.</p>
+                    </div>
+                </div>
+
+                <!-- Screenshot lobby centré -->
+                <div style="background:rgba(0,0,0,.4);border-radius:20px;padding:2rem;border:1px solid rgba(255,255,255,.08);margin-bottom:2rem;">
+                    <h3 style="color:#fff;font-size:1.3rem;margin-bottom:1.5rem;text-align:center;">
+                        📱 Le Salon de Jeu
+                    </h3>
+                    <div class="lobby-preview">
+                        <div class="lobby-text">
+                            <p style="color:var(--text-secondary);line-height:1.8;font-size:.96rem;margin-bottom:1rem;">
+                                Rejoins une partie publique ou crée ton propre salon privé avec tes amis. 
+                                Tu choisis les rôles, le nombre de joueurs et tu lances la partie quand tout le monde est prêt.
+                            </p>
+                            <ul style="color:#cbd5e1;font-size:.92rem;padding-left:1.2rem;line-height:1.9;">
+                                <li>Salons publics ou protégés par code secret</li>
+                                <li>Attribution secrète des rôles à chaque partie</li>
+                                <li>Retours haptiques lors des votes et révélations</li>
+                                <li>Bande-son originale pour une ambiance immersive</li>
+                            </ul>
+                        </div>
+                        <div class="lobby-img">
+                            <img src="assets/lupus-arena/screen-lobby.jpg" alt="Salon de jeu Lupus Arena" loading="lazy">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── SECTION 2 : LES RÔLES ────────────────────── -->
+            <section id="roles" class="policy-card" style="margin-bottom:3.5rem;">
+                <div class="policy-header" style="text-align:center;margin-bottom:2rem;">
+                    <div class="policy-badge" style="background:rgba(234,67,53,.12);border-color:rgba(234,67,53,.4);color:var(--google-red);">
+                        🃏 Galerie des Rôles
+                    </div>
+                    <h2 class="section-title" style="font-size:2.2rem;color:#fff;">Plus de 30 Rôles Légendaires</h2>
+                    <p style="color:var(--text-secondary);margin-top:.8rem;max-width:600px;margin-left:auto;margin-right:auto;line-height:1.7;">
+                        Chaque rôle a son pouvoir, ses contraintes et sa stratégie. 
+                        Qui es-tu ce soir — protecteur du village ou loup tapi dans l'ombre ?
+                    </p>
+                </div>
+
+                <div class="cards-showcase-grid">
+                    <div class="role-card-item">
+                        <div class="role-card-thumb">
+                            <img src="assets/lupus-arena/card-seer.jpg" alt="Voyante" loading="lazy">
+                        </div>
+                        <div class="role-card-name">
+                            Voyante
+                            <span class="role-card-faction faction-village">Village • Révélation</span>
+                        </div>
+                    </div>
+                    <div class="role-card-item">
+                        <div class="role-card-thumb">
+                            <img src="assets/lupus-arena/card-witch.jpg" alt="Sorcière" loading="lazy">
+                        </div>
+                        <div class="role-card-name">
+                            Sorcière
+                            <span class="role-card-faction faction-village">Village • Potions</span>
+                        </div>
+                    </div>
+                    <div class="role-card-item">
+                        <div class="role-card-thumb">
+                            <img src="assets/lupus-arena/card-wolf.jpg" alt="Loup Blanc" loading="lazy">
+                        </div>
+                        <div class="role-card-name">
+                            Loup Blanc
+                            <span class="role-card-faction faction-wolf">Meute • Traître</span>
+                        </div>
+                    </div>
+                    <div class="role-card-item">
+                        <div class="role-card-thumb">
+                            <img src="assets/lupus-arena/card-guard.jpg" alt="Salvateur" loading="lazy">
+                        </div>
+                        <div class="role-card-name">
+                            Salvateur
+                            <span class="role-card-faction faction-village">Village • Bouclier</span>
+                        </div>
+                    </div>
+                    <div class="role-card-item">
+                        <div class="role-card-thumb">
+                            <img src="assets/lupus-arena/card-hunter.jpg" alt="Chasseur" loading="lazy">
+                        </div>
+                        <div class="role-card-name">
+                            Chasseur
+                            <span class="role-card-faction faction-village">Village • Ultime</span>
+                        </div>
+                    </div>
+                    <div class="role-card-item">
+                        <div class="role-card-thumb">
+                            <img src="assets/lupus-arena/card-thief.jpg" alt="Voleur" loading="lazy">
+                        </div>
+                        <div class="role-card-name">
+                            Voleur
+                            <span class="role-card-faction faction-solo">Neutre • Échange</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="text-align:center;margin-top:2.5rem;">
+                    <p style="color:var(--text-secondary);font-size:.95rem;margin-bottom:1.5rem;">
+                        Et bien d'autres encore — Cupidon, Ancien, Corbeau, Idiot du Village… chaque rôle transforme la dynamique de la partie.
+                    </p>
+                </div>
+            </section>
+
+            <!-- ── SECTION 3 : CONFIDENTIALITÉ ─────────────── -->
+            <section id="privacy" class="policy-card" style="margin-bottom:3.5rem;">
+                <div class="policy-header" style="text-align:left;margin-bottom:2rem;">
+                    <div class="policy-badge">🔒 Document Légal — Google Play Store</div>
+                    <h2 class="section-title" style="font-size:2.2rem;color:#fff;">Politique de Confidentialité — Lupus Arena</h2>
+                    <p style="color:var(--text-secondary);margin-top:.5rem;">
+                        <strong>Package :</strong> <code>com.ghdinteractivestudio.lupusarena</code><br>
+                        <strong>Éditeur :</strong> GHD Interactive Studio<br>
+                        <strong>Mise à jour :</strong> 28 Septembre 2026 • Version v1.0.1
+                    </p>
+                </div>
+
+                <div class="compliance-callout">
+                    <h4>📌 Conformité Google Play</h4>
+                    <p>Cette politique est conforme au Règlement du programme pour les développeurs Google Play (Confidentialité, Sécurité et Tromperie), au RGPD et au CCPA.</p>
+                </div>
+
+                <article class="policy-block">
+                    <h2><span>01.</span> Responsable de Traitement</h2>
+                    <p>L'application <strong>Lupus Arena</strong> est développée et exploitée par <strong>GHD Interactive Studio</strong>.</p>
+                    <p>Contact : <a href="mailto:ghdinteractivestudio@gmail.com" style="color:var(--google-yellow);font-weight:700;">ghdinteractivestudio@gmail.com</a><br>
+                    Site officiel : <a href="https://ghdinteractivestudio.github.io/" style="color:#38bdf8;font-weight:600;">ghdinteractivestudio.github.io</a></p>
+                </article>
+
+                <article class="policy-block">
+                    <h2><span>02.</span> Utilisation du Microphone</h2>
+                    <p>Le microphone est utilisé exclusivement pour le chat vocal multijoueur en cours de partie.</p>
+                    <ul>
+                        <li><strong>Flux en direct uniquement :</strong> Le micro n'est actif qu'en partie, uniquement si le joueur n'est pas en sourdine.</li>
+                        <li><strong>Aucun enregistrement :</strong> Les échanges vocaux sont transmis en temps réel entre joueurs. Rien n'est stocké sur nos serveurs.</li>
+                        <li><strong>Contrôle total :</strong> Le joueur peut couper son micro à tout moment dans l'interface ou révoquer la permission depuis les paramètres Android.</li>
+                    </ul>
+                </article>
+
+                <article class="policy-block">
+                    <h2><span>03.</span> Données Collectées</h2>
+                    <ul>
+                        <li><strong>Pseudonyme &amp; Avatar :</strong> Choisi librement par le joueur. Aucune identité réelle n'est requise.</li>
+                        <li><strong>Identifiant de session anonyme :</strong> Un jeton aléatoire pour maintenir la connexion au salon.</li>
+                        <li><strong>État de jeu :</strong> Les rôles, votes et actions nocturnes sont stockés temporairement pendant la partie, puis supprimés à la fin.</li>
+                        <li><strong>Diagnostics anonymes :</strong> Rapports de plantage pour corriger les bugs (modèle d'appareil, version Android).</li>
+                    </ul>
+                </article>
+
+                <article class="policy-block">
+                    <h2><span>04.</span> Permissions Android</h2>
+                    <div class="data-table-responsive">
+                        <table class="data-safety-table">
+                            <thead>
+                                <tr>
+                                    <th>Permission</th>
+                                    <th>Usage</th>
+                                    <th>Données accédées</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td data-label="Permission"><code>RECORD_AUDIO</code></td>
+                                    <td data-label="Usage">Chat vocal multijoueur en temps réel</td>
+                                    <td data-label="Données">Flux audio en direct (non stocké)</td>
+                                </tr>
+                                <tr>
+                                    <td data-label="Permission"><code>INTERNET</code> &amp; <code>NETWORK_STATE</code></td>
+                                    <td data-label="Usage">Synchronisation de l'état de jeu et vocal</td>
+                                    <td data-label="Données">Connectivité réseau</td>
+                                </tr>
+                                <tr>
+                                    <td data-label="Permission"><code>MODIFY_AUDIO_SETTINGS</code> &amp; <code>BLUETOOTH_CONNECT</code></td>
+                                    <td data-label="Usage">Bascule haut-parleur / casque Bluetooth</td>
+                                    <td data-label="Données">Routage audio matériel uniquement</td>
+                                </tr>
+                                <tr>
+                                    <td data-label="Permission"><code>POST_NOTIFICATIONS</code> (Android 13+)</td>
+                                    <td data-label="Usage">Alertes de début de partie et de tour</td>
+                                    <td data-label="Données">Notifications système locales</td>
+                                </tr>
+                                <tr>
+                                    <td data-label="Permission"><code>VIBRATE</code></td>
+                                    <td data-label="Usage">Retours haptiques lors des révélations</td>
+                                    <td data-label="Données">Moteur de vibration uniquement</td>
+                                </tr>
+                                <tr>
+                                    <td data-label="Permission"><code>WAKE_LOCK</code></td>
+                                    <td data-label="Usage">Empêche la mise en veille pendant les débats</td>
+                                    <td data-label="Données">Gestionnaire d'alimentation système</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+
+                <article class="policy-block">
+                    <h2><span>05.</span> Protection des Enfants (COPPA)</h2>
+                    <ul>
+                        <li>Lupus Arena est classifié <strong>PEGI 12+</strong> en raison des interactions vocales en direct.</li>
+                        <li>L'application ne cible pas délibérément les enfants de moins de 13 ans.</li>
+                        <li>Toute demande de suppression de données par un parent : <a href="mailto:ghdinteractivestudio@gmail.com" style="color:var(--google-yellow);">ghdinteractivestudio@gmail.com</a></li>
+                    </ul>
+                </article>
+
+                <article class="policy-block">
+                    <h2><span>06.</span> Vos Droits (RGPD &amp; CCPA)</h2>
+                    <p>Vous pouvez demander l'accès, la rectification ou la suppression de vos données à tout moment en écrivant à <a href="mailto:ghdinteractivestudio@gmail.com" style="color:var(--google-yellow);font-weight:700;">ghdinteractivestudio@gmail.com</a>.</p>
+                </article>
+            </section>
+
+            <!-- ── SECTION 4 : SÉCURITÉ DES DONNÉES ─────────── -->
+            <section id="data-safety" class="policy-card" style="margin-bottom:3.5rem;">
+                <div class="policy-header" style="text-align:left;margin-bottom:2rem;">
+                    <div class="policy-badge" style="background:rgba(0,86,145,.15);border-color:rgba(0,86,145,.4);color:#38bdf8;">
+                        🛡️ Fiche Sécurité des Données — Google Play Console
+                    </div>
+                    <h2 class="section-title" style="font-size:2.2rem;color:#fff;">Sécurité des Données (Data Safety)</h2>
+                    <p style="color:var(--text-secondary);margin-top:.5rem;">
+                        Récapitulatif correspondant au questionnaire obligatoire de la Google Play Console.
+                    </p>
+                </div>
+
+                <div class="data-safety-card">
+                    <div class="data-table-responsive">
+                        <table class="data-safety-table">
+                            <thead>
+                                <tr>
+                                    <th>Type de Donnée</th>
+                                    <th>Statut</th>
+                                    <th>Chiffrée ?</th>
+                                    <th>Supprimable ?</th>
+                                    <th>Finalité</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td data-label="Donnée"><strong>Voix (flux direct)</strong><br><small style="color:#94a3b8;">Chat vocal en partie</small></td>
+                                    <td data-label="Statut"><span class="compliance-badge-info">Non stockée</span></td>
+                                    <td data-label="Chiffrée ?"><span class="compliance-badge-ok">✓ Oui</span></td>
+                                    <td data-label="Supprim. ?"><span class="compliance-badge-ok">✓ N/A</span></td>
+                                    <td data-label="Finalité">Fonctionnalité vocale multijoueur</td>
+                                </tr>
+                                <tr>
+                                    <td data-label="Donnée"><strong>Pseudonyme &amp; UUID anonyme</strong></td>
+                                    <td data-label="Statut"><span class="compliance-badge-ok">Collectée</span></td>
+                                    <td data-label="Chiffrée ?"><span class="compliance-badge-ok">✓ Oui</span></td>
+                                    <td data-label="Supprim. ?"><span class="compliance-badge-ok">✓ Oui</span></td>
+                                    <td data-label="Finalité">Gestion des comptes &amp; anti-triche</td>
+                                </tr>
+                                <tr>
+                                    <td data-label="Donnée"><strong>Diagnostics de plantage</strong></td>
+                                    <td data-label="Statut"><span class="compliance-badge-ok">Collectée</span></td>
+                                    <td data-label="Chiffrée ?"><span class="compliance-badge-ok">✓ Oui</span></td>
+                                    <td data-label="Supprim. ?"><span class="compliance-badge-ok">✓ Sous 90 j.</span></td>
+                                    <td data-label="Finalité">Correction de bugs</td>
+                                </tr>
+                                <tr>
+                                    <td data-label="Donnée"><strong>Données financières</strong></td>
+                                    <td data-label="Statut"><span class="compliance-badge-info">Aucune collecte</span></td>
+                                    <td data-label="Chiffrée ?">—</td>
+                                    <td data-label="Supprim. ?">—</td>
+                                    <td data-label="Finalité">Non applicable</td>
+                                </tr>
+                                <tr>
+                                    <td data-label="Donnée"><strong>Localisation GPS</strong></td>
+                                    <td data-label="Statut"><span class="compliance-badge-info">Aucune collecte</span></td>
+                                    <td data-label="Chiffrée ?">—</td>
+                                    <td data-label="Supprim. ?">—</td>
+                                    <td data-label="Finalité">Non applicable</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="compliance-callout" style="margin-top:1.5rem;">
+                    <h4>🔒 Engagements de Sécurité</h4>
+                    <p>✓ Toutes les données transmises sont chiffrées en transit (TLS / HTTPS).<br>
+                    ✓ Lupus Arena fournit un mécanisme documenté de suppression des données, conforme aux exigences Google Play (octobre 2023).</p>
+                </div>
+            </section>
+
+            <!-- ── SECTION 5 : CONDITIONS ────────────────────── -->
+            <section id="terms" class="policy-card" style="margin-bottom:3.5rem;">
+                <div class="policy-header" style="text-align:left;margin-bottom:2rem;">
+                    <div class="policy-badge" style="background:rgba(234,67,53,.15);border-color:rgba(234,67,53,.4);color:var(--google-red);">
+                        📜 Règles de la Communauté &amp; CGU
+                    </div>
+                    <h2 class="section-title" style="font-size:2.2rem;color:#fff;">Conditions Générales &amp; Charte Vocale</h2>
+                    <p style="color:var(--text-secondary);margin-top:.5rem;">
+                        Pour que chaque partie reste une expérience agréable et équitable pour tous.
+                    </p>
+                </div>
+
+                <article class="policy-block">
+                    <h2><span>01.</span> Respect Mutuel — Tolérance Zéro</h2>
+                    <p>Conformément à la politique Google Play sur les contenus générés par les utilisateurs, sont strictement interdits :</p>
+                    <ul>
+                        <li>Propos haineux, discriminatoires ou insultants.</li>
+                        <li>Harcèlement ou menaces envers d'autres joueurs.</li>
+                        <li>Divulgation d'informations personnelles d'autrui (doxxing).</li>
+                        <li>Nuisances sonores intentionnelles pour perturber la partie.</li>
+                    </ul>
+                </article>
+
+                <article class="policy-block">
+                    <h2><span>02.</span> Pouvoirs de l'Hôte</h2>
+                    <ul>
+                        <li>Expulsion d'un joueur toxique du salon.</li>
+                        <li>Mise en sourdine temporaire d'un joueur perturbateur.</li>
+                        <li>Verrouillage du salon par code confidentiel.</li>
+                    </ul>
+                </article>
+
+                <article class="policy-block">
+                    <h2><span>03.</span> Anti-Triche &amp; Fair-Play</h2>
+                    <p>Il est interdit de contourner l'attribution secrète des rôles, de communiquer avec des joueurs éliminés par des canaux externes, ou d'exploiter des failles techniques pour obtenir un avantage déloyal.</p>
+                </article>
+            </section>
+
+            <!-- ── SECTION 6 : SUPPORT ───────────────────────── -->
+            <section id="support" class="policy-card">
+                <div class="policy-header" style="text-align:left;margin-bottom:2rem;">
+                    <div class="policy-badge" style="background:rgba(1,135,95,.15);border-color:rgba(1,135,95,.4);color:#10b981;">
+                        ✉️ Assistance &amp; Contact Officiel
+                    </div>
+                    <h2 class="section-title" style="font-size:2.2rem;color:#fff;">Support Développeur</h2>
+                    <p style="color:var(--text-secondary);margin-top:.5rem;">
+                        Coordonnées officielles pour la fiche Google Play Store de Lupus Arena.
+                    </p>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:1.5rem;margin-bottom:2rem;">
+                    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:1.5rem;">
+                        <h4 style="color:var(--google-yellow);margin-bottom:.5rem;">📧 Contact &amp; Support</h4>
+                        <p style="color:#cbd5e1;font-size:.92rem;line-height:1.7;">
+                            <a href="mailto:ghdinteractivestudio@gmail.com" style="color:#fff;font-weight:700;">ghdinteractivestudio@gmail.com</a><br>
+                            Site officiel : <a href="https://ghdinteractivestudio.github.io/" style="color:#38bdf8;font-weight:600;">ghdinteractivestudio.github.io</a><br>
+                            Support joueurs, signalement, demandes RGPD.<br>
+                            Réponse garantie sous 24h à 48h.
+                        </p>
+                    </div>
+                    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:1.5rem;">
+                        <h4 style="color:var(--play-green);margin-bottom:.5rem;">📱 Informations de l'App</h4>
+                        <p style="color:#cbd5e1;font-size:.92rem;line-height:1.7;">
+                            <strong>Package :</strong> com.ghdinteractivestudio.lupusarena<br>
+                            <strong>Version :</strong> v1.0.1<br>
+                            <strong>Compatibilité :</strong> Android 7.0 (API 24) et supérieur<br>
+                            <strong>Classification :</strong> PEGI 12+
+                        </p>
+                    </div>
+                </div>
+
+                <div style="text-align:center;margin-top:2rem;">
+                    <a href="index.html#contact" class="btn-primary">
+                        <span>Envoyer un message à l'équipe</span>
+                    </a>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-content">
+            <a href="index.html" class="logo">GHD<span>.</span></a>
+            <ul class="footer-links">
+                <li><a href="index.html">Accueil</a></li>
+                <li><a href="applications.html">Nos Applications</a></li>
+                <li><a href="lupus-arena.html">Lupus Arena</a></li>
+                <li><a href="reglementation.html">Réglementation</a></li>
+                <li><a href="index.html#contact">Contact</a></li>
+            </ul>
+            <p class="footer-copy">© 2026 GHD INTERACTIVE STUDIO. Tous droits réservés. Site officiel : <a href="https://ghdinteractivestudio.github.io/" style="color: #38bdf8; text-decoration: none;">ghdinteractivestudio.github.io</a> • Contact : <a href="mailto:ghdinteractivestudio@gmail.com" style="color:#cbd5e1;text-decoration:none;">ghdinteractivestudio@gmail.com</a>
+            </p>
+        </div>
+    </footer>
+
+    <script src="main.js?v=20260928g"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            if (typeof gsap !== 'undefined') {
+                gsap.fromTo(".game-header",  { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.9, delay: 0.3 });
+                gsap.fromTo(".policy-card",  { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.8, stagger: 0.2, delay: 0.5 });
+            }
+        });
+    </script>
+</body>
+</html>

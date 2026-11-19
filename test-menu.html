@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #111; color: white; font-family: sans-serif; }
+nav {
+  position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+  width: 90%; background: rgba(0,0,0,0.8); border-radius: 20px;
+  padding: 1rem 1.5rem; display: flex; justify-content: space-between;
+  align-items: flex-wrap; z-index: 1000;
+}
+.logo { color: white; font-weight: bold; font-size: 1.4rem; }
+.mobile-toggle {
+  display: none; background: transparent; border: none; cursor: pointer;
+  flex-direction: column; gap: 5px; padding: 10px 8px;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.mobile-toggle span {
+  display: block; width: 24px; height: 2.5px; background: white; border-radius: 3px;
+  pointer-events: none;
+}
+.nav-links {
+  list-style: none; display: flex; gap: 1.5rem; align-items: center;
+}
+.nav-links a { color: #ccc; text-decoration: none; }
+#status {
+  margin-top: 120px; padding: 2rem; text-align: center; font-size: 1.2rem;
+  background: #1a1a2e;
+}
+@media (max-width: 768px) {
+  .mobile-toggle { display: flex; }
+  .nav-links {
+    display: none; flex-direction: column; position: absolute;
+    top: calc(100% + 10px); left: 0; right: 0;
+    background: rgba(10,14,24,0.97); border-radius: 16px;
+    padding: 1.5rem; gap: 1rem;
+  }
+  nav.open .nav-links { display: flex; }
+}
+</style>
+</head>
+<body>
+<nav id="mainnav">
+  <span class="logo">GHD.</span>
+  <button class="mobile-toggle" id="btn" onclick="toggle()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+  <ul class="nav-links">
+    <li><a href="#">Accueil</a></li>
+    <li><a href="#">Applications</a></li>
+    <li><a href="#">Contact</a></li>
+  </ul>
+</nav>
+<div id="status">Appuie sur le bouton ☰ pour tester</div>
+<script>
+function toggle() {
+  const nav = document.getElementById('mainnav');
+  nav.classList.toggle('open');
+  document.getElementById('status').textContent = 
+    nav.classList.contains('open') ? '✅ MENU OUVERT' : '❌ MENU FERMÉ';
+}
+</script>
+</body>
+</html>
